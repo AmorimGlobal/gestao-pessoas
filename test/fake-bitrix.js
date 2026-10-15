@@ -1,0 +1,91 @@
+// Bitrix24 em memória, só com os métodos que o provisionamento usa.
+// Responde no mesmo formato da API (result/next), via chamar(metodo, params) -> {dados, proximo}.
+function criarBitrixFalso(opcoes) {
+  const o = opcoes || {};
+  const estado = {
+    tipos: (o.tiposIniciais || []).map((t) => Object.assign({ relations: { parent: [], child: [] } }, t)),
+    categorias: {}, // eti -> [{id, isDefault}]
+    status: [],     // {ID, ENTITY_ID, STATUS_ID, NAME, COLOR, SORT}
+    campos: [],     // {entityId, fieldName, ...}
+    solucoes: [],
+    chamadas: [],
+  };
+  let proxTipo = 50, proxEti = 1200, proxCat = 300, proxStatus = 1, proxSol = 10;
+
+  function paginar(lista, params) {
+    const start = Number(params.start || 0);
+    const pagina = lista.slice(start, start + 50);
+    return { pagina, proximo: start + 50 < lista.length ? start + 50 : null };
+  }
+
+  async function chamar(metodo, params) {
+    params = params || {};
+    estado.chamadas.push({ metodo, params });
+    switch (metodo) {
+      case "crm.type.list": {
+        const { pagina, proximo } = paginar(estado.tipos, params);
+        return { dados: { types: pagina }, proximo };
+      }
+      case "crm.type.add": {
+        const f = params.fields;
+        const t = { id: proxTipo++, entityTypeId: proxEti, title: f.title, relations: f.relations };
+        proxEti += 2;
+        estado.tipos.push(t);
+        const cat = { id: proxCat++, isDefault: "Y" };
+        estado.categorias[t.entityTypeId] = [cat];
+        ["NEW", "PREPARATION", "CLIENT", "SUCCESS", "FAIL"].forEach((cod, i) => estado.status.push({
+          ID: proxStatus++, ENTITY_ID: "DYNAMIC_" + t.entityTypeId + "_STAGE_" + cat.id,
+          STATUS_ID: "DT" + t.entityTypeId + "_" + cat.id + ":" + cod, NAME: cod, COLOR: "#000000", SORT: (i + 1) * 10,
+        }));
+        return { dados: { type: t }, proximo: null };
+      }
+      case "crm.type.update": {
+        const t = estado.tipos.find((x) => x.id === params.id);
+        if (params.fields.relations) t.relations = params.fields.relations;
+        return { dados: { type: t }, proximo: null };
+      }
+      case "crm.category.list":
+        return { dados: { categories: estado.categorias[params.entityTypeId] || [] }, proximo: null };
+      case "crm.status.list": {
+        const lista = estado.status.filter((s) => s.ENTITY_ID === params.filter.ENTITY_ID).sort((a, b) => a.SORT - b.SORT);
+        return { dados: lista, proximo: null };
+      }
+      case "crm.status.add": {
+        const s = Object.assign({ ID: proxStatus++ }, params.fields);
+        estado.status.push(s);
+        return { dados: s.ID, proximo: null };
+      }
+      case "crm.status.update": {
+        Object.assign(estado.status.find((s) => s.ID === params.id), params.fields);
+        return { dados: true, proximo: null };
+      }
+      case "crm.status.delete":
+        estado.status = estado.status.filter((s) => s.ID !== params.id);
+        return { dados: true, proximo: null };
+      case "userfieldconfig.list": {
+        const lista = estado.campos.filter((f) => f.entityId === params.filter.entityId);
+        const { pagina, proximo } = paginar(lista, params);
+        return { dados: { fields: pagina }, proximo };
+      }
+      case "userfieldconfig.add":
+        if (o.semEscopoCampos) throw new Error("insufficient_scope");
+        estado.campos.push(Object.assign({}, params.field));
+        return { dados: { field: params.field }, proximo: null };
+      case "crm.automatedsolution.list":
+        return { dados: { automatedSolutions: estado.solucoes }, proximo: null };
+      case "crm.automatedsolution.add": {
+        const s = { id: proxSol++, title: params.fields.title, typeIds: params.fields.typeIds.slice() };
+        estado.solucoes.push(s);
+        return { dados: { automatedSolution: s }, proximo: null };
+      }
+      case "crm.automatedsolution.update": {
+        Object.assign(estado.solucoes.find((s) => s.id === params.id), params.fields);
+        return { dados: true, proximo: null };
+      }
+      default:
+        throw new Error("método não simulado: " + metodo);
+    }
+  }
+  return { chamar, estado };
+}
+module.exports = { criarBitrixFalso };
