@@ -8,5 +8,5 @@
     "test": "node --test test/*.test.js",
     "provisionar": "node tools/provisionar.js"
   },
-  "engines": { "node": ">=18" }
+  "engines": { "node": "22.x" }
 }

@@ -2,6 +2,7 @@
 /* Junta src/ numa página única e gera o handler da Vercel.
      dist/index.html  — a página inteira (abra no navegador para a demonstração)
      api/app.js       — função serverless que devolve a página (o Bitrix chama por POST)
+     public/robots.txt — saída estática da Vercel (sem index.html, ver abaixo)
    Rode depois de qualquer mudança em src/:  node build.js */
 "use strict";
 const fs = require("fs");
@@ -33,4 +34,10 @@ const handler = "// GERADO por build.js a partir de src/. Não edite à mão.\n"
   "};\n";
 fs.mkdirSync(path.join(raiz, "api"), { recursive: true });
 fs.writeFileSync(path.join(raiz, "api", "app.js"), handler);
+
+// Pasta de saída estática da Vercel: de propósito SEM index.html. A página precisa
+// sair da função (o Bitrix abre com POST, e arquivo estático recusa POST), então
+// toda rota cai no rewrite para /api/app (vercel.json).
+fs.mkdirSync(path.join(raiz, "public"), { recursive: true });
+fs.writeFileSync(path.join(raiz, "public", "robots.txt"), "User-agent: *\nDisallow: /\n");
 console.log("dist/index.html e api/app.js gerados (" + arquivosJs.length + " módulos, " + Math.round(html.length / 1024) + " KB).");
