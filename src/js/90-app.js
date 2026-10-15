@@ -18,7 +18,7 @@
     feriadosLocais: { SP: [], BA: [] },
     links: {
       manual: "https://drive.google.com/file/d/1fZNxcYlnxcGshaoWlYZ9pjLljZOVkqcL/view",
-      formVaga: "https://amorimglobal.bitrix24.com.br/pub/form.php?view=frame&form_id=259&sec=fctuf6",
+      formVaga: "https://b24-ljukko.bitrix24.site/crm_form_4nlpe/",
     },
     parametros: { carencia1a1: 7, prazoLeitura: 7 },
     recrutamento: { categoria: 77 },

@@ -13,7 +13,7 @@
 
   const LINKS = [
     ["manual", "Manual da liderança", "Faixa no topo do Início e item do menu."],
-    ["formVaga", "Formulário de solicitação de vaga", "Formulário CRM 259 (funil HR | Requisição de Vagas)."],
+    ["formVaga", "Formulário de solicitação de vaga", "Solicitação de Contratação (formulário CRM 259, funil HR | Requisição de Vagas)."],
     ["formEncerramento", "Formulário de solicitação de encerramento", "Opcional: o app já tem a solicitação com verificação."],
     ["baseConhecimento", "Base de Conhecimento", "Guias de apoio às lideranças."],
     ["guiaOnboarding", "Guia do onboarding", "Link na aba Onboarding."],
