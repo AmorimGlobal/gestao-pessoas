@@ -203,7 +203,15 @@
     const perto = mapa.reduce((acc, l) => acc.concat(l.atrasos.filter((a) => a.atrasoDias >= 7 && a.atrasoDias <= 13)), []);
     const planos = mapa.reduce((acc, l) => acc.concat(l.equipe.map((m) => dom.planoAtivoDo(ctx, m.id)).filter(Boolean)), []);
     const cartao = (t, n, nota, alerta, rota) => '<a class="card" href="' + rota + '" style="display:block;text-decoration:none;color:inherit;' + (alerta ? "border-left:4px solid var(--ambar)" : "") + '"><div class="muted" style="font-size:12px">' + t + '</div><div class="num" style="font-size:26px;font-weight:800;color:var(--navy)">' + n + '</div><div class="muted" style="font-size:12px">' + nota + "</div></a>";
-    let h = abas + faixa("Meu setor", "Lideranças do seu departamento", null) +
+    const membrosSetor = mapa.reduce((n, l) => n + l.tamanho, 0);
+    const atrasosSetor = mapa.reduce((n, l) => n + l.atrasos.length, 0);
+    const emDia = mapa.filter((l) => l.ind.situacao.chave === "em-dia").length;
+    let h = abas + faixa("Meu setor", "Lideranças do seu departamento", [
+      { valor: mapa.length, rotulo: mapa.length === 1 ? "liderança" : "lideranças" },
+      { valor: membrosSetor, rotulo: "membros no setor" },
+      { valor: atrasosSetor, rotulo: atrasosSetor === 1 ? "item atrasado" : "itens atrasados", alerta: atrasosSetor > 0 },
+      { valor: emDia + " de " + mapa.length, rotulo: "equipes em dia" },
+    ]) +
       '<div class="grade c3" style="margin-bottom:16px">' +
       cartao("Suas aprovações", aprov.length, aprov.length ? "a mais antiga há " + Math.max.apply(null, aprov.map((a) => a.dias)) + " dias (prazo de 3)" : "nenhuma aguardando", aprov.some((a) => a.dias > 3), "#/offboarding") +
       cartao("Perto do aviso de 14 dias", perto.length, perto.length ? "aviso a partir de " + calc.fmtData(perto.map((p) => p.avisoCoordenacao).sort()[0]) : "nenhum item com 7 a 13 dias de atraso", perto.length > 0, "#/painel/setor") +
