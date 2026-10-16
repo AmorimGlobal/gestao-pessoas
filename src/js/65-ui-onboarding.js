@@ -89,7 +89,8 @@
       return '<div class="card' + (a.atrasado ? " acao vermelho" : "") + '"><h3 style="font-size:13.5px">' + esc(a.rotulo) + '<span class="extra muted">Dia ' + a.dia + "</span></h3>" +
         '<div class="muted" style="font-size:12px">' + esc(a.fase) + " · " + calc.fmtDataAno(a.data) + "</div>" +
         '<div style="margin:10px 0"><span class="num" style="font-size:22px;font-weight:800;color:var(--navy)">' + (a.nota === null ? "—" : a.nota) + '</span> <span class="muted">/ patamar ' + (a.patamar === undefined ? "—" : a.patamar) + "</span></div>" +
-        (a.resultado ? c.tag(a.resultado, COR_RESULTADO[a.resultado]) : '<span class="muted" style="font-size:12px">' + (a.leituras.length ? "" : "sem leituras ainda") + "</span>") +
+        (a.resultado ? c.tag((a.registrado ? "" : "Prévia: ") + a.resultado, COR_RESULTADO[a.resultado]) : '<span class="muted" style="font-size:12px">' + (a.leituras.length ? "" : "sem leituras ainda") + "</span>") +
+        (!a.registrado && a.nota !== null ? '<div class="muted" style="font-size:11.5px;margin-top:4px">Prévia com as leituras feitas até agora.</div>' : "") +
         '<div class="muted" style="font-size:12px;margin-top:8px">' + plural(a.leituras.length, "entrega", "entregas") + (a.pendentesLeitura ? " · " + a.pendentesLeitura + " aguardando leitura" : "") + (a.fora ? " · " + a.fora + " fora do padrão" : "") + "</div>" +
         (a.registrado ? '<div class="muted" style="font-size:12px;margin-top:6px">Registrado em ' + calc.fmtData(a.dataRegistro) + "</div>" : "") +
         (pode ? '<div style="margin-top:12px">' + (a.atrasado ? c.prazo(a.data) + "<br>" : "") + '<button class="btn peq" data-acao="registrar-alinhamento" data-id="' + esc(o.id) + '" data-n="' + a.numero + '"' + (a.pendentesLeitura ? ' disabled title="Leia as entregas da fase primeiro"' : "") + ">Registrar o alinhamento</button></div>" : "") + "</div>";

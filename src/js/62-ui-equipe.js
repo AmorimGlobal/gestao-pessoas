@@ -87,10 +87,12 @@
   }
 
   /* ================================================================ CARD DO MEMBRO */
+  /** Nome da lista de onde a pessoa veio, para o "voltar" */
+  function rotuloEquipe() { return E().visao === "rh" ? "Todas as equipes" : "Minha equipe"; }
   ui.rotas.membro = function (partes) {
     const ctx = E().ctx;
     const m0 = ctx.idx.membro[partes[0]];
-    if (!m0) return c.voltar("#/equipe", "Minha equipe") + '<div class="card">' + c.vazio("Membro não encontrado ou fora da sua visão.") + "</div>";
+    if (!m0) return c.voltar("#/equipe", rotuloEquipe()) + '<div class="card">' + c.vazio("Membro não encontrado ou fora da sua visão.") + "</div>";
     const m = dom.infoMembro(ctx, m0);
     const aba = partes[1] || "resumo";
     if (aba === "dossie") return dossie(m);
@@ -105,7 +107,7 @@
       (cic && !cic.data1a1 && m.estagio === "ATIVO" ? '<button class="btn sec" data-acao="agendar-1a1" data-id="' + esc(cic.id) + '">' + icone("calendario", 15) + " Agendar 1:1</button>" : "") +
       '<a class="btn sec" href="#/membro/' + esc(m.id) + '/dossie">Dossiê em PDF</a>' +
       (E().visao === "rh" || E().eu.admin ? '<button class="btn sec" data-acao="editar-membro" data-id="' + esc(m.id) + '">Editar cadastro</button>' : "");
-    let h = c.voltar("#/equipe", "Minha equipe") +
+    let h = c.voltar("#/equipe", rotuloEquipe()) +
       '<div class="card"><div class="ficha-topo">' + c.avatar(m, 64) + '<div class="info"><div class="nome-grande">' + esc(m.nome) + "</div>" +
       '<div class="muted">' + esc(m.funcao || m.cargo || "") + "</div><div style=\"margin-top:6px;display:flex;gap:6px;flex-wrap:wrap\">" + c.tag(ROTULO_ESTAGIO_MEMBRO[m.estagio] || m.estagioNome, COR_ESTAGIO_MEMBRO[m.estagio]) +
       (m.ingresso ? c.tag("Na Amorim desde " + calc.fmtDataAno(m.ingresso), "cinza") : "") + "</div></div>" +
