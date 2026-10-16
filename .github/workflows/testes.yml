@@ -1,0 +1,22 @@
+# Roda os testes a cada push e confere se api/app.js foi regerado depois de mexer em src/.
+name: testes
+on:
+  push:
+  pull_request:
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Testes (cálculo, provisionamento e regras de negócio)
+        run: node --test test/*.test.js
+      - name: api/app.js em dia com src/
+        run: |
+          node build.js
+          if ! git diff --quiet -- api/app.js; then
+            echo "::error::api/app.js está desatualizado. Rode 'node build.js' e commite o resultado."
+            exit 1
+          fi
