@@ -10,6 +10,13 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
 
 - **Dados:** 9 processos inteligentes nativos ("Gestão de Pessoas · Membros", "· Feedbacks SCI", "· Ciclo trimestral", "· Planos de alinhamento de resultados", "· Encerramentos de contrato", "· Onboarding", "· Leituras de entrega", "· Planejamento da função", "· Avaliações de finalistas"), agrupados na solução automatizada "Gestão de Pessoas". As vagas vêm do funil de negócios **HR | Requisição de Vagas (categoria 77)**.
 - **Interface:** uma página única (HTML, CSS e JS sem framework), servida por uma função da Vercel. Toda chamada ao Bitrix sai do **navegador** por `BX24.callMethod`, com o login de quem abriu o app. Por isso as funções de acesso do CRM (2.4) valem sozinhas: a liderança só recebe os itens do departamento que chefia. É o mesmo padrão do `widget-rotina-contabil`.
+- **Servidor (só o que o navegador não pode fazer), em `api/` + `lib/`, pelo webhook de entrada:**
+  - `api/sincronizar.js` (cron 6h): Membros acompanha a estrutura da empresa.
+  - `api/avisos.js` (cron 8h): avisos da 4.4.
+  - `api/eventos.js`: webhook de saída do Bitrix, para a trava do encerramento (4.1).
+  - `api/painel.js`: números da CEO, que não tem leitura nos processos.
+  
+  Todos calculam com as mesmas regras do navegador (`src/js/50-dominio.js`, `35-registros.js`). Variáveis e passo a passo: `docs/configuracao-bitrix.md`.
 - **Fora do Bitrix** (página aberta direto no navegador, ou `?demo=1`) o app roda em **demonstração**, com os 6 casos do protótipo e hoje = 08/10/2026. Os parâmetros são `?papel=lideranca|coordenacao|rh|ceo`, `?hoje=AAAA-MM-DD` e `?tour=0`.
 
 ## Estrutura
@@ -22,18 +29,24 @@ src/js/05-marca.js    logos da Amorim em base64 (copiados do app Inovação). N�
 src/js/10-calc.js     regras de cálculo da 4.5 (datas, Dia N, dia útil, %, notas, situação)  [Node + navegador]
 src/js/20-schema.js   ESQUEMA: processos, estágios (com cor) e campos — fonte única           [Node + navegador]
 src/js/30-provision.js cria/completa a estrutura no Bitrix (idempotente, com simulação)      [Node + navegador]
-src/js/40-bitrix.js   repositório Bitrix (BX24): conversão ufCrm<id>… <-> objeto, paginação, lote
+src/js/35-registros.js conversão item do Bitrix (ufCrm<id>…, stageId, parentId) <-> objeto do app; descoberta pelo título [Node + navegador]
+src/js/40-bitrix.js   repositório Bitrix (BX24): paginação, lote, pessoas, agenda, vagas, painel da CEO (fetch /api/painel)
 src/js/45-demo.js     repositório de demonstração (mesma interface) + dados dos 6 casos     [Node + navegador]
 src/js/55-sync.js     sincronização com a estrutura da empresa: entradas, mudanças de liderança e saídas  [Node + navegador]
-lib/sincronizacao-servidor.js  a mesma sincronização no servidor, por webhook
-api/sincronizar.js    rotina diária da Vercel (cron em vercel.json; variáveis em docs/configuracao-bitrix.md)
+lib/bitrix-servidor.js  webhook de entrada: chamar/paginar, abrirPortal (listar/obter/criar/atualizar/comentar/notificar), vagas, token da sessão
+lib/contexto-servidor.js o mesmo ctx da tela, montado no servidor
+lib/sincronizacao-servidor.js  a sincronização no servidor
+lib/trava-encerramento.js  trava do encerramento (4.1): decidir() puro + tratar()
+lib/avisos.js         avisos da 4.4: planejar() puro (marcos cruzados desde o dia útil anterior) + enviar()
+api/sincronizar.js, api/avisos.js, api/eventos.js, api/painel.js  funções da Vercel (escritas à mão; crons em vercel.json)
 src/js/50-dominio.js  regras de negócio puras: papéis, equipe, pendências, indicadores, verificação do encerramento, agenda, dicas  [Node + navegador]
 src/js/60-ui-base.js  estado, rotas (hash), layout, componentes, painel lateral, eventos
 src/js/61..70-ui-*.js telas: início/painel, equipe/card do membro, rotinas, desempenho, onboarding, offboarding, recrutamento, agenda, configuração
 src/js/90-app.js      inicialização (Bitrix ou demonstração)
 build.js              junta tudo em dist/index.html e gera api/app.js
 tools/provisionar.js  CLI de provisionamento por webhook (crm + userfieldconfig)
-test/                 node --test: calc, provisionamento (Bitrix falso em memória), domínio (dados da demonstração)
+test/                 node --test: calc, provisionamento, domínio, sincronização, trava, avisos, painel, repositório do navegador (vm + BX24 falso).
+                      test/fake-bitrix.js é o portal em memória: provisiona e depois guarda itens, comentários, avisos e usuários
 docs/                 configuração manual no Bitrix e tabela 2.7 / validações 6.2
 ```
 
@@ -41,7 +54,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 41 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 78 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -65,6 +78,14 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
 - **`build.js` compila o JS (`new Function`) antes de gravar**: um erro de sintaxe derruba o build, e a Vercel mantém a versão anterior no ar.
 - **Mudou o esquema?** Altere `20-schema.js`, rode os testes, rode o provisionamento (simulação primeiro) e reconstrua.
 
-## Estado (15/10/2026)
+## Estado (20/10/2026)
 
-Implementado e testado em demonstração (41 testes de unidade, 38 rotas × 4 papéis sem erro, 21 fluxos de gravação clicando na interface, teste de injeção de HTML em todas as telas e formulários sem nenhum elemento injetado). **Ainda não rodou contra o portal real**: a estrutura não foi criada, e o webhook do `webflow-btrix-api` só tem os escopos `crm` e `task`. O provisionamento em modo simulação foi validado contra o portal (só leitura): ele criaria 9 processos, 49 estágios, 157 campos e 1 solução automatizada. Pendências e riscos: `docs/tabela-2.7-e-validacoes.md`.
+- **Portal:** a estrutura foi criada no portal (9 processos, solução automatizada id 3). A 1ª execução recusou 10 estágios e 1 campo. A correção (`895d35c`) está no ar e falta rodar de novo: **Configuração → Simular** (deve mostrar cerca de `crm.status.add` 10 e `userfieldconfig.add` 1) e depois **Criar ou completar**.
+- **Feito e testado em demonstração e no Bitrix falso:**
+  - sincronização com a estrutura;
+  - trava do encerramento no servidor;
+  - avisos da 4.4;
+  - painel da CEO pelo servidor.
+- **Falta ligar na Vercel:** as variáveis da seção 3 de `docs/configuracao-bitrix.md` (`BITRIX_WEBHOOK_URL`, `CRON_SECRET`, `GP_AVISAR_IDS`, `GP_EXCECOES_IDS`, `GP_CEO_IDS`, `BITRIX_EVENTO_TOKEN`, `GP_LINK_APP`) e o webhook de saída. Sem elas, `/api/*` responde 503.
+- **Aguardando o RH (Luciele):** a confirmação da arquitetura, as decisões da 6.1 (níveis, feriados locais, links, modelos SCI, critérios de situação) e a pergunta da 6.3 para Operações.
+- **Pendências e riscos:** `docs/tabela-2.7-e-validacoes.md`.

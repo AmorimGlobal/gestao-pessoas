@@ -40,7 +40,10 @@ Há duas formas, e as duas usam o mesmo código (`src/js/30-provision.js`). As d
 
 O que é criado:
 
-- **9 processos inteligentes** com relação pai/filho com "Membros". A relação faz feedbacks, ciclos, planos, encerramentos, onboarding e leituras aparecerem como abas no card nativo do membro. As avaliações de finalistas ficam ligadas ao negócio da vaga.
+- **9 processos inteligentes** com relação pai/filho com "Membros". A relação liga feedbacks, ciclos, planos, encerramentos, onboarding e leituras ao membro. As avaliações de finalistas ficam ligadas ao negócio da vaga.
+  - **Abas no card nativo:** no portal, a relação foi gravada com "mostrar no card" desligado, mesmo com o app pedindo para ligar (`isChildrenListEnabled`). O app não depende disso, porque mostra tudo no card do membro dele. Para ver as abas também no CRM, ligue à mão:
+    1. Abra CRM → Processos inteligentes → "Gestão de Pessoas · Membros" → Editar → Relações.
+    2. Em cada processo filho, marque a opção de exibir a lista no card.
 - **Estágios com cor**: amarelo espera ação, vermelho é atraso, azul é andamento, verde é concluído.
 - **Os campos de cada processo**, com texto de ajuda.
 - **A solução automatizada "Gestão de Pessoas"** no menu lateral.
