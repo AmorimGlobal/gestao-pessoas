@@ -70,6 +70,19 @@
       if (metodo === "crm.automatedsolution.add") return { automatedSolution: { id: "novo" + seq } };
       return true;
     }
+    // Uma falha pontual (um campo, um estágio) fica registrada e o resto continua: rodar de
+    // novo completa o que faltou. Falta de permissão ou sessão vencida param tudo na hora.
+    const falhas = [];
+    const SISTEMICO = /insufficient_scope|ACCESS_DENIED|expired_token|invalid_token|NO_AUTH_FOUND|QUERY_LIMIT/i;
+    function registrarFalha(desc, e) {
+      const msg = (e && e.message) || String(e);
+      if (SISTEMICO.test(msg)) throw e;
+      falhas.push(desc + ": " + msg);
+      log("  FALHOU " + desc + ": " + msg);
+    }
+    async function tentar(desc, fn) {
+      try { return await fn(); } catch (e) { registrarFalha(desc, e); return null; }
+    }
     async function listarTodos(metodo, params, extrair) {
       const itens = [];
       let start = 0;
@@ -94,6 +107,7 @@
     // membros primeiro: os outros são filhos dele
     const ordem = schema.PROCESSOS.slice().sort((a, b) => (a.pai === null ? -1 : 0) - (b.pai === null ? -1 : 0));
     for (const p of ordem) {
+     try {
       const titulo = schema.tituloProcesso(p);
       const anterior = configAnterior.processos && configAnterior.processos[p.chave];
       let tipo = (anterior && porEntity[String(anterior.entityTypeId)]) || porTitulo[titulo];
@@ -124,10 +138,10 @@
         const temPai = !paiEti || (rel.parent || []).some((x) => String(x.entityTypeId) === String(paiEti));
         if (!temPai) {
           log("  ligando ao processo pai (entityTypeId " + paiEti + ")");
-          await chamar("crm.type.update", {
+          await tentar("ligação de " + p.nome + " ao processo pai", () => chamar("crm.type.update", {
             id: tipo.id,
             fields: { relations: { parent: (rel.parent || []).concat(relPai), child: rel.child || [] } },
-          });
+          }));
         }
       }
 
@@ -151,17 +165,17 @@
         const atual = estagiosAtuais.find((s) => codigoDoEstagio(s.STATUS_ID) === e.codigo);
         if (atual) {
           if (atual.NAME !== e.nome || String(atual.COLOR || "").toUpperCase() !== e.cor.toUpperCase() || Number(atual.SORT) !== sort) {
-            await chamar("crm.status.update", { id: atual.ID, fields: { NAME: e.nome, COLOR: e.cor, SORT: sort } });
+            await tentar("estágio \"" + e.nome + "\" de " + p.nome, () => chamar("crm.status.update", { id: atual.ID, fields: { NAME: e.nome, COLOR: e.cor, SORT: sort } }));
           }
         } else {
-          await chamar("crm.status.add", { fields: { ENTITY_ID: entityStage, STATUS_ID: prefixo + ":" + e.codigo, NAME: e.nome, COLOR: e.cor, SORT: sort } });
+          await tentar("estágio \"" + e.nome + "\" de " + p.nome, () => chamar("crm.status.add", { fields: { ENTITY_ID: entityStage, STATUS_ID: prefixo + ":" + e.codigo, NAME: e.nome, COLOR: e.cor, SORT: sort } }));
         }
       }
       if (criadoAgora) {
         for (const s of estagiosAtuais) {
           const cod = codigoDoEstagio(s.STATUS_ID);
           if (ESTAGIOS_PADRAO_DESCARTAVEIS.indexOf(cod) >= 0 && !p.estagios.some((e) => e.codigo === cod)) {
-            await chamar("crm.status.delete", { id: s.ID });
+            await tentar("remover o estágio padrão " + cod + " de " + p.nome, () => chamar("crm.status.delete", { id: s.ID }));
           }
         }
       }
@@ -176,14 +190,14 @@
       const camposAtuais = (simular && criadoAgora) ? [] : await listarTodos(
         "userfieldconfig.list", { moduleId: "crm", filter: { entityId: "CRM_" + typeId } }, (d) => d && d.fields);
       const existentes = new Set(camposAtuais.map((f) => String(f.fieldName).toUpperCase()));
-      let criados = 0;
+      let criados = 0, jaExistiam = 0, falharam = 0;
       for (let i = 0; i < p.campos.length; i++) {
         const campo = p.campos[i];
-        if (existentes.has(schema.nomeCampo(typeId, campo.sufixo))) continue;
-        await chamar("userfieldconfig.add", payloadCampo(typeId, campo, i));
-        criados++;
+        if (existentes.has(schema.nomeCampo(typeId, campo.sufixo))) { jaExistiam++; continue; }
+        const r = await tentar("campo \"" + campo.rotulo + "\" de " + p.nome, () => chamar("userfieldconfig.add", payloadCampo(typeId, campo, i)));
+        if (r) criados++; else falharam++;
       }
-      log("  campos: " + (p.campos.length - criados) + " já existiam, " + criados + (simular ? " seriam criados" : " criados"));
+      log("  campos: " + jaExistiam + " já existiam, " + criados + (simular ? " seriam criados" : " criados") + (falharam ? ", " + falharam + " falharam" : ""));
 
       const campos = {};
       p.campos.forEach((campo) => { campos[campo.chave] = schema.codigoCampo(typeId, campo.sufixo); });
@@ -192,27 +206,36 @@
         campoPai: paiEti ? "parentId" + paiEti : null,
         estagios, campos,
       };
+     } catch (e) {
+      // Sem o processo Membros, os outros não têm a quem se ligar: para tudo.
+      if (p.chave === "membros") throw e;
+      registrarFalha("processo " + p.nome, e);
+     }
     }
 
     /* 5. solução automatizada "Gestão de Pessoas" (menu lateral) */
-    const typeIds = schema.PROCESSOS.map((p) => config.processos[p.chave].typeId);
-    const solucoes = await listarTodos("crm.automatedsolution.list", {}, (d) => d && d.automatedSolutions);
-    const solucao = solucoes.find((s) => s.title === schema.SOLUCAO);
-    if (!solucao) {
-      log("Criando a solução automatizada " + schema.SOLUCAO);
-      const r = await chamar("crm.automatedsolution.add", { fields: { title: schema.SOLUCAO, typeIds } });
-      config.solucaoId = r.dados && r.dados.automatedSolution ? r.dados.automatedSolution.id : null;
-    } else {
-      config.solucaoId = solucao.id;
-      const atuais = (solucao.typeIds || []).map(String);
-      const faltam = typeIds.filter((id) => atuais.indexOf(String(id)) < 0);
-      if (faltam.length) {
-        log("Incluindo " + faltam.length + " processo(s) na solução automatizada");
-        await chamar("crm.automatedsolution.update", { id: solucao.id, fields: { typeIds: atuais.concat(faltam.map(String)) } });
+    const typeIds = schema.PROCESSOS.filter((p) => config.processos[p.chave]).map((p) => config.processos[p.chave].typeId);
+    await tentar("solução automatizada " + schema.SOLUCAO, async () => {
+      const solucoes = await listarTodos("crm.automatedsolution.list", {}, (d) => d && d.automatedSolutions);
+      const solucao = solucoes.find((s) => s.title === schema.SOLUCAO);
+      if (!solucao) {
+        log("Criando a solução automatizada " + schema.SOLUCAO);
+        const r = await chamar("crm.automatedsolution.add", { fields: { title: schema.SOLUCAO, typeIds } });
+        config.solucaoId = r.dados && r.dados.automatedSolution ? r.dados.automatedSolution.id : null;
+      } else {
+        config.solucaoId = solucao.id;
+        const atuais = (solucao.typeIds || []).map(String);
+        const faltam = typeIds.filter((id) => atuais.indexOf(String(id)) < 0);
+        if (faltam.length) {
+          log("Incluindo " + faltam.length + " processo(s) na solução automatizada");
+          await chamar("crm.automatedsolution.update", { id: solucao.id, fields: { typeIds: atuais.concat(faltam.map(String)) } });
+        }
       }
-    }
+      return true;
+    });
 
-    return { config, relatorio };
+    if (falhas.length) log("\n" + falhas.length + " item(ns) não foram criados. Rode de novo para tentar completar; o que já existe não é recriado.");
+    return { config, relatorio, falhas };
   }
 
   return { provisionar, payloadCampo, codigoDoEstagio, TIPO_UF };

@@ -92,3 +92,46 @@ test("códigos camelCase iguais aos do portal", () => {
     assert.equal(new Set(k).size, k.length, "chave repetida em " + p.chave);
   }
 });
+
+/* ---------- falhas pontuais não derrubam o resto (a API real pode recusar algo) ---------- */
+const totalCampos = schema.PROCESSOS.reduce((s, p) => s + p.campos.length, 0);
+
+test("estágio padrão que não pode ser apagado: registra e segue", async () => {
+  const bx = criarBitrixFalso({ falharSe: (m) => m === "crm.status.delete" && "estágio do sistema" });
+  const r = await provisionar({ chamar: bx.chamar });
+  assert.equal(r.falhas.length, schema.PROCESSOS.length * 2); // PREPARATION e CLIENT de cada processo
+  assert.equal(bx.estado.campos.length, totalCampos);
+  assert.equal(Object.keys(r.config.processos).length, schema.PROCESSOS.length);
+  assert.equal(bx.estado.solucoes.length, 1);
+});
+
+test("campo recusado: os outros são criados e a segunda execução completa", async () => {
+  let recusar = true;
+  const bx = criarBitrixFalso({ falharSe: (m, p) => recusar && m === "userfieldconfig.add" && p.field.userTypeId === "double" && "tipo inválido" });
+  const r1 = await provisionar({ chamar: bx.chamar });
+  const numericos = schema.PROCESSOS.reduce((s, p) => s + p.campos.filter((c) => c.tipo === "numero").length, 0);
+  assert.ok(numericos > 0);
+  assert.equal(r1.falhas.length, numericos);
+  assert.equal(bx.estado.campos.length, totalCampos - numericos);
+  recusar = false;
+  const r2 = await provisionar({ chamar: bx.chamar, configAtual: r1.config });
+  assert.equal(r2.falhas.length, 0);
+  assert.equal(bx.estado.campos.length, totalCampos);
+  assert.equal(r2.relatorio.filter((x) => x.metodo === "userfieldconfig.add").length, numericos);
+});
+
+test("processo filho recusado: os demais seguem; Membros recusado: para tudo", async () => {
+  const bx = criarBitrixFalso({ falharSe: (m, p) => m === "crm.type.add" && /Onboarding/.test(p.fields.title) && "limite de processos" });
+  const r = await provisionar({ chamar: bx.chamar });
+  assert.equal(r.falhas.length, 1);
+  assert.ok(!r.config.processos.onboarding);
+  assert.equal(Object.keys(r.config.processos).length, schema.PROCESSOS.length - 1);
+  const bx2 = criarBitrixFalso({ falharSe: (m, p) => m === "crm.type.add" && /Membros/.test(p.fields.title) && "limite de processos" });
+  await assert.rejects(provisionar({ chamar: bx2.chamar }), /limite de processos/);
+});
+
+test("falta de permissão no meio para tudo na hora (não vira 157 falhas)", async () => {
+  const bx = criarBitrixFalso({ falharSe: (m) => m === "userfieldconfig.add" && "ACCESS_DENIED" });
+  await assert.rejects(provisionar({ chamar: bx.chamar }), /ACCESS_DENIED/);
+  assert.equal(bx.estado.chamadas.filter((c) => c.metodo === "userfieldconfig.add").length, 1);
+});

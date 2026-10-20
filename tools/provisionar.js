@@ -56,15 +56,19 @@ function criarChamada(webhook) {
   const configAtual = a.config ? JSON.parse(fs.readFileSync(a.config, "utf8")) : undefined;
   console.log(a.simular ? "SIMULAÇÃO — nada será gravado no portal.\n" : "Gravando no portal.\n");
   try {
-    const { config, relatorio } = await provisionar({
+    const { config, relatorio, falhas } = await provisionar({
       chamar: criarChamada(a.webhook), simular: a.simular, configAtual, log: (m) => console.log(m),
     });
     const porMetodo = {};
     relatorio.forEach((r) => { porMetodo[r.metodo] = (porMetodo[r.metodo] || 0) + 1; });
-    console.log("\nAlterações " + (a.simular ? "que seriam feitas" : "feitas") + ":", Object.keys(porMetodo).length ? porMetodo : "nenhuma");
+    console.log("\nGravações " + (a.simular ? "que seriam feitas" : "enviadas") + ":", Object.keys(porMetodo).length ? porMetodo : "nenhuma");
     if (a.saida) {
       fs.writeFileSync(a.saida, JSON.stringify(config, null, 2));
       console.log("Configuração gravada em " + a.saida + ". Importe-a na tela Configuração do app.");
+    }
+    if (falhas && falhas.length) {
+      console.error("\n" + falhas.length + " item(ns) não foram criados:\n- " + falhas.join("\n- ") + "\nRode de novo para completar.");
+      process.exit(1);
     }
   } catch (e) {
     console.error("\nFALHOU: " + e.message);

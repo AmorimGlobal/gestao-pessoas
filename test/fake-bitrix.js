@@ -21,6 +21,9 @@ function criarBitrixFalso(opcoes) {
   async function chamar(metodo, params) {
     params = params || {};
     estado.chamadas.push({ metodo, params });
+    // o.falharSe(metodo, params) -> mensagem de erro para simular uma recusa da API
+    const recusa = o.falharSe && o.falharSe(metodo, params);
+    if (recusa) throw new Error(metodo + ": " + recusa);
     switch (metodo) {
       case "crm.type.list": {
         const { pagina, proximo } = paginar(estado.tipos, params);

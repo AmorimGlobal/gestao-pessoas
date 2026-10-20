@@ -112,12 +112,18 @@
       const r = await E().repo.provisionar(simular, (m) => { log.textContent += m + "\n"; log.scrollTop = log.scrollHeight; });
       const porMetodo = {};
       r.relatorio.forEach((x) => { porMetodo[x.metodo] = (porMetodo[x.metodo] || 0) + 1; });
-      log.textContent += "\n" + (simular ? "Seria feito: " : "Feito: ") + (Object.keys(porMetodo).length ? JSON.stringify(porMetodo) : "nada (estrutura completa)") + "\n";
+      log.textContent += "\n" + (simular ? "Seria feito: " : "Gravações enviadas: ") + (Object.keys(porMetodo).length ? JSON.stringify(porMetodo) : "nada (estrutura completa)") + "\n";
+      const falhas = r.falhas || [];
+      if (falhas.length) {
+        log.textContent += "\nATENÇÃO: " + falhas.length + " item(ns) não foram criados:\n- " + falhas.join("\n- ") +
+          "\nClique em \"Criar ou completar a estrutura\" de novo: o que já existe não é recriado. Se repetir, mande este texto ao TI.\n";
+      }
       if (!simular) {
         const cfg = Object.assign({}, E().config || {}, { processos: r.config.processos, solucaoId: r.config.solucaoId, provisionadoEm: r.config.provisionadoEm });
         await E().repo.salvarConfig(cfg);
-        log.textContent += "Configuração gravada. Recarregue o app.\n";
+        log.textContent += (falhas.length ? "Configuração gravada com o que foi criado. " : "Estrutura completa e configuração gravada. ") + "Recarregue o app (F5).\n";
       }
+      log.scrollTop = log.scrollHeight;
     } catch (e) {
       log.textContent += "\nFALHOU: " + (e.message || E().repo.mensagemErro(e)) + "\n";
     } finally { el.disabled = false; }
