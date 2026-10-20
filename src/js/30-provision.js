@@ -43,8 +43,15 @@
       settings,
     };
     if (campo.ajuda) field.helpMessage = rotulos(campo.ajuda);
-    if (campo.tipo === "lista") field.enum = campo.opcoes.map((v, i) => ({ value: v, sort: (i + 1) * 10, def: "N" }));
+    // xmlId explícito em cada opção: sem ele o Bitrix gera um código a partir do texto, e
+    // a lista "São Paulo (SP)" / "Salvador (BA)" foi recusada no portal em 21/10/2026.
+    if (campo.tipo === "lista") field.enum = campo.opcoes.map((v, i) => ({ value: v, xmlId: codigoOpcao(v, i), sort: (i + 1) * 10, def: "N" }));
     return { moduleId: "crm", field };
+  }
+  /** "Salvador (BA)" -> "SALVADOR_BA" (sem acento, só letras, números e _), com o índice para nunca repetir */
+  function codigoOpcao(valor, i) {
+    const base = String(valor).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+    return (base || "OPCAO") + "_" + (i + 1);
   }
 
   /** Sufixo do STATUS_ID ("DT1100_7:ATIVO" -> "ATIVO") */
@@ -134,14 +141,19 @@
         criadoAgora = true;
       } else {
         log("Processo já existe: " + titulo + " (entityTypeId " + tipo.entityTypeId + ")");
-        const rel = tipo.relations || { parent: [], child: [] };
-        const temPai = !paiEti || (rel.parent || []).some((x) => String(x.entityTypeId) === String(paiEti));
-        if (!temPai) {
-          log("  ligando ao processo pai (entityTypeId " + paiEti + ")");
-          await tentar("ligação de " + p.nome + " ao processo pai", () => chamar("crm.type.update", {
-            id: tipo.id,
-            fields: { relations: { parent: (rel.parent || []).concat(relPai), child: rel.child || [] } },
-          }));
+        if (paiEti) {
+          // crm.type.list NÃO traz as ligações (conferido no portal em 21/10/2026): lê o tipo
+          // inteiro. Sem conseguir ler, não mexe: regravar às cegas apagaria ligações existentes.
+          const lido = await tentar("leitura das ligações de " + p.nome, () => chamar("crm.type.get", { id: tipo.id }));
+          const rel = lido && lido.dados && lido.dados.type ? lido.dados.type.relations : null;
+          const temPai = rel && (rel.parent || []).some((x) => String(x.entityTypeId) === String(paiEti));
+          if (rel && !temPai) {
+            log("  ligando ao processo pai (entityTypeId " + paiEti + ")");
+            const so = (lista) => (lista || []).map((x) => ({ entityTypeId: x.entityTypeId, isChildrenListEnabled: x.isChildrenListEnabled }));
+            await tentar("ligação de " + p.nome + " ao processo pai", () => chamar("crm.type.update", {
+              id: tipo.id, fields: { relations: { parent: so(rel.parent).concat(relPai), child: so(rel.child) } },
+            }));
+          }
         }
       }
 
@@ -159,17 +171,19 @@
 
       /* 3. estágios */
       const estagiosAtuais = (simular && criadoAgora) ? [] : await listarTodos("crm.status.list", { filter: { ENTITY_ID: entityStage } }, (d) => d);
-      for (let i = 0; i < p.estagios.length; i++) {
-        const e = p.estagios[i];
-        const sort = (i + 1) * 10;
-        const atual = estagiosAtuais.find((s) => codigoDoEstagio(s.STATUS_ID) === e.codigo);
-        if (atual) {
-          if (atual.NAME !== e.nome || String(atual.COLOR || "").toUpperCase() !== e.cor.toUpperCase() || Number(atual.SORT) !== sort) {
-            await tentar("estágio \"" + e.nome + "\" de " + p.nome, () => chamar("crm.status.update", { id: atual.ID, fields: { NAME: e.nome, COLOR: e.cor, SORT: sort } }));
-          }
-        } else {
-          await tentar("estágio \"" + e.nome + "\" de " + p.nome, () => chamar("crm.status.add", { fields: { ENTITY_ID: entityStage, STATUS_ID: prefixo + ":" + e.codigo, NAME: e.nome, COLOR: e.cor, SORT: sort } }));
+      const planoEstagios = p.estagios.map((e, i) => ({ e, sort: (i + 1) * 10, atual: estagiosAtuais.find((s) => codigoDoEstagio(s.STATUS_ID) === e.codigo) }));
+      // 1º reposiciona os que já existem, do maior para o menor: o Bitrix recusa etapa nova com ordem
+      // maior que a da etapa final bem-sucedida, então ela precisa ir para o fim antes (portal, 21/10/2026).
+      for (const x of planoEstagios.filter((y) => y.atual).sort((a, b) => b.sort - a.sort)) {
+        const { e, sort, atual } = x;
+        if (atual.NAME !== e.nome || String(atual.COLOR || "").toUpperCase() !== e.cor.toUpperCase() || Number(atual.SORT) !== sort) {
+          await tentar("estágio \"" + e.nome + "\" de " + p.nome, () => chamar("crm.status.update", { id: atual.ID, fields: { NAME: e.nome, COLOR: e.cor, SORT: sort } }));
         }
+      }
+      // 2º cria os que faltam
+      for (const x of planoEstagios.filter((y) => !y.atual)) {
+        const { e, sort } = x;
+        await tentar("estágio \"" + e.nome + "\" de " + p.nome, () => chamar("crm.status.add", { fields: { ENTITY_ID: entityStage, STATUS_ID: prefixo + ":" + e.codigo, NAME: e.nome, COLOR: e.cor, SORT: sort } }));
       }
       if (criadoAgora) {
         for (const s of estagiosAtuais) {

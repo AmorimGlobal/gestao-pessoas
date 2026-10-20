@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const schema = require("../src/js/20-schema.js");
-const { provisionar } = require("../src/js/30-provision.js");
+const { provisionar, codigoDoEstagio: provisionCodigo } = require("../src/js/30-provision.js");
 const { criarBitrixFalso } = require("./fake-bitrix.js");
 
 const escritas = (rel) => rel.filter((r) => !r.simulado).length;
@@ -15,7 +15,7 @@ test("portal vazio: cria os 9 processos, estágios, campos e a solução automat
   // filhos do Membros ligados por relação nativa
   for (const chave of ["feedbacks", "ciclo", "planos", "encerramentos", "onboarding", "leituras"]) {
     const t = bx.estado.tipos.find((x) => x.entityTypeId === config.processos[chave].entityTypeId);
-    assert.deepEqual(t.relations.parent, [{ entityTypeId: membros.entityTypeId, isChildrenListEnabled: "Y" }]);
+    assert.deepEqual(t.relations.parent.map((r) => r.entityTypeId), [membros.entityTypeId]);
     assert.equal(config.processos[chave].campoPai, "parentId" + membros.entityTypeId);
   }
   // finalistas ficam ligados ao negócio (vaga)
@@ -134,4 +134,39 @@ test("falta de permissão no meio para tudo na hora (não vira 157 falhas)", asy
   const bx = criarBitrixFalso({ falharSe: (m) => m === "userfieldconfig.add" && "ACCESS_DENIED" });
   await assert.rejects(provisionar({ chamar: bx.chamar }), /ACCESS_DENIED/);
   assert.equal(bx.estado.chamadas.filter((c) => c.metodo === "userfieldconfig.add").length, 1);
+});
+
+test("estado do portal em 21/10: rodar de novo completa estágios e campo sem regravar as ligações", async () => {
+  const bx = criarBitrixFalso();
+  const { config } = await provisionar({ chamar: bx.chamar });
+  // como ficou no portal: estágios do meio recusados e o campo Cidade não criado
+  const sem = ["REALIZADO", "EVID_ATRASO", "ENC_PENDENTE", "ENC_ATRASO", "ENVIADA_RH", "EM_ANALISE", "APROVADA", "CONVERSA_OK", "POS", "MAR_ABERTO"];
+  bx.estado.status = bx.estado.status.filter((s) => sem.indexOf(provisionCodigo(s.STATUS_ID)) < 0);
+  const tM = config.processos.membros.typeId;
+  bx.estado.campos = bx.estado.campos.filter((f) => f.fieldName !== "UF_CRM_" + tM + "_CIDADE_REF");
+  bx.estado.atualizacoesDeTipo = 0;
+  const r = await provisionar({ chamar: bx.chamar, configAtual: config });
+  assert.deepEqual(r.falhas, []);
+  assert.equal(r.relatorio.filter((x) => x.metodo === "crm.status.add").length, sem.length);
+  assert.equal(r.relatorio.filter((x) => x.metodo === "userfieldconfig.add").length, 1);
+  assert.equal(bx.estado.atualizacoesDeTipo, 0, "as ligações já existiam: nenhum crm.type.update");
+  // a ligação predefinida (39) continua lá
+  const fb = bx.estado.tipos.find((t) => t.entityTypeId === config.processos.feedbacks.entityTypeId);
+  assert.ok(fb.relations.child.some((c) => c.entityTypeId === 39));
+  // e a ordem final bate com o esquema
+  const ent = "DYNAMIC_" + config.processos.ciclo.entityTypeId + "_STAGE_" + config.processos.ciclo.categoriaId;
+  assert.deepEqual(bx.estado.status.filter((s) => s.ENTITY_ID === ent).sort((a, b) => a.SORT - b.SORT).map((s) => provisionCodigo(s.STATUS_ID)),
+    schema.processo("ciclo").estagios.map((e) => e.codigo));
+});
+
+test("opções de lista vão com xmlId explícito e único", () => {
+  const { payloadCampo } = require("../src/js/30-provision.js");
+  const campo = schema.processo("membros").campos.find((c) => c.chave === "cidade");
+  const p = payloadCampo(57, campo, 7);
+  assert.deepEqual(p.field.enum.map((e) => e.xmlId), ["SAO_PAULO_SP_1", "SALVADOR_BA_2"]);
+  for (const proc of schema.PROCESSOS) for (const c of proc.campos.filter((x) => x.tipo === "lista")) {
+    const ids = payloadCampo(1, c, 0).field.enum.map((e) => e.xmlId);
+    assert.equal(new Set(ids).size, ids.length, c.chave);
+    ids.forEach((id) => assert.match(id, /^[A-Z0-9_]{1,45}$/));
+  }
 });

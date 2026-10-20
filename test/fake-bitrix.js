@@ -26,12 +26,19 @@ function criarBitrixFalso(opcoes) {
     if (recusa) throw new Error(metodo + ": " + recusa);
     switch (metodo) {
       case "crm.type.list": {
-        const { pagina, proximo } = paginar(estado.tipos, params);
+        // como no portal real: a listagem NÃO traz as ligações (relations); crm.type.get traz
+        const { pagina, proximo } = paginar(estado.tipos.map((t) => Object.assign({}, t, { relations: undefined })), params);
         return { dados: { types: pagina }, proximo };
+      }
+      case "crm.type.get": {
+        const t = estado.tipos.find((x) => String(x.id) === String(params.id));
+        if (!t) throw new Error("tipo não encontrado");
+        return { dados: { type: t }, proximo: null };
       }
       case "crm.type.add": {
         const f = params.fields;
-        const t = { id: proxTipo++, entityTypeId: proxEti, title: f.title, relations: f.relations };
+        const t = { id: proxTipo++, entityTypeId: proxEti, title: f.title,
+          relations: { parent: (f.relations.parent || []).map((r) => Object.assign({}, r, { isChildrenListEnabled: "N", isPredefined: "N" })), child: [{ entityTypeId: 39, isChildrenListEnabled: "Y", isPredefined: "Y" }] } };
         proxEti += 2;
         estado.tipos.push(t);
         const cat = { id: proxCat++, isDefault: "Y" };
@@ -39,11 +46,13 @@ function criarBitrixFalso(opcoes) {
         ["NEW", "PREPARATION", "CLIENT", "SUCCESS", "FAIL"].forEach((cod, i) => estado.status.push({
           ID: proxStatus++, ENTITY_ID: "DYNAMIC_" + t.entityTypeId + "_STAGE_" + cat.id,
           STATUS_ID: "DT" + t.entityTypeId + "_" + cat.id + ":" + cod, NAME: cod, COLOR: "#000000", SORT: (i + 1) * 10,
+          SEMANTICS: cod === "SUCCESS" ? "S" : cod === "FAIL" ? "F" : null,
         }));
         return { dados: { type: t }, proximo: null };
       }
       case "crm.type.update": {
         const t = estado.tipos.find((x) => x.id === params.id);
+        estado.atualizacoesDeTipo = (estado.atualizacoesDeTipo || 0) + 1;
         if (params.fields.relations) t.relations = params.fields.relations;
         return { dados: { type: t }, proximo: null };
       }
@@ -54,6 +63,10 @@ function criarBitrixFalso(opcoes) {
         return { dados: lista, proximo: null };
       }
       case "crm.status.add": {
+        const final = estado.status.find((x) => x.ENTITY_ID === params.fields.ENTITY_ID && x.SEMANTICS === "S");
+        if (final && Number(params.fields.SORT) >= Number(final.SORT)) {
+          throw new Error("crm.status.add: Não é possível criar mais etapas após a etapa final porque a etapa final bem-sucedida já existe.");
+        }
         const s = Object.assign({ ID: proxStatus++ }, params.fields);
         estado.status.push(s);
         return { dados: s.ID, proximo: null };
