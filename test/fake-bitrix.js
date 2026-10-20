@@ -1,5 +1,8 @@
-// Bitrix24 em memória, só com os métodos que o provisionamento usa.
+// Bitrix24 em memória: os métodos do provisionamento e, por cima da estrutura criada por ele,
+// itens (crm.item.*), comentários, avisos, usuários e departamentos.
 // Responde no mesmo formato da API (result/next), via chamar(metodo, params) -> {dados, proximo}.
+const { camelDoCampo } = require("../src/js/20-schema.js");
+
 function criarBitrixFalso(opcoes) {
   const o = opcoes || {};
   const estado = {
@@ -9,8 +12,23 @@ function criarBitrixFalso(opcoes) {
     campos: [],     // {entityId, fieldName, ...}
     solucoes: [],
     chamadas: [],
+    itens: {},       // eti -> [item no formato do crm.item.get]
+    comentarios: [], // {ENTITY_TYPE, ENTITY_ID, COMMENT}
+    avisos: [],      // {USER_ID, MESSAGE}
+    usuarios: o.usuarios || [],         // formato do user.get
+    departamentos: o.departamentos || [], // formato do department.get
+    agora: o.agora || "2026-10-08T10:00:00-03:00",
   };
-  let proxTipo = 50, proxEti = 1200, proxCat = 300, proxStatus = 1, proxSol = 10;
+  let proxTipo = 50, proxEti = 1200, proxCat = 300, proxStatus = 1, proxSol = 10, proxEnum = 9000, proxItem = 500;
+
+  const tipoPorEti = (eti) => estado.tipos.find((t) => String(t.entityTypeId) === String(eti));
+  /** filtro simples do crm.item.list: igualdade (lista = "um destes"), com ou sem "=" na frente */
+  function confere(it, filtro) {
+    return Object.keys(filtro || {}).every((k) => {
+      const v = filtro[k], atual = it[k.replace(/^=/, "")];
+      return Array.isArray(v) ? v.map(String).indexOf(String(atual)) >= 0 : String(atual) === String(v);
+    });
+  }
 
   function paginar(lista, params) {
     const start = Number(params.start || 0);
@@ -85,7 +103,7 @@ function criarBitrixFalso(opcoes) {
       }
       case "userfieldconfig.add":
         if (o.semEscopoCampos) throw new Error("insufficient_scope");
-        estado.campos.push(Object.assign({}, params.field));
+        estado.campos.push(Object.assign({}, params.field, params.field.enum ? { enum: params.field.enum.map((e) => Object.assign({ id: proxEnum++ }, e)) } : {}));
         return { dados: { field: params.field }, proximo: null };
       case "crm.automatedsolution.list":
         return { dados: { automatedSolutions: estado.solucoes }, proximo: null };
@@ -98,6 +116,55 @@ function criarBitrixFalso(opcoes) {
         Object.assign(estado.solucoes.find((s) => s.id === params.id), params.fields);
         return { dados: true, proximo: null };
       }
+      /* ---------- itens ---------- */
+      case "crm.item.fields": {
+        const t = tipoPorEti(params.entityTypeId);
+        const fields = {};
+        estado.campos.filter((f) => t && f.entityId === "CRM_" + t.id).forEach((f) => {
+          fields[camelDoCampo(f.fieldName)] = Object.assign({ type: f.userTypeId, isMultiple: f.multiple === "Y" },
+            f.enum ? { items: f.enum.map((e) => ({ ID: String(e.id), VALUE: e.value })) } : {});
+        });
+        return { dados: { fields }, proximo: null };
+      }
+      case "crm.item.list": {
+        const lista = (estado.itens[params.entityTypeId] || []).filter((it) => confere(it, params.filter));
+        const { pagina, proximo } = paginar(lista, params);
+        return { dados: { items: pagina.map((x) => Object.assign({}, x)) }, proximo };
+      }
+      case "crm.item.get": {
+        const it = (estado.itens[params.entityTypeId] || []).find((x) => String(x.id) === String(params.id));
+        if (!it) throw new Error("crm.item.get: NOT_FOUND");
+        return { dados: { item: Object.assign({}, it) }, proximo: null };
+      }
+      case "crm.item.add": {
+        const t = tipoPorEti(params.entityTypeId);
+        const cat = estado.categorias[params.entityTypeId][0];
+        const primeiro = estado.status.filter((x) => x.ENTITY_ID === "DYNAMIC_" + t.entityTypeId + "_STAGE_" + cat.id).sort((a, b) => a.SORT - b.SORT)[0];
+        const it = Object.assign({ id: proxItem++, stageId: primeiro.STATUS_ID, createdBy: o.autorPadrao || 1, createdTime: estado.agora, updatedTime: estado.agora, movedTime: estado.agora }, params.fields);
+        (estado.itens[params.entityTypeId] = estado.itens[params.entityTypeId] || []).push(it);
+        return { dados: { item: Object.assign({}, it) }, proximo: null };
+      }
+      case "crm.item.update": {
+        const it = (estado.itens[params.entityTypeId] || []).find((x) => String(x.id) === String(params.id));
+        if (!it) throw new Error("crm.item.update: NOT_FOUND");
+        if (params.fields.stageId && params.fields.stageId !== it.stageId) it.movedTime = estado.agora;
+        Object.assign(it, params.fields, { updatedTime: estado.agora });
+        return { dados: { item: Object.assign({}, it) }, proximo: null };
+      }
+      case "crm.timeline.comment.add":
+        estado.comentarios.push(Object.assign({}, params.fields));
+        return { dados: estado.comentarios.length, proximo: null };
+      case "im.notify.system.add":
+        estado.avisos.push({ USER_ID: params.USER_ID, MESSAGE: params.MESSAGE });
+        return { dados: estado.avisos.length, proximo: null };
+      case "user.get": {
+        const F = Object.assign({}, params.FILTER || {}, params.ID !== undefined ? { ID: params.ID } : {});
+        const lista = estado.usuarios.filter((u) => (!F.ACTIVE || u.ACTIVE !== false) && (F.ID === undefined || String(u.ID) === String(F.ID)));
+        const { pagina, proximo } = paginar(lista, params);
+        return { dados: pagina, proximo };
+      }
+      case "department.get":
+        return { dados: estado.departamentos, proximo: null };
       default:
         throw new Error("método não simulado: " + metodo);
     }

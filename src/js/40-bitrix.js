@@ -94,44 +94,12 @@
     });
   }
 
-  /** Data do Bitrix em ISO, venha ela como "2026-10-08T...", "08.10.2026 ..." ou "08/10/2026 ..." */
-  function dataBitrix(s) {
-    const t = String(s || "");
-    if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
-    const m = /^(\d{2})[./](\d{2})[./](\d{4})/.exec(t);
-    return m ? m[3] + "-" + m[2] + "-" + m[1] : "";
-  }
+  const reg = GP.registros;
+  const dataBitrix = reg.dataBitrix;
 
   function lerJSON(txt, padrao) {
     if (txt && typeof txt === "object") return txt;
     try { return txt ? JSON.parse(txt) : padrao; } catch (e) { return padrao; }
-  }
-
-  /* ---------- conversão de valores ---------- */
-  function lerValor(def, v, enumInfo) {
-    switch (def.tipo) {
-      case "data": return v ? String(v).slice(0, 10) : "";
-      case "dataHora": return v ? String(v) : "";
-      case "pessoa": return Array.isArray(v) ? v.map(String) : (v ? String(v) : "");
-      case "lista": {
-        const ler = (x) => (enumInfo && enumInfo.porId[String(x)]) || "";
-        return Array.isArray(v) ? v.map(ler).filter(Boolean) : (v ? ler(v) : "");
-      }
-      case "simNao": return v === true || v === 1 || v === "1" || v === "Y";
-      case "arquivo": return Array.isArray(v) ? v : (v && typeof v === "object" ? [v] : []);
-      case "numero": return v === null || v === undefined || v === "" ? null : Number(v);
-      default: return v === null || v === undefined ? "" : String(v);
-    }
-  }
-  function escreverValor(def, v, enumInfo) {
-    switch (def.tipo) {
-      case "lista": return v ? ((enumInfo && enumInfo.porValor[v]) || "") : "";
-      case "pessoa": return v ? Number(v) : "";
-      case "simNao": return v ? 1 : 0;
-      case "numero": return v === null || v === undefined || v === "" ? "" : Number(v);
-      case "data": return v || "";
-      default: return v === null || v === undefined ? "" : String(v);
-    }
   }
 
   function criarRepositorio() {
@@ -141,43 +109,12 @@
     function montarEstrutura(cfg) {
       schema.PROCESSOS.forEach(function (p) {
         const c = cfg.processos && cfg.processos[p.chave];
-        if (!c) return;
-        const defs = {};
-        p.campos.forEach(function (d) { defs[d.chave] = d; });
-        const estagioPorId = {}, nomes = {};
-        p.estagios.forEach(function (e) { nomes[e.codigo] = e.nome; });
-        Object.keys(c.estagios || {}).forEach(function (cod) { estagioPorId[c.estagios[cod]] = cod; });
-        const campos = {};
-        p.campos.forEach(function (d) { campos[d.chave] = schema.codigoCampo(c.typeId, d.sufixo); });
-        estrutura[p.chave] = {
-          eti: c.entityTypeId, typeId: c.typeId, campoPai: c.campoPai, estagios: c.estagios || {},
-          estagioPorId, nomes, campos, defs, enums: {}, presentes: new Set(),
-        };
+        if (c) estrutura[p.chave] = reg.estruturaDoProcesso(p, c);
       });
     }
 
     /** Sem configuração gravada: acha os processos pelo título (depois do CLI tools/provisionar.js) */
-    async function descobrirEstrutura() {
-      const tipos = await bxTudo("crm.type.list", {}, "types");
-      const cfg = { versao: 1, processos: {}, descoberta: true };
-      const membrosT = tipos.find((t) => t.title === schema.tituloProcesso(schema.processo("membros")));
-      for (const p of schema.PROCESSOS) {
-        const t = tipos.find((x) => x.title === schema.tituloProcesso(p));
-        if (!t) continue;
-        const cats = await bxTudo("crm.category.list", { entityTypeId: t.entityTypeId }, "categories");
-        const cat = cats.find((x) => x.isDefault === "Y" || x.isDefault === true) || cats[0];
-        if (!cat) continue;
-        const st = await bxTudo("crm.status.list", { filter: { ENTITY_ID: "DYNAMIC_" + t.entityTypeId + "_STAGE_" + cat.id } });
-        const estagios = {};
-        p.estagios.forEach(function (e) {
-          const s = st.find((x) => GP.provision.codigoDoEstagio(x.STATUS_ID) === e.codigo);
-          if (s) estagios[e.codigo] = s.STATUS_ID;
-        });
-        const paiEti = p.pai === "membros" ? (membrosT && membrosT.entityTypeId) : p.pai === "negocio" ? schema.ENTITY_TYPE_NEGOCIO : null;
-        cfg.processos[p.chave] = { entityTypeId: t.entityTypeId, typeId: t.id, categoriaId: cat.id, campoPai: paiEti ? "parentId" + paiEti : null, estagios };
-      }
-      return cfg;
-    }
+    function descobrirEstrutura() { return reg.descobrirEstrutura(bxTudo); }
 
     /** Lê os campos de cada processo: IDs das listas e quais campos existem de fato */
     async function carregarMetadados() {
@@ -186,51 +123,15 @@
       const r = await bxLote(cmds);
       const ausentes = [];
       Object.keys(estrutura).forEach(function (k) {
-        const e = estrutura[k];
         const flds = (r[k] && r[k].ok && r[k].dados && r[k].dados.fields) || {};
-        Object.keys(e.campos).forEach(function (ch) {
-          const f = flds[e.campos[ch]];
-          if (!f) { ausentes.push(k + "." + ch); return; }
-          e.presentes.add(ch);
-          if (f.items) {
-            const porId = {}, porValor = {};
-            f.items.forEach(function (i) { porId[String(i.ID)] = i.VALUE; porValor[i.VALUE] = i.ID; });
-            e.enums[ch] = { porId, porValor };
-          }
-        });
+        reg.aplicarMetadados(estrutura[k], flds).forEach(function (ch) { ausentes.push(k + "." + ch); });
       });
       return ausentes;
     }
 
-    function normalizar(chave, it) {
-      const e = estrutura[chave];
-      const o = {
-        id: String(it.id), titulo: it.title || "", stageId: it.stageId || "",
-        estagio: e.estagioPorId[it.stageId] || GP.provision.codigoDoEstagio(it.stageId || ""),
-        criadoEm: it.createdTime || "", atualizadoEm: it.updatedTime || "",
-        criadoPor: String(it.createdBy || ""), responsavel: String(it.assignedById || ""),
-        membroId: e.campoPai && it[e.campoPai] ? String(it[e.campoPai]) : "",
-      };
-      o.estagioNome = e.nomes[o.estagio] || o.estagio;
-      Object.keys(e.campos).forEach(function (ch) { o[ch] = lerValor(e.defs[ch], it[e.campos[ch]], e.enums[ch]); });
-      return o;
-    }
-
+    function normalizar(chave, it) { return reg.normalizar(estrutura[chave], it); }
     function montarCampos(chave, dados) {
-      const e = estrutura[chave];
-      const f = {};
-      Object.keys(dados || {}).forEach(function (ch) {
-        if (ch === "titulo") { f.title = dados[ch]; return; }
-        if (ch === "estagio") { if (dados[ch]) f.stageId = e.estagios[dados[ch]]; return; }
-        if (ch === "membroId") { if (e.campoPai && dados[ch]) f[e.campoPai] = Number(dados[ch]); return; }
-        if (ch === "responsavel") { if (dados[ch]) f.assignedById = Number(dados[ch]); return; }
-        const def = e.defs[ch];
-        if (!def) return;
-        if (!e.presentes.has(ch)) { console.warn("Campo ausente no Bitrix, não gravado:", chave + "." + ch); return; }
-        if (def.tipo === "arquivo") { f[e.campos[ch]] = dados[ch]; return; } // já no formato [{id}, [nome, base64]]
-        f[e.campos[ch]] = escreverValor(def, dados[ch], e.enums[ch]);
-      });
-      return f;
+      return reg.montarCampos(estrutura[chave], dados, function (ch) { console.warn("Campo ausente no Bitrix, não gravado:", chave + "." + ch); });
     }
 
     const repo = {
@@ -433,5 +334,5 @@
     return repo;
   }
 
-  GP.bitrix = { criarRepositorio, mensagemErro, lerValor, escreverValor, CHAVE_CONFIG };
+  GP.bitrix = { criarRepositorio, mensagemErro, lerValor: reg.lerValor, escreverValor: reg.escreverValor, CHAVE_CONFIG };
 })(window);
