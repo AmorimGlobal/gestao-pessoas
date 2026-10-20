@@ -314,6 +314,12 @@
         if (!r.ok || !j.ok) throw new Error(j.erro || "o servidor respondeu " + r.status);
         return j.resumo;
       },
+      /** Rotinas do servidor ligadas na Vercel (api/status.js): só sim/não, nunca os valores */
+      statusServidor: async function () {
+        const r = await fetch("/api/status", { cache: "no-store" });
+        if (!r.ok) throw new Error("o servidor respondeu " + r.status);
+        return r.json();
+      },
       /** O download do dossiê fica registrado: comentário na timeline do item Membros (4.4) */
       registrarDossie: async function (membroId, eu) {
         const e = estrutura.membros;

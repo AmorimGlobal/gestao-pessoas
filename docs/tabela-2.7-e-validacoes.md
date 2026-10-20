@@ -34,7 +34,7 @@ Com o app, a liderança vê o que o protótipo mostra, e as regras de cálculo d
 | Rotinas (1:1 e SCI) | Nativo com ajuste | Processos nativos. No app: pauta automática, combinados anteriores, 4 modelos SCI, revisão do texto e bloqueio de 48 h com adendo. |
 | Leitura de entregas | Nativo com ajuste | Processo "Leituras de entrega", fora do alcance do membro. Falta ligar a criação automática ao concluir a tarefa "Entrega". |
 | Desempenho anual | Nativo com ajuste | Os 4 itens do Ciclo do ano mais os feedbacks, com a classificação em 4 níveis (4.8). |
-| Offboarding e trava | Nativo com ajuste | A verificação roda no app antes de enviar e de novo a cada envio. A trava no servidor fica com um processo de negócio (configuração manual). |
+| Offboarding e trava | Nativo com ajuste | A verificação roda no app antes de enviar e de novo a cada envio. No servidor, `api/eventos.js` recebe o webhook de saída do Bitrix e confere de novo qualquer solicitação, inclusive a do formulário ou a arrastada no kanban (configuração, seção 7). |
 
 ## 3. Validações da 6.2
 
@@ -57,7 +57,7 @@ Com o app, a liderança vê o que o protótipo mostra, e as regras de cálculo d
 | Aviso automático ao Responsável | A validar e desligar (veja o ponto de atenção 2). |
 | Bloqueio de 48 h | Na tela: feito, com adendo. No Bitrix: robô de 48 h e estágio só de leitura (configuração manual). |
 | Robô "Não entregue" quando o prazo vence sem conclusão | Depende do modelo "Entrega". |
-| Resumo semanal e e-mails de 7 e 14 dias | **Não feito.** Precisa de uma rotina agendada fora da tela (proposta: uma função agendada na Vercel com webhook). |
+| Resumo semanal e e-mails de 7 e 14 dias | **Feito** na rotina das 8h (`api/avisos.js`). Sai como notificação do Bitrix; confirmar se o envio por e-mail das notificações não lidas atende ao "e-mail" da 4.4. |
 | Dossiê em PDF | **Feito** ("Salvar em PDF" no card do membro, com o registro de quem baixou). |
 | Agendar pendência na agenda do Bitrix | **Feito.** Compromisso na agenda da pessoa, com lembrete de 15 minutos. O prazo não muda. |
 | Ausências e aniversários na Agenda | **Feito**, com ocultar o aniversário por pessoa. A leitura do gráfico de ausências nativo ainda precisa ser validada. |

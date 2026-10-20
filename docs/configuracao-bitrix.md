@@ -70,6 +70,8 @@ O RH recebe uma notificação com o resumo, e cada item ganha um comentário no 
 | `GP_AVISAR_IDS` | IDs de usuário do RH que recebem o resumo, separados por vírgula. O ID aparece na URL do perfil: `/company/personal/user/<ID>/` |
 | `GP_EXCECOES_IDS` | IDs de quem fica fora do app (hoje, só a Giselle) |
 
+No app, **Configuração → Rotinas no servidor** mostra quais rotinas já estão ligadas (pergunta a `/api/status`, que só diz sim ou não e o nome do que falta). Mostra também os valores de `GP_AVISAR_IDS`, `GP_CEO_IDS`, `GP_EXCECOES_IDS` e `GP_LINK_APP`, tirados dos Papéis, para copiar.
+
 Para testar sem esperar o dia seguinte: Vercel → projeto → Settings → Cron Jobs → **Run**. A resposta mostra quantos itens foram criados, atualizados e encerrados.
 
 ### Avisos da 4.4 (rotina das 8h)

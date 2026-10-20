@@ -359,6 +359,7 @@
         const D = (typeof window !== "undefined" && window.GP && window.GP.dominio) || require("./50-dominio.js");
         return D.resumoPainel(D.painelGeral(ctx));
       },
+      statusServidor: async () => null, // fora do Bitrix não há servidor para conferir
       comentarios: [],
       comentar: async function (chave, id, texto) { this.comentarios.push({ chave, id, texto }); },
       lerPreferencia: (nome) => { try { return localStorage.getItem("gp_demo_" + euId + "_" + nome); } catch (e) { return null; } },
