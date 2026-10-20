@@ -26,7 +26,7 @@ Não há dependências para instalar.
 
 ## Publicar
 
-A Vercel publica a cada push na `main`. O Bitrix abre o app com POST, por isso a página sai da função `api/app.js`, e não de um arquivo estático (ver `vercel.json`).
+A Vercel publica a cada push na `main`, em **https://gestao-pessoas-bice.vercel.app** (conta `amorims-projects-ee19b0fd`). Atenção: `gestao-pessoas.vercel.app`, sem o "-bice", é outro app, de outra conta. O Bitrix abre o app com POST, por isso a página sai da função `api/app.js`, e não de um arquivo estático (ver `vercel.json`).
 
 No Bitrix, o app é cadastrado como aplicativo local, com a URL da Vercel e os escopos `crm`, `user`, `department`, `userfieldconfig`, `im` e `calendar`. Depois, um administrador abre o app, vai em **Configuração** e clica em **Criar ou completar a estrutura**.
 

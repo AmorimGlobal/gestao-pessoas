@@ -42,6 +42,8 @@ node --test test/*.test.js            # 41 testes; os exemplos da 4.5 são casos
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
+Produção: **https://gestao-pessoas-bice.vercel.app** (Vercel, conta `amorims-projects-ee19b0fd`, deploy a cada push na `main`). Esse é o endereço do app local no Bitrix. `gestao-pessoas.vercel.app` é OUTRO app, de outra conta. Os endereços de deploy com letras aleatórias pedem login da Vercel e não servem para o Bitrix.
+
 `api/app.js` é **gerado**: não edite à mão. Ele embute a página como string porque o Bitrix abre o app local com **POST**, e a hospedagem estática só responde GET. O `vercel.json` manda toda rota para `/api/app`. Se a conta da Vercel for Hobby, o commit precisa ser do autor da conta (veja a nota do `widget-rotina-contabil` sobre `staff@amorimglobal.com`).
 
 Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstração; `dist/` não é versionado, `api/app.js` é). Os testes de interface usados até aqui rodaram com o Edge headless (`--dump-dom`), com um script de driver injetado antes do `</body>`.
