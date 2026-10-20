@@ -670,6 +670,55 @@
     return { ano, ciclos, feedbacks: fbs, tipos, classificados: ciclos.filter((c) => c.item && c.item.classificacao).length };
   }
 
+  /* ================================================================ checagem antes de ligar o app (5.3) */
+  const EMAIL_PESSOAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|icloud|me|uol|bol|terra|ig)\.(com|com\.br)$/i;
+  /** Os testes que o TI roda antes de liberar o app, sobre os dados já carregados. O 5º teste (exemplos
+      da 4.5) são os testes automáticos do código e a conferência dos 6 casos no ambiente de teste. */
+  function checagemImplantacao(ctx) {
+    const cfg = ctx.config || {};
+    const pc = cfg.papeis || {};
+    const fora = {};
+    (pc.ceo || []).concat(pc.excecoes || []).forEach((p) => { fora[String(p.id)] = true; });
+    const usuarios = (ctx.usuarios || []).filter((u) => !fora[u.id] && (u.departamentos || []).length && (!u.tipo || u.tipo === "employee"));
+    const ativos = membrosAtivos(ctx.registros.membros || []);
+    const porUsuario = {};
+    ativos.forEach((m) => { porUsuario[m.responsavel] = m; });
+    const p1 = [];
+    usuarios.forEach((u) => {
+      const m = porUsuario[u.id];
+      if (!m) { p1.push(u.nome + ": sem item no processo Membros"); return; }
+      const falta = [["lideranca", "liderança direta"], ["coordenacao", "coordenação"], ["nivel", "nível"], ["senioridade", "senioridade"], ["ingresso", "data de ingresso"]]
+        .filter((x) => !m[x[0]]).map((x) => x[1]);
+      if (falta.length) p1.push(u.nome + ": falta " + falta.join(", "));
+    });
+    const p2 = [];
+    const chefes = {};
+    (ctx.departamentos || []).forEach((d) => { if (d.chefe) chefes[d.chefe] = true; });
+    const lids = {};
+    ativos.forEach((m) => { if (m.lideranca) lids[m.lideranca] = true; });
+    Object.keys(lids).forEach((l) => { if (!chefes[l]) p2.push(pessoa(ctx, l).nome + " é liderança direta no Membros, mas não chefia nenhum departamento"); });
+    ativos.forEach((m) => {
+      const u = ctx.idx.usuario[m.responsavel];
+      if (!u || !m.lideranca || !(u.departamentos || []).length) return;
+      const pela = liderancaPelaEstrutura(ctx.idx.depto, u.id, u.departamentos);
+      if (pela && pela !== m.lideranca) p2.push(u.nome + ": a liderança direta no Membros é " + pessoa(ctx, m.lideranca).nome + ", e pela estrutura é " + pessoa(ctx, pela).nome);
+    });
+    const p3 = usuarios.filter((u) => !u.email || EMAIL_PESSOAL.test(u.email)).map((u) => u.nome + (u.email ? ": e-mail pessoal no cadastro" : ": sem e-mail"));
+    const p4 = [];
+    const ano = Number(String(ctx.hoje).slice(0, 4));
+    const locais = cfg.feriadosLocais || {};
+    [["SP", "São Paulo"], ["BA", "Salvador"]].forEach((s) => [ano, ano + 1].forEach((a) => {
+      if (!(locais[s[0]] || []).some((f) => String(f.data).slice(0, 4) === String(a))) p4.push("Feriados de " + s[1] + " de " + a + " não cadastrados");
+    }));
+    ativos.filter((m) => !m.cidade).forEach((m) => p4.push(infoMembro(ctx, m).nome + ": sem cidade de referência"));
+    return [
+      { chave: "membros", titulo: "Todo membro ativo tem item no Membros, com liderança direta, coordenação, nível, senioridade e data de ingresso", problemas: p1 },
+      { chave: "estrutura", titulo: "Toda liderança chefia um departamento, e cada membro está no departamento da sua liderança direta", problemas: p2 },
+      { chave: "email", titulo: "Nenhum usuário ativo sem e-mail corporativo", problemas: p3 },
+      { chave: "feriados", titulo: "Feriados de SP e Salvador do ano corrente e do seguinte, e cidade de referência de todo membro", problemas: p4 },
+    ].map((x) => Object.assign(x, { ok: !x.problemas.length }));
+  }
+
   /* ================================================================ painel geral do RH e da CEO (4.4, 4.6, 4.8) */
   function painelGeral(ctx) {
     const todos = membrosAtivos(ctx.registros.membros || []);
@@ -715,6 +764,6 @@
     cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
     verificarRegistros, destinoEncerramento, aprovadorDe,
     pendenciasDe, ordenarPendencias, aprovacoesPendentes, filaRH,
-    indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, agendaEquipe, dicas, anoDoMembro, painelGeral, resumoPainel,
+    indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, agendaEquipe, dicas, anoDoMembro, painelGeral, resumoPainel, checagemImplantacao,
   };
 });

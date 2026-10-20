@@ -60,6 +60,7 @@
       '<p class="muted" style="font-size:12px">Roda sozinha todo dia de manhã quando a rotina da Vercel estiver configurada (docs/configuracao-bitrix.md). A primeira carga, com todo mundo, é melhor fazer por aqui.</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-acao="sync-previa">Ver o que mudaria</button><button class="btn" data-acao="sync-executar">Sincronizar agora</button></div>' +
       '<div id="sync-resultado" style="margin-top:14px"></div></div>';
+    h += checagemHtml();
     h += servidorHtml(cfg);
     // Listas e textos
     const fl = cfg.feriadosLocais || {};
@@ -75,6 +76,19 @@
       '<button class="btn" data-acao="salvar-config">Salvar os cadastros</button></div></div>';
     return h;
   };
+
+  /* ---------------- checagem antes de ligar o app (5.3) ---------------- */
+  function checagemHtml() {
+    const lista = dom.checagemImplantacao(E().ctx);
+    const ok = lista.filter((x) => x.ok).length;
+    return '<div class="card"><h3>Checagem antes de ligar o app<span class="extra">' + c.tag(ok + " de " + lista.length + " ok", ok === lista.length ? "verde" : "ambar") + "</span></h3>" +
+      '<p class="muted" style="margin-top:0">Os testes da seção 5.3, com os dados que o app leu agora. Só libere para as lideranças quando todos passarem. Recarregue a página depois de corrigir no Bitrix.</p>' +
+      '<div class="lista">' + lista.map((x) => '<div class="item"><div class="principal-item"><div class="t">' + (x.ok ? "✓ " : "✗ ") + esc(x.titulo) + "</div>" +
+        (x.ok ? "" : '<div class="d">' + esc(x.problemas.slice(0, 8).join(" · ")) + (x.problemas.length > 8 ? " · e mais " + (x.problemas.length - 8) : "") + "</div>") +
+        '</div><div class="lado">' + c.tag(x.ok ? "ok" : plural(x.problemas.length, "ponto", "pontos"), x.ok ? "verde" : "vermelho") + "</div></div>").join("") +
+      '<div class="item"><div class="principal-item"><div class="t">Os exemplos da 4.5 dão o mesmo resultado</div><div class="d">Os exemplos são testes automáticos do código (test/calc.test.js). No ambiente de teste, confira também os 6 casos do protótipo na tela.</div></div><div class="lado">' + c.tag("conferir à mão", "cinza") + "</div></div>" +
+      "</div></div>";
+  }
 
   /* ---------------- rotinas do servidor (Vercel) ---------------- */
   const ROTINAS = [

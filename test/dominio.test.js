@@ -205,3 +205,29 @@ test("Desempenho anual: 4 trimestres e nota das leituras do 1º trimestre = 94",
   assert.equal(a.ciclos[0].notaLeituras, 94);
   assert.equal(a.classificados, 2);
 });
+
+test("checagem antes de ligar o app (5.3)", () => {
+  const { dadosDemo } = require("../src/js/45-demo.js");
+  const montar = (mexer) => {
+    const d = dadosDemo();
+    if (mexer) mexer(d);
+    const ctx = dom.indexar({ hoje: "2026-10-08", eu: { id: "6" }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros, feriados: { nacionais: calc.feriadosNacionais(2026) } });
+    const r = {};
+    dom.checagemImplantacao(ctx).forEach((x) => { r[x.chave] = x; });
+    return r;
+  };
+  const r = montar();
+  // as lideranças ainda não têm item (a sincronização cria); a CEO fica de fora
+  assert.equal(r.membros.problemas.length, 5);
+  assert.ok(!r.membros.problemas.some((p) => /Beatriz/.test(p)));
+  assert.equal(r.estrutura.ok, true);
+  assert.equal(r.email.ok, true);
+  const r2 = montar((d) => {
+    d.usuarios.find((u) => u.id === "100").email = "ana.pessoal@gmail.com";
+    d.registros.membros.find((m) => m.responsavel === "101").lideranca = "4"; // Bruno está na Imigração, da Carla
+    d.registros.membros.find((m) => m.responsavel === "102").cidade = "";
+  });
+  assert.deepEqual(r2.email.problemas, ["Ana Ribeiro: e-mail pessoal no cadastro"]);
+  assert.match(r2.estrutura.problemas[0], /Bruno Teixeira: a liderança direta no Membros é Marcos Lima, e pela estrutura é Carla Mendes/);
+  assert.ok(r2.feriados.problemas.some((p) => /sem cidade de referência/.test(p)));
+});
