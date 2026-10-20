@@ -2,7 +2,8 @@
   "buildCommand": "node build.js",
   "outputDirectory": "public",
   "functions": {
-    "api/sincronizar.js": { "maxDuration": 60 }
+    "api/sincronizar.js": { "maxDuration": 60 },
+    "api/eventos.js": { "maxDuration": 30 }
   },
   "crons": [
     { "path": "/api/sincronizar", "schedule": "0 9 * * *" }

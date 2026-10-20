@@ -117,7 +117,7 @@ O app move os estágios quando a pessoa age pela tela: agendar, registrar, aprov
 | Planos · Em andamento | Ao entrar: notificar coordenação e RH. "Data de início" + 24 dias: lembrete do check-in. + 30 dias: mover para "Check-in atrasado" |
 | Planos · Check-in realizado | 5 dias antes do término: lembrete. Na data de término: mover para "Encerramento pendente" |
 | Planos · Encerramento pendente | 1 dia depois: mover para "Encerramento atrasado" (com notificação) |
-| Encerramentos · Enviada ao RH | Notificar o RH e criar a tarefa "Analisar solicitação de encerramento" |
+| Encerramentos · Enviada ao RH | Criar a tarefa "Analisar solicitação de encerramento" (o aviso ao RH já sai do app e da trava no servidor, seção 7) |
 | Encerramentos · Aprovada | Tarefas à liderança: "Conduzir a conversa de encerramento" (prazo = data desejada) e "Comunicar o time" (mesmo dia). Se a reposição for "Substituição de membro", notificar o RH |
 | Encerramentos · Conversa realizada | Tarefas das semanas 1, 2 e 4 (clima) e notificar o RH (distrato e acessos) |
 | Encerramentos · Acompanhamento | Esperar 28 dias e notificar o RH para concluir |
@@ -138,18 +138,33 @@ Ainda sem robô nem código, a decidir:
 - **Avisos da 4.4:** resumo semanal às segundas, e-mail com 7 dias de atraso e aviso à coordenação com 14 dias.
 - **Criação da leitura ao concluir a tarefa "Entrega":** precisa do modelo de tarefa e de um processo de negócio nas tarefas.
 
-## 7. Trava do encerramento no servidor (4.1) — processo de negócio
+## 7. Trava do encerramento no servidor (4.1) — webhook de saída
 
-A tela confere os registros antes de enviar (`dominio.verificarRegistros`). A especificação exige que o **Bitrix** confira de novo, para cobrir uma solicitação criada por outro caminho.
+A tela confere os registros antes de enviar (`dominio.verificarRegistros`). A especificação exige que o servidor confira de novo, para cobrir uma solicitação que chegue por outro caminho: o formulário do Bitrix, um item criado direto no kanban ou um item arrastado de estágio. Quem faz isso é a função `api/eventos.js` na Vercel (regra em `lib/trava-encerramento.js`), e não um processo de negócio, porque o designer de processos não consegue contar feedbacks ligados a um plano.
 
-Crie em "Encerramentos de contrato" um processo de negócio que roda ao **criar** e ao **mudar para "Aguardando coordenação" ou "Enviada ao RH"**:
+Como funciona:
 
-1. Se o Motivo for "Resultados abaixo do acordado" ou "Desalinhamento de perfil":
-   - Leia o item de Planos pelo campo "Plano vinculado (ID)" e confira que o estágio é "Resultados não atingidos".
-   - Confira que os campos "Feedback de abertura (ID)" e "Feedback de encerramento (ID)" do plano estão preenchidos, e que os dois feedbacks existem e não são retroativos sem anexo.
-   - Se faltar qualquer um: mover para "Bloqueada" e gravar em "Motivo do bloqueio" a mensagem *"Este motivo exige 2 feedbacks SCI e um plano de alinhamento de 60 dias encerrado."*
-2. Se o Motivo for "Reestruturação da área" ou "Fim do prazo previsto no contrato" e a "Justificativa do fluxo abreviado" estiver vazia: bloquear com *"Registre a justificativa do fluxo abreviado."*
-3. Se o Motivo for "Situação grave ou urgente": mover para "Enviada ao RH" e criar uma tarefa ao RH.
+- **Item novo vindo de fora do app** (em Rascunho e sem autor, como o formulário grava): a função preenche a origem ("Formulário da coordenação") e o solicitante (quem criou), e liga o item ao membro pelo Responsável. Depois confere os registros:
+  - se passou, o item vai direto para "Enviada ao RH" e o RH é avisado;
+  - se não passou, o item vai para "Bloqueada", com o motivo.
+- **Item em "Aguardando coordenação", "Enviada ao RH" ou "Em análise"** sem "Liberação excepcional do RH": a função confere de novo. Se não passar, o item volta para "Bloqueada", com o motivo em "Motivo do bloqueio" e um comentário no histórico. Quem pediu recebe um aviso.
+- **As regras são as da tela:**
+  - "Resultados abaixo do acordado" e "Desalinhamento de perfil" exigem um plano em "Resultados não atingidos", com os feedbacks SCI de abertura e de encerramento.
+  - "Reestruturação da área" e "Fim do prazo previsto no contrato" exigem a justificativa do fluxo abreviado.
+  - "Situação grave ou urgente" segue sem bloqueio.
+- **Avisos:** nunca vão para o membro nem para quem está em `GP_EXCECOES_IDS`, e nunca trazem o conteúdo dos registros.
+- **Rascunhos:** os rascunhos do app e os itens a partir de "Aprovada" não são tocados.
+
+Para ligar:
+
+1. Em **Aplicativos → Recursos para desenvolvedores → Outros → Webhook de saída**, crie um webhook com:
+   - o endereço `https://gestao-pessoas-bice.vercel.app/api/eventos`;
+   - os eventos **ONCRMDYNAMICITEMADD** (item de processo inteligente criado) e **ONCRMDYNAMICITEMUPDATE** (item atualizado).
+2. Copie o **token de aplicação** que o Bitrix mostra e grave na Vercel, em Settings → Environment Variables, como `BITRIX_EVENTO_TOKEN`. A função recusa chamadas sem esse token.
+3. Confirme que `BITRIX_WEBHOOK_URL`, `GP_AVISAR_IDS` e `GP_EXCECOES_IDS` estão gravadas (são as mesmas da seção 3) e faça um Redeploy.
+4. Para testar, crie no kanban de "Encerramentos de contrato" um item com Motivo "Reestruturação da área", sem justificativa, e mova para "Enviada ao RH". Em até um minuto, o item deve voltar para "Bloqueada" com *"Registre a justificativa do fluxo abreviado."*
+
+O Bitrix manda o evento de qualquer processo inteligente do portal. A função ignora todos que não são de "Encerramentos de contrato", e a própria gravação dela não entra em repetição: depois que ela move o item, o evento seguinte já não tem nada a fazer.
 
 A aprovação da coordenação pode ser feita de duas formas:
 
