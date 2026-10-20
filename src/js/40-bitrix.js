@@ -287,6 +287,9 @@
             foto: u.PERSONAL_PHOTO || "", email: u.EMAIL || "", cargo: u.WORK_POSITION || "",
             departamentos: (u.UF_DEPARTMENT || []).map(String),
             aniversario: nasc ? nasc.slice(5, 10) : "", // só mês e dia (3.6: nunca o ano)
+            // para a sincronização com a estrutura (55-sync.js)
+            registro: dataBitrix(u.DATE_REGISTER), tipo: u.USER_TYPE || "",
+            estado: [u.PERSONAL_STATE, u.WORK_STATE].filter(Boolean).join(" "), cidade: [u.PERSONAL_CITY, u.WORK_CITY].filter(Boolean).join(" "),
           };
         });
       },
@@ -401,6 +404,12 @@
           ENTITY_ID: Number(membroId), ENTITY_TYPE: "DYNAMIC_" + e.eti,
           COMMENT: "Dossiê exportado por " + eu.nome + " em " + agora.toLocaleDateString("pt-BR") + " às " + agora.toLocaleTimeString("pt-BR").slice(0, 5) + ".",
         } });
+      },
+      /** Comentário na timeline de um registro do app (histórico de quem, quando e por quê) */
+      comentar: async function (chave, id, texto) {
+        const e = estrutura[chave];
+        if (!e) return;
+        await bx("crm.timeline.comment.add", { fields: { ENTITY_ID: Number(id), ENTITY_TYPE: "DYNAMIC_" + e.eti, COMMENT: texto } });
       },
       /** Preferência da pessoa (ex.: tour já visto), guardada no Bitrix por usuário */
       lerPreferencia: function (nome) { try { return BX24.userOption.get(nome); } catch (e) { return null; } },

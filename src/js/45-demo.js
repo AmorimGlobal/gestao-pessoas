@@ -19,7 +19,8 @@
   const PAPEL_USUARIO = { lideranca: "3", coordenacao: "2", rh: "6", ceo: "1" };
 
   function dadosDemo() {
-    const U = (id, nome, deptos, aniversario, cargo) => ({
+    const U = (id, nome, deptos, aniversario, cargo, registro) => ({
+      registro: registro || "2021-03-01", tipo: "employee", estado: "", cidade: "",
       id, nome, foto: "", email: nome.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, ".") + "@amorimglobal.com",
       cargo: cargo || "", departamentos: deptos, aniversario: aniversario || "",
     });
@@ -351,6 +352,8 @@
       notificacoes: [],
       notificar: async function (ids, mensagem) { this.notificacoes.push({ ids, mensagem }); },
       registrarDossie: async () => {},
+      comentarios: [],
+      comentar: async function (chave, id, texto) { this.comentarios.push({ chave, id, texto }); },
       lerPreferencia: (nome) => { try { return localStorage.getItem("gp_demo_" + euId + "_" + nome); } catch (e) { return null; } },
       gravarPreferencia: (nome, valor) => { try { localStorage.setItem("gp_demo_" + euId + "_" + nome, valor); } catch (e) { /* sem storage */ } },
     };

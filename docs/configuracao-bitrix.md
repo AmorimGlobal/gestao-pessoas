@@ -47,7 +47,29 @@ O que é criado:
 
 Todo processo nasce **sem permissão aberta** (`isSetOpenPermissions = N`).
 
-## 3. Funções de acesso (2.4) — à mão
+## 3. Sincronização com a estrutura da empresa
+
+O processo Membros acompanha a estrutura do Bitrix sozinho:
+
+- **Quem entra:** ganha o item com a liderança direta (o chefe do departamento) e a coordenação (o chefe do setor). Se o cadastro tem menos de 90 dias, ganha também o Onboarding.
+- **Quem muda de departamento:** tem a liderança e a coordenação atualizadas.
+- **Quem é desativado:** vai para Encerrado.
+
+O RH recebe uma notificação com o resumo, e cada item ganha um comentário no histórico. Ficam de fora a CEO e quem estiver em **Configuração → Papéis → Fora do app**. Se a execução tentar encerrar mais de 30% das pessoas de uma vez, ela retém as saídas e pede confirmação.
+
+- **Primeira carga e quando quiser:** Configuração → **Ver o que mudaria** (prévia) e depois **Sincronizar agora** (usa o login do administrador).
+- **Todo dia às 6h:** a rotina `api/sincronizar.js` na Vercel. Ela só liga depois que estas variáveis forem configuradas em Vercel → Settings → Environment Variables, seguidas de um Redeploy:
+
+| Variável | Valor |
+|---|---|
+| `BITRIX_WEBHOOK_URL` | Webhook de entrada (Aplicativos → Recursos para desenvolvedores → Outros → Webhook de entrada), criado por um administrador, com as permissões CRM, Usuários, Estrutura da empresa e Chat e notificações |
+| `CRON_SECRET` | Uma senha longa qualquer. A Vercel a envia nas chamadas do agendamento e a rotina recusa chamadas sem ela |
+| `GP_AVISAR_IDS` | IDs de usuário do RH que recebem o resumo, separados por vírgula. O ID aparece na URL do perfil: `/company/personal/user/<ID>/` |
+| `GP_EXCECOES_IDS` | IDs de quem fica fora do app (hoje, só a Giselle) |
+
+Para testar sem esperar o dia seguinte: Vercel → projeto → Settings → Cron Jobs → **Run**. A resposta mostra quantos itens foram criados, atualizados e encerrados.
+
+## 4. Funções de acesso (2.4) — à mão
 
 Configure em CRM → Configurações → Permissões. Para cada um dos 9 processos:
 
@@ -63,7 +85,7 @@ Mais duas permissões:
 - **Funil 77 (HR \| Requisição de Vagas):** a Liderança precisa de **leitura** para a aba Recrutamento mostrar as vagas que ela pediu. O app filtra pelo e-mail do solicitante (`UF_CRM_RV_EMAIL`).
 - **CEO:** veja o ponto de atenção 3 em `tabela-2.7-e-validacoes.md`. O app calcula os números no navegador da CEO, então ela precisa de leitura. Se ela não puder abrir os registros, o painel dela tem de vir do BI Builder ou de um resumo calculado no servidor.
 
-## 4. Campos obrigatórios por estágio — à mão
+## 5. Campos obrigatórios por estágio — à mão
 
 O app já valida nos formulários, mas a especificação pede a trava também no Bitrix. Marque no editor do card de cada processo, em "obrigatório a partir do estágio":
 
@@ -80,7 +102,7 @@ O app já valida nos formulários, mas a especificação pede a trava também no
   - Descrição, data desejada, reposição e apoio do RH em "Aguardando coordenação".
   - Data da conversa em "Conversa realizada".
 
-## 5. Regras de automação (robôs) — à mão
+## 6. Regras de automação (robôs) — à mão
 
 O app move os estágios quando a pessoa age pela tela: agendar, registrar, aprovar. Os robôs abaixo cuidam do **tempo**, isto é, do que acontece quando ninguém age. O "supervisor do responsável" é o destinatário nativo que segue a estrutura.
 
@@ -116,7 +138,7 @@ Ainda sem robô nem código, a decidir:
 - **Avisos da 4.4:** resumo semanal às segundas, e-mail com 7 dias de atraso e aviso à coordenação com 14 dias.
 - **Criação da leitura ao concluir a tarefa "Entrega":** precisa do modelo de tarefa e de um processo de negócio nas tarefas.
 
-## 6. Trava do encerramento no servidor (4.1) — processo de negócio
+## 7. Trava do encerramento no servidor (4.1) — processo de negócio
 
 A tela confere os registros antes de enviar (`dominio.verificarRegistros`). A especificação exige que o **Bitrix** confira de novo, para cobrir uma solicitação criada por outro caminho.
 
@@ -134,7 +156,7 @@ A aprovação da coordenação pode ser feita de duas formas:
 - **Pelo app:** botões "Aprovar" e "Devolver" na solicitação. Quem pediu nunca aprova o próprio pedido: quando a coordenação é a liderança direta, a aprovação vai para o RH.
 - **Pela aprovação nativa:** a ação "Aprovar documento" atribuída ao campo "Coordenação responsável".
 
-## 7. Outros itens nativos
+## 8. Outros itens nativos
 
 - **Avisos ao membro (4.1):** como o Responsável de todo registro é o membro, desligue para ele as notificações de CRM desses processos. Esta é uma validação pendente (veja a tabela 2.7).
 - **Modelo de tarefa "Entrega" (3.4):** a liderança é a criadora, o "controle após a conclusão" fica ligado e há o campo "Complexidade".

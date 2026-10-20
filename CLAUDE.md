@@ -24,6 +24,9 @@ src/js/20-schema.js   ESQUEMA: processos, estágios (com cor) e campos — fonte
 src/js/30-provision.js cria/completa a estrutura no Bitrix (idempotente, com simulação)      [Node + navegador]
 src/js/40-bitrix.js   repositório Bitrix (BX24): conversão ufCrm<id>… <-> objeto, paginação, lote
 src/js/45-demo.js     repositório de demonstração (mesma interface) + dados dos 6 casos     [Node + navegador]
+src/js/55-sync.js     sincronização com a estrutura da empresa: entradas, mudanças de liderança e saídas  [Node + navegador]
+lib/sincronizacao-servidor.js  a mesma sincronização no servidor, por webhook
+api/sincronizar.js    rotina diária da Vercel (cron em vercel.json; variáveis em docs/configuracao-bitrix.md)
 src/js/50-dominio.js  regras de negócio puras: papéis, equipe, pendências, indicadores, verificação do encerramento, agenda, dicas  [Node + navegador]
 src/js/60-ui-base.js  estado, rotas (hash), layout, componentes, painel lateral, eventos
 src/js/61..70-ui-*.js telas: início/painel, equipe/card do membro, rotinas, desempenho, onboarding, offboarding, recrutamento, agenda, configuração
@@ -58,6 +61,8 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
 - **Datas:** strings ISO `AAAA-MM-DD`, cálculo em UTC (`GP.calc`). Dia N = início + (N − 1). Prazo em dia não útil passa para o próximo dia útil (feriados nacionais mais os de SP/BA pela cidade de referência).
 - **Bloqueio de 48 h** (4.1): a tela respeita o prazo (`dom.editavel`). Depois dele, só adendo, com data, autor e justificativa. O bloqueio "de verdade" é o robô e a permissão por estágio no Bitrix (docs).
 - **Leitura de entrega** (4.8): só onboarding, plano e "marcada como relevante". Não é indicador. A nota do trimestre é a classificação da liderança em 4 níveis.
+- **Equipe = liderança direta pela estrutura** (`dom.liderancaPelaEstrutura`): é o chefe do departamento da pessoa ou, se ela mesma é a chefe, o primeiro chefe acima. Por isso a liderança de uma área está na equipe da coordenação. A sincronização (`55-sync.js`) usa a mesma regra para preencher "Liderança direta" e "Coordenação responsável".
+- **`build.js` compila o JS (`new Function`) antes de gravar**: um erro de sintaxe derruba o build, e a Vercel mantém a versão anterior no ar.
 - **Mudou o esquema?** Altere `20-schema.js`, rode os testes, rode o provisionamento (simulação primeiro) e reconstrua.
 
 ## Estado (15/10/2026)

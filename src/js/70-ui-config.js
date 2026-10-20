@@ -8,7 +8,7 @@
   "use strict";
   const GP = raiz.GP;
   const { esc, icone, plural } = GP.util;
-  const calc = GP.calc, ui = GP.ui, c = GP.ui.c;
+  const calc = GP.calc, dom = GP.dominio, ui = GP.ui, c = GP.ui.c;
   const E = () => ui.estado;
 
   const LINKS = [
@@ -20,7 +20,7 @@
     ["guiaOffboarding", "Guia de offboarding (versão 2)", "Card fechado no topo da aba Offboarding."],
     ["modelosSCI", "Modelos de feedback SCI", "Página com os 4 modelos revisados pelo RH."],
   ];
-  const PAPEIS = [["coordenacao", "Coordenação e acima", "Enviam solicitações formais direto ao RH e aprovam as da equipe (1.2)."], ["rh", "RH", "Veem todas as equipes, a fila do RH e recebem os avisos."], ["ceo", "CEO", "Painel geral, só números (sem o conteúdo dos registros)."]];
+  const PAPEIS = [["coordenacao", "Coordenação e acima", "Enviam solicitações formais direto ao RH e aprovam as da equipe (1.2)."], ["rh", "RH", "Veem todas as equipes, a fila do RH e recebem os avisos."], ["ceo", "CEO", "Painel geral, só números (sem o conteúdo dos registros)."], ["excecoes", "Fora do app", "Não ganham item no processo Membros nem entram nas equipes. A CEO já fica de fora sozinha."]];
 
   function linhasFeriados(lista) { return (lista || []).map((f) => f.data + " " + f.nome).join("\n"); }
   function lerFeriados(txt) {
@@ -54,6 +54,12 @@
         lista.map((u) => '<span class="tag azul">' + esc(u.nome || "ID " + u.id) + ' <a href="#" data-acao="remover-papel" data-papel="' + p[0] + '" data-id="' + esc(u.id) + '" aria-label="Remover">✕</a></span>').join("") +
         '<button class="btn peq sec" data-acao="adicionar-papel" data-papel="' + p[0] + '">' + icone("mais", 13) + " Adicionar</button></div></div>";
     }).join("") + '<p class="muted" style="font-size:12px;margin:0">Liderança não precisa de cadastro: é quem chefia um departamento na estrutura da empresa (1.1).</p></div>';
+    // Sincronização com a estrutura da empresa (55-sync.js)
+    h += '<div class="card"><h3>Sincronização com a estrutura da empresa</h3>' +
+      '<p class="muted" style="margin-top:0">Mantém o processo Membros igual à estrutura do Bitrix. Quem entra ganha o item (e o onboarding, se entrou há menos de 90 dias). Quem muda de departamento tem a liderança e a coordenação atualizadas. Quem é desativado vai para Encerrado. O RH recebe um aviso com o resumo, e cada item ganha um comentário no histórico.</p>' +
+      '<p class="muted" style="font-size:12px">Roda sozinha todo dia de manhã quando a rotina da Vercel estiver configurada (docs/configuracao-bitrix.md). A primeira carga, com todo mundo, é melhor fazer por aqui.</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-acao="sync-previa">Ver o que mudaria</button><button class="btn" data-acao="sync-executar">Sincronizar agora</button></div>' +
+      '<div id="sync-resultado" style="margin-top:14px"></div></div>';
     // Listas e textos
     const fl = cfg.feriadosLocais || {};
     h += '<div class="card"><h3>Cadastros</h3><div id="form-config">' +
@@ -128,6 +134,58 @@
       log.textContent += "\nFALHOU: " + (e.message || E().repo.mensagemErro(e)) + "\n";
     } finally { el.disabled = false; }
   };
+  /* ---------------- sincronização com a estrutura ---------------- */
+  function entradaSync() {
+    const ctx = E().ctx, cfg = E().config || {};
+    const ids = (lista) => (lista || []).map((p) => String(p.id));
+    return {
+      hoje: ctx.hoje, usuarios: ctx.usuarios || [], departamentos: ctx.departamentos || [], membros: ctx.registros.membros || [],
+      excecoes: ids((cfg.papeis || {}).excecoes), ceos: ids((cfg.papeis || {}).ceo),
+    };
+  }
+  function planoHtml(p) {
+    const ctx = E().ctx;
+    const nomeId = (id) => (id ? dom.pessoa(ctx, id).nome : "—");
+    const bloco = (titulo, itens) => '<div style="margin-bottom:12px"><b style="color:var(--navy)">' + esc(titulo) + "</b>" +
+      (itens.length ? '<ul style="margin:6px 0 0;padding-left:18px">' + itens.map((t) => "<li>" + t + "</li>").join("") + "</ul>" : '<div class="muted">nenhuma</div>') + "</div>";
+    return (p.alerta ? '<div class="aviso-atencao" style="margin-bottom:12px">' + esc(p.alerta) + "</div>" : "") +
+      bloco("Entradas (" + p.criar.length + ")", p.criar.map((c) => esc(c.usuario.nome) + ' <span class="muted">· liderança ' + esc(nomeId(c.lideranca)) + " · coordenação " + esc(nomeId(c.coordenacao)) + " · " + (c.onboarding ? "onboarding a partir de " + calc.fmtData(c.ingresso) : "Ativo") + "</span>")) +
+      bloco("Mudanças de liderança (" + p.atualizar.length + ")", p.atualizar.map((a) => esc(a.usuario.nome) + ' <span class="muted">· ' + Object.keys(a.mudancas).map((k) => (k === "lideranca" ? "liderança " : "coordenação ") + esc(nomeId(a.antes[k])) + " → " + esc(nomeId(a.mudancas[k]))).join(" · ") + "</span>")) +
+      bloco("Saídas, vão para Encerrado (" + (p.encerrar.length + (p.saidasRetidas || []).length) + ")", p.encerrar.concat(p.saidasRetidas || []).map((e) => esc(e.membro.titulo || dom.pessoa(ctx, e.membro.responsavel).nome))) +
+      (p.conferir.length ? bloco("Para o RH conferir (" + p.conferir.length + ")", p.conferir.map((x) => esc(x.usuario.nome) + ' <span class="muted">· ' + esc(x.motivo) + "</span>")) : "");
+  }
+  ui.acoes["sync-previa"] = function () {
+    const p = GP.sync.planejar(entradaSync());
+    document.getElementById("sync-resultado").innerHTML = '<div class="aviso-info" style="margin-bottom:12px">Prévia: nada foi gravado.</div>' + planoHtml(p);
+  };
+  ui.acoes["sync-executar"] = async function (el) {
+    const p = GP.sync.planejar(entradaSync());
+    const total = p.criar.length + p.atualizar.length + p.encerrar.length + (p.saidasRetidas || []).length;
+    const alvo = document.getElementById("sync-resultado");
+    if (!total) { alvo.innerHTML = '<div class="aviso-info">✓ O processo Membros já está igual à estrutura da empresa.</div>' + (p.conferir.length ? planoHtml(p) : ""); return; }
+    if (!window.confirm("Aplicar " + total + " mudança(s) no processo Membros?\n\n" + p.criar.length + " entrada(s), " + p.atualizar.length + " mudança(s) de liderança, " + (p.encerrar.length + (p.saidasRetidas || []).length) + " saída(s).")) return;
+    const forcar = !!(p.saidasRetidas && p.saidasRetidas.length) && window.confirm(p.alerta + "\n\nConfirma mover essas " + p.saidasRetidas.length + " pessoas para Encerrado mesmo assim?");
+    const ctx = E().ctx;
+    const ops = {
+      criarMembro: (d) => ui.criar("membros", d),
+      criarOnboarding: (d) => ui.criar("onboarding", Object.assign({ autor: E().eu.id }, d)),
+      atualizarMembro: (id, d) => ui.atualizar("membros", id, d),
+      comentar: (id, t) => E().repo.comentar("membros", id, t),
+      notificar: (ids, t) => E().repo.notificar(ids, t),
+      nomeDe: (id) => dom.pessoa(ctx, id).nome,
+    };
+    const avisarIds = (((E().config || {}).papeis || {}).rh || []).map((x) => String(x.id));
+    el.disabled = true; el.textContent = "Sincronizando…";
+    try {
+      const r = await GP.sync.executar(p, ops, { hoje: ctx.hoje, avisarIds, forcarSaidas: forcar });
+      ui.render();
+      const novo = document.getElementById("sync-resultado");
+      if (novo) novo.innerHTML = '<div class="' + (r.falhas.length ? "aviso-atencao" : "aviso-info") + '">' + (r.texto ? esc(r.texto).replace(/\n/g, "<br>") : "Nada a mudar.") + (avisarIds.length ? "" : "<br>Nenhum RH cadastrado em Papéis: o aviso não foi enviado.") + "</div>";
+    } catch (e) {
+      alvo.innerHTML = '<div class="aviso-erro">Não foi possível sincronizar: ' + esc(E().repo.mensagemErro(e)) + "</div>";
+    } finally { if (document.body.contains(el)) { el.disabled = false; el.textContent = "Sincronizar agora"; } }
+  };
+
   ui.acoes["importar-config"] = function () {
     ui.abrirPainel({
       titulo: "Importar configuração", sub: "Cole o JSON gravado por tools/provisionar.js --saida.",

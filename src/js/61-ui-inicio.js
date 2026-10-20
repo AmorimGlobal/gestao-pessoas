@@ -341,12 +341,11 @@
     });
     const membrosIds = {};
     (ctx.registros.membros || []).forEach((m) => { membrosIds[m.responsavel] = true; });
-    const chefes = {};
-    (ctx.departamentos || []).forEach((d) => { if (d.chefe) chefes[d.chefe] = true; });
     const papeis = (ctx.config && ctx.config.papeis) || {};
     const ceo = {};
     (papeis.ceo || []).forEach((p) => { ceo[p.id] = true; });
-    const semItem = (ctx.usuarios || []).filter((u) => !membrosIds[u.id] && !chefes[u.id] && !ceo[u.id]);
+    (papeis.excecoes || []).forEach((p) => { ceo[p.id] = true; });
+    const semItem = (ctx.usuarios || []).filter((u) => !membrosIds[u.id] && !ceo[u.id] && (u.departamentos || []).length);
     return '<div class="card"><h3>Dados faltando<span class="extra muted">para corrigir toda semana</span></h3>' +
       (semItem.length ? '<div class="aviso-atencao" style="margin-bottom:10px">' + plural(semItem.length, "usuário ativo sem item", "usuários ativos sem item") + " no processo Membros: " + esc(semItem.slice(0, 8).map((u) => u.nome).join(", ")) + (semItem.length > 8 ? "…" : "") + "</div>" : "") +
       (falta.length ? '<div class="lista">' + falta.map((x) => '<div class="item clicavel" data-rota="#/membro/' + esc(x.m.id) + '">' + c.avatar(x.m, 28) + '<div class="principal-item"><div class="t">' + esc(x.m.nome) + '</div><div class="d">Falta: ' + esc(x.f.join(", ")) + "</div></div></div>").join("") + "</div>" : c.vazio("Nenhum dado faltando nos itens Membros.")) + "</div>";

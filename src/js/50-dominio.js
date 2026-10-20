@@ -89,21 +89,41 @@
     };
   }
 
-  /** Membros da equipe direta: quem está num departamento que a pessoa chefia (sem subdepartamentos).
-      Sem estrutura no Bitrix, cai para o campo "Liderança direta" do item Membros. */
+  /** Liderança direta pela estrutura (1.1): o chefe do departamento da pessoa. Se a própria
+      pessoa é a chefe (ou o departamento não tem chefe), sobe até o primeiro chefe acima.
+      Assim a liderança de uma área entra na equipe da coordenação do setor. */
+  function liderancaPelaEstrutura(deptoPorId, userId, deptosDoUsuario) {
+    let d = deptoPorId[(deptosDoUsuario || [])[0]];
+    const vistos = {};
+    while (d && !vistos[d.id]) {
+      vistos[d.id] = true;
+      if (d.chefe && d.chefe !== String(userId)) return d.chefe;
+      d = d.pai ? deptoPorId[d.pai] : null;
+    }
+    return "";
+  }
+  /** Coordenação responsável: o chefe do setor, isto é, o departamento logo abaixo da raiz
+      (a CEO fica acima de todos os setores). Para a própria coordenação, a liderança acima dela. */
+  function coordenacaoPelaEstrutura(deptoPorId, userId, deptosDoUsuario) {
+    let d = deptoPorId[(deptosDoUsuario || [])[0]];
+    const cadeia = [], vistos = {};
+    while (d && !vistos[d.id]) { vistos[d.id] = true; cadeia.push(d); d = d.pai ? deptoPorId[d.pai] : null; }
+    const setor = cadeia.length >= 2 ? cadeia[cadeia.length - 2] : cadeia[0];
+    if (setor && setor.chefe && setor.chefe !== String(userId)) return setor.chefe;
+    return liderancaPelaEstrutura(deptoPorId, userId, deptosDoUsuario);
+  }
+
+  /** Membros da equipe direta: quem tem a pessoa como liderança direta pela estrutura.
+      Sem estrutura no Bitrix (ou membro sem departamento), cai para o campo "Liderança direta". */
   function equipeDe(ctx, uid) {
     const id = String(uid);
-    const deptos = deptosChefiados(ctx, id);
-    const membros = (ctx.registros.membros || []).filter((m) => m.responsavel !== id);
-    let equipe;
-    if (deptos.length) {
-      equipe = membros.filter((m) => {
-        const u = ctx.idx.usuario[m.responsavel];
-        return u && u.departamentos.some((d) => deptos.indexOf(d) >= 0);
-      });
-    } else {
-      equipe = membros.filter((m) => m.lideranca === id);
-    }
+    const temEstrutura = (ctx.departamentos || []).length > 0;
+    const equipe = (ctx.registros.membros || []).filter((m) => {
+      if (m.responsavel === id) return false;
+      const u = ctx.idx.usuario[m.responsavel];
+      if (!temEstrutura || !u || !(u.departamentos || []).length) return m.lideranca === id;
+      return liderancaPelaEstrutura(ctx.idx.depto, u.id, u.departamentos) === id;
+    });
     return membrosAtivos(equipe);
   }
   /** Coordenação: lideranças dos subdepartamentos, cada uma com a sua equipe */
@@ -652,7 +672,7 @@
 
   return {
     MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE,
-    indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, liderancasDoSetor, membrosVisiveis,
+    indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancasDoSetor, membrosVisiveis,
     feriadosDe, feriadosDoMembro, feedbackValido, feedbacksDo, editavel, ultimoFeedback,
     cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
     verificarRegistros, destinoEncerramento, aprovadorDe,
