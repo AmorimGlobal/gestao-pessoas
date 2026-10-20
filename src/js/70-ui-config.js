@@ -121,7 +121,7 @@
     try { ref = /\/marketplace\/app\/\d+\/?/.test(document.referrer) ? document.referrer.replace(/[?#].*$/, "") : ""; } catch (e) { /* sem referrer */ }
     const valores = [
       ["GP_AVISAR_IDS", rh.join(","), "o RH, de Papéis no app"],
-      ["GP_CEO_IDS", ceo.join(","), "a CEO, de Papéis no app"],
+      ["GP_CEO_IDS", ceo.join(","), "a CEO, de Papéis no app (obrigatória: ela nunca ganha item nem aviso)"],
       ["GP_EXCECOES_IDS", fora.join(","), "CEO e Fora do app: nunca recebem aviso"],
       ["GP_LINK_APP", ref, "endereço deste app no Bitrix, no fim de cada aviso"],
     ];

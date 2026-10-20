@@ -83,3 +83,36 @@ test("CEO recebe o resumo calculado com os registros do portal", async () => {
   assert.deepEqual(res.corpo.resumo.areas.map((a) => [a.depto.nome, a.lideranca.nome, a.nEquipe]), [["Imigração", "Carla Mendes", 2]]);
   assert.ok(JSON.stringify(res.corpo).indexOf("Ana") < 0);
 });
+
+test("áreas: uma por liderança (quem chefia dois departamentos aparece uma vez) e sem a raiz", () => {
+  const d = dadosDemo();
+  d.departamentos.push({ id: "14", nome: "Vistos", pai: "10", chefe: "3" }); // a Carla chefia também Vistos
+  d.registros.membros.push({ id: "70", titulo: "Livia Prado", responsavel: "2", estagio: "ATIVO", lideranca: "1", coordenacao: "1" }); // equipe da CEO
+  const ctx = dom.indexar({ hoje: "2026-10-08", eu: { id: "1" }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros, vagas: d.vagas, feriados: { nacionais: calc.feriadosNacionais(2026) } });
+  const g = dom.painelGeral(ctx);
+  const carla = g.areas.filter((a) => a.lideranca.id === "3");
+  assert.equal(carla.length, 1);
+  assert.equal(carla[0].depto.nome, "Imigração · Vistos");
+  assert.ok(!g.areas.some((a) => a.lideranca.id === "1"), "a raiz (CEO) não é uma área");
+  assert.ok(g.areas.reduce((s, a) => s + a.nEquipe, 0) <= g.nMembros);
+});
+
+test("funil de vagas: sem SEMANTICS (como o portal devolve), WON é sucesso e as etapas depois dela são fracasso", () => {
+  const reg = require("../src/js/35-registros.js");
+  const etapas = reg.etapasDoFunil([
+    { STATUS_ID: "C77:NEW", NAME: "Nova solicitação", SORT: 10 }, { STATUS_ID: "C77:EXECUTING", NAME: "Em recrutamento", SORT: 40 },
+    { STATUS_ID: "C77:LOSE", NAME: "Reprovada", SORT: 70 }, { STATUS_ID: "C77:WON", NAME: "Vaga preenchida", SORT: 60 }, { STATUS_ID: "C77:APOLOGY", NAME: "Cancelada", SORT: 80 },
+  ]);
+  assert.deepEqual(etapas.map((e) => e.id + "=" + e.semantica), ["C77:NEW=", "C77:EXECUTING=", "C77:WON=S", "C77:LOSE=F", "C77:APOLOGY=F"]);
+  assert.equal(reg.etapasDoFunil([{ STATUS_ID: "X", SORT: 1, SEMANTICS: "S" }])[0].semantica, "S");
+});
+
+test("prazo da aprovação conta da entrada no estágio, não da última edição", () => {
+  const d = dadosDemo();
+  d.registros.encerramentos.push({ id: "901", membroId: "2", estagio: "AG_COORD", coordenacao: "2", solicitante: "3",
+    criadoEm: "2026-09-01T10:00:00-03:00", movidoEm: "2026-10-01T10:00:00-03:00", atualizadoEm: "2026-10-07T18:00:00-03:00" });
+  const ctx = dom.indexar({ hoje: "2026-10-08", eu: { id: "2" }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros, feriados: { nacionais: calc.feriadosNacionais(2026) } });
+  const a = dom.aprovacoesPendentes(ctx, "2").find((x) => x.item.id === "901");
+  assert.equal(a.desde, "2026-10-01");
+  assert.equal(a.prazo, "2026-10-04");
+});

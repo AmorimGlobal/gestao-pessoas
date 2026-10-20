@@ -392,7 +392,8 @@
       const a = aprovadorDe(ctx, e);
       return !a.rh && a.id === String(uid);
     }).map((e) => {
-      const desde = dataDe(e.atualizadoEm || e.criadoEm);
+      // desde a entrada no estágio (movedTime): uma edição no item não reinicia o prazo nem os avisos
+      const desde = dataDe(e.movidoEm || e.atualizadoEm || e.criadoEm);
       return { item: e, membro: ctx.idx.membro[e.membroId] ? infoMembro(ctx, ctx.idx.membro[e.membroId]) : null, desde, dias: desde ? calc.diffDias(desde, ctx.hoje) : 0, prazo: desde ? calc.addDias(desde, 3) : "" };
     });
   }
@@ -723,11 +724,16 @@
   function painelGeral(ctx) {
     const todos = membrosAtivos(ctx.registros.membros || []);
     const ind = indicadoresEquipe(ctx, todos, {});
-    // áreas = departamentos com liderança e equipe
-    const areas = (ctx.departamentos || []).filter((d) => d.chefe && equipeDe(ctx, d.chefe).length).map((d) => {
-      const equipe = equipeDe(ctx, d.chefe);
-      return { depto: d, lideranca: pessoa(ctx, d.chefe), equipe, nEquipe: equipe.length, ind: indicadoresEquipe(ctx, equipe, { uid: d.chefe }) };
-    }).sort((a, b) => a.depto.nome.localeCompare(b.depto.nome, "pt-BR"));
+    // áreas = uma por liderança: quem chefia dois departamentos aparece uma vez (a equipe é a mesma),
+    // e o departamento raiz (a empresa, chefiada pela CEO) não entra
+    const porChefe = {};
+    (ctx.departamentos || []).filter((d) => d.chefe && d.pai).forEach((d) => { (porChefe[d.chefe] = porChefe[d.chefe] || []).push(d); });
+    const areas = Object.keys(porChefe).map((chefe) => {
+      const equipe = equipeDe(ctx, chefe);
+      if (!equipe.length) return null;
+      const deptos = porChefe[chefe].slice().sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      return { depto: { id: deptos[0].id, nome: deptos.map((d) => d.nome).join(" · ") }, deptos, lideranca: pessoa(ctx, chefe), equipe, nEquipe: equipe.length, ind: indicadoresEquipe(ctx, equipe, { uid: chefe }) };
+    }).filter(Boolean).sort((a, b) => a.depto.nome.localeCompare(b.depto.nome, "pt-BR"));
     const emDia = areas.filter((a) => a.ind.situacao.chave === "em-dia").length;
     // Rotatividade: saídas (encerramentos concluídos) nos últimos 12 meses ÷ membros ativos (aproximação até existir a foto mensal)
     const ini12 = calc.addDias(ctx.hoje, -365);

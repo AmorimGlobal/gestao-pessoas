@@ -352,7 +352,7 @@
           }),
           bxTudo("crm.stagehistory.list", { entityTypeId: 2, filter: { CATEGORY_ID: cat }, order: { ID: "ASC" } }, "items").catch(function () { return []; }),
         ]);
-        return { etapas: (etapas || []).map(function (s) { return { id: s.STATUS_ID, nome: s.NAME, semantica: s.SEMANTICS || "" }; }), negocios, historico };
+        return { etapas: reg.etapasDoFunil(etapas), negocios, historico };
       },
     };
     return repo;

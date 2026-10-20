@@ -10,9 +10,9 @@
 //   BITRIX_EVENTO_TOKEN  token de aplicação do webhook de saída
 //   BITRIX_WEBHOOK_URL   webhook de entrada (o mesmo da rotina diária), para ler e gravar os itens
 //   GP_AVISAR_IDS        IDs do RH que recebem o aviso de solicitação enviada ao RH
-//   GP_EXCECOES_IDS      IDs de quem fica fora do app (ex.: a CEO): nunca recebem aviso
+//   GP_CEO_IDS e GP_EXCECOES_IDS  a CEO e quem fica fora do app: nunca recebem aviso
 "use strict";
-const { criarChamadaWebhook, abrirPortal, hojeSaoPaulo, idsDe, lerCorpo, pegar } = require("../lib/bitrix-servidor.js");
+const { criarChamadaWebhook, abrirPortal, hojeSaoPaulo, idsDe, foraDoApp, lerCorpo, pegar } = require("../lib/bitrix-servidor.js");
 const trava = require("../lib/trava-encerramento.js");
 
 const PROCESSOS = ["membros", "feedbacks", "planos", "encerramentos"];
@@ -50,10 +50,15 @@ module.exports = async function handler(req, res, injetado) {
   try {
     if (inj.semCache) cache = null;
     const chamar = inj.chamar || criarChamadaWebhook(env.BITRIX_WEBHOOK_URL);
-    const portal = await portalEmCache(chamar, Date.now());
+    let portal = await portalEmCache(chamar, Date.now());
+    // processo recriado (entityTypeId novo) enquanto a estrutura estava guardada: lê de novo, no máximo 1 vez por minuto
+    if (String(portal.eti("encerramentos")) !== eti && cache && Date.now() - cache.em > 60 * 1000) {
+      cache = null;
+      portal = await portalEmCache(chamar, Date.now());
+    }
     if (String(portal.eti("encerramentos")) !== eti) return responder(res, 200, { ok: true, ignorado: "outro processo" });
     const r = await trava.tratar({
-      portal, id, hoje: inj.hoje || hojeSaoPaulo(), rhIds: idsDe(env.GP_AVISAR_IDS), naoAvisar: idsDe(env.GP_EXCECOES_IDS),
+      portal, id, hoje: inj.hoje || hojeSaoPaulo(), rhIds: idsDe(env.GP_AVISAR_IDS), naoAvisar: foraDoApp(env),
     });
     return responder(res, 200, Object.assign({ ok: true, evento }, r));
   } catch (e) {

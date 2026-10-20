@@ -138,12 +138,64 @@ test("com a justificativa, liberação do RH ou situação grave, a solicitaçã
   assert.equal((await c.portal.obter("encerramentos", ok.id)).estagio, "AG_COORD");
 });
 
-test("formulário sem membro identificável: bloqueia pedindo o membro", async () => {
+test("formulário com o Responsável deixado em quem pediu: não liga ao item de quem pediu", async () => {
   const c = await cenario();
-  const id = await c.peloFormulario("3", "Reestruturação da área", { title: "Sem membro" }); // Responsável = a liderança, não um membro
+  // em produção a coordenação também tem item no Membros (a sincronização cria)
+  await c.portal.criar("membros", { titulo: "Livia Prado", responsavel: "2", estagio: "ATIVO", lideranca: "1", coordenacao: "1" });
+  const id = await c.peloFormulario("2", "Reestruturação da área", { title: "Sem membro" }); // Responsável = a própria coordenação que enviou
   const r = await evento(c, "ONCRMDYNAMICITEMADD", id);
   assert.equal(r.acao, "bloquear");
-  assert.match((await c.portal.obter("encerramentos", id)).bloqueio, /identificar o membro/);
+  const enc = await c.portal.obter("encerramentos", id);
+  assert.match(enc.bloqueio, /identificar o membro/);
+  assert.equal(enc.membroId, "");
+  assert.ok(!c.bx.estado.avisos.some((a) => /Livia/.test(a.MESSAGE)));
+});
+
+test("recontratação: liga ao item ativo mais recente, não ao do contrato antigo", async () => {
+  const c = await cenario();
+  // o item da Ana criado no cenário fica como o do contrato antigo (Arquivado); o novo é criado depois
+  await c.portal.atualizar("membros", c.ana.id, { estagio: "FAIL", coordenacao: "9" });
+  const nova = await c.portal.criar("membros", { titulo: "Ana Souza", responsavel: "100", estagio: "ATIVO", lideranca: "3", coordenacao: "2" });
+  const id = await c.peloFormulario("100", "Situação grave ou urgente");
+  await evento(c, "ONCRMDYNAMICITEMADD", id);
+  const enc = await c.portal.obter("encerramentos", id);
+  assert.equal(enc.membroId, nova.id);
+  assert.equal(enc.coordenacao, "2");
+});
+
+test("dois eventos quase juntos: só um grava e avisa", async () => {
+  const c = await cenario();
+  await c.planoCompleto(c.ana);
+  const id = await c.peloFormulario("100", "Resultados abaixo do acordado");
+  // entre a 1ª leitura e a releitura, outra execução já moveu o item
+  let leituras = 0;
+  const chamarOriginal = c.bx.chamar;
+  c.bx.chamar = async (m, p) => {
+    if (m === "crm.item.get" && String(p.id) === id && p.entityTypeId === c.E.eti && ++leituras === 2) {
+      await chamarOriginal("crm.item.update", { entityTypeId: c.E.eti, id: Number(id), fields: { stageId: c.E.estagios.ENVIADA_RH } });
+    }
+    return chamarOriginal(m, p);
+  };
+  const r = await evento(c, "ONCRMDYNAMICITEMADD", id);
+  assert.equal(r.acao, "nada");
+  assert.equal(c.bx.estado.avisos.length, 0);
+  assert.equal(c.bx.estado.comentarios.length, 0);
+});
+
+test("o Bitrix recusa a mudança: o RH é avisado e a função responde erro", async () => {
+  const c = await cenario();
+  const id = await c.peloFormulario("100", "Resultados abaixo do acordado");
+  const chamarOriginal = c.bx.chamar;
+  c.bx.chamar = async (m, p) => {
+    if (m === "crm.item.update" && p.entityTypeId === c.E.eti) throw new Error("crm.item.update: o campo Descrição do motivo é obrigatório");
+    return chamarOriginal(m, p);
+  };
+  const res = resposta();
+  await handler(requisicao(corpoEvento("ONCRMDYNAMICITEMADD", c.E.eti, id)), res, { env: ENV, chamar: c.bx.chamar, hoje: HOJE, semCache: true });
+  assert.equal(res.statusCode, 500);
+  const rh = c.bx.estado.avisos.find((a) => a.USER_ID === 6);
+  assert.match(rh.MESSAGE, /não conseguiu mover a solicitação de encerramento nº \d+ para "Bloqueada": .*obrigatório/);
+  assert.ok(!c.bx.estado.avisos.some((a) => a.USER_ID === 1 || a.USER_ID === 100));
 });
 
 test("segurança: token errado 401, sem configuração 503, GET 405, outros processos e eventos ignorados", async () => {

@@ -2,10 +2,11 @@
 // os valores. Usado pela tela de Configuração. Escrito à mão (não é gerado pelo build.js).
 "use strict";
 
+// GP_CEO_IDS é obrigatória em todas: é o que garante que a CEO não ganhe item nem receba aviso
 const ROTINAS = {
-  sincronizacao: ["BITRIX_WEBHOOK_URL", "CRON_SECRET", "GP_AVISAR_IDS"],
-  avisos: ["BITRIX_WEBHOOK_URL", "CRON_SECRET", "GP_AVISAR_IDS"],
-  trava: ["BITRIX_WEBHOOK_URL", "BITRIX_EVENTO_TOKEN"],
+  sincronizacao: ["BITRIX_WEBHOOK_URL", "CRON_SECRET", "GP_AVISAR_IDS", "GP_CEO_IDS"],
+  avisos: ["BITRIX_WEBHOOK_URL", "CRON_SECRET", "GP_AVISAR_IDS", "GP_CEO_IDS"],
+  trava: ["BITRIX_WEBHOOK_URL", "BITRIX_EVENTO_TOKEN", "GP_CEO_IDS"],
   painelCEO: ["BITRIX_WEBHOOK_URL", "GP_CEO_IDS"],
 };
 const OPCIONAIS = ["GP_EXCECOES_IDS", "GP_LINK_APP", "GP_CATEGORIA_VAGAS"];

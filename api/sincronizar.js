@@ -5,9 +5,11 @@
 //   BITRIX_WEBHOOK_URL  webhook de entrada com escopos crm, user, department e im
 //   CRON_SECRET         a Vercel manda "Authorization: Bearer <CRON_SECRET>" nas chamadas do cron
 //   GP_AVISAR_IDS       IDs de usuário do RH que recebem o resumo (separados por vírgula)
-//   GP_EXCECOES_IDS     IDs de quem fica fora do app (ex.: a CEO), separados por vírgula
+//   GP_CEO_IDS          IDs da CEO: não ganha item no Membros e nunca recebe aviso
+//   GP_EXCECOES_IDS     IDs de quem fica fora do app, separados por vírgula
 "use strict";
 const { criarChamadaWebhook, sincronizar, hojeSaoPaulo } = require("../lib/sincronizacao-servidor.js");
+const { idsDe, foraDoApp } = require("../lib/bitrix-servidor.js");
 
 function responder(res, status, corpo) {
   res.statusCode = status;
@@ -15,7 +17,6 @@ function responder(res, status, corpo) {
   res.setHeader("Cache-Control", "no-store");
   res.end(JSON.stringify(corpo));
 }
-const ids = (v) => String(v || "").split(/[,\s;]+/).filter(Boolean);
 
 module.exports = async function handler(req, res, injetado) {
   const env = (injetado && injetado.env) || process.env;
@@ -26,7 +27,8 @@ module.exports = async function handler(req, res, injetado) {
     const r = await sincronizar({
       chamar: (injetado && injetado.chamar) || criarChamadaWebhook(env.BITRIX_WEBHOOK_URL),
       hoje: (injetado && injetado.hoje) || hojeSaoPaulo(),
-      excecoes: ids(env.GP_EXCECOES_IDS), ceos: [], avisarIds: ids(env.GP_AVISAR_IDS), limite: 40,
+      // a CEO e quem está fora do app não ganham item no Membros nem recebem aviso
+      excecoes: idsDe(env.GP_EXCECOES_IDS), ceos: idsDe(env.GP_CEO_IDS), avisarIds: idsDe(env.GP_AVISAR_IDS).filter((id) => foraDoApp(env).indexOf(id) < 0), limite: 40,
     });
     return responder(res, 200, Object.assign({ ok: true }, r));
   } catch (e) {

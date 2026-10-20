@@ -4,7 +4,8 @@
   "functions": {
     "api/sincronizar.js": { "maxDuration": 60 },
     "api/eventos.js": { "maxDuration": 30 },
-    "api/avisos.js": { "maxDuration": 60 }
+    "api/avisos.js": { "maxDuration": 60 },
+    "api/painel.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/sincronizar", "schedule": "0 9 * * *" },

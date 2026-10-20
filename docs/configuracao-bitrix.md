@@ -68,6 +68,7 @@ O RH recebe uma notificação com o resumo, e cada item ganha um comentário no 
 | `BITRIX_WEBHOOK_URL` | Webhook de entrada (Aplicativos → Recursos para desenvolvedores → Outros → Webhook de entrada), criado por um administrador, com as permissões CRM, Usuários, Estrutura da empresa e Chat e notificações |
 | `CRON_SECRET` | Uma senha longa qualquer. A Vercel a envia nas chamadas do agendamento e a rotina recusa chamadas sem ela |
 | `GP_AVISAR_IDS` | IDs de usuário do RH que recebem o resumo, separados por vírgula. O ID aparece na URL do perfil: `/company/personal/user/<ID>/` |
+| `GP_CEO_IDS` | ID de usuário da CEO. Obrigatória: é o que garante que ela não ganhe item no Membros nem receba aviso, e que só ela abra o painel calculado no servidor |
 | `GP_EXCECOES_IDS` | IDs de quem fica fora do app (hoje, só a Giselle) |
 
 No app, **Configuração → Rotinas no servidor** mostra quais rotinas já estão ligadas (pergunta a `/api/status`, que só diz sim ou não e o nome do que falta). Mostra também os valores de `GP_AVISAR_IDS`, `GP_CEO_IDS`, `GP_EXCECOES_IDS` e `GP_LINK_APP`, tirados dos Papéis, para copiar.
@@ -89,6 +90,8 @@ A rotina `api/avisos.js` roda todo dia às 8h (horário de Brasília, com a marg
 - **Uma vez só, sem guardar estado:** cada marco sai no dia útil em que é cruzado. O que cruzar no fim de semana ou num feriado sai no dia útil seguinte. Se a rotina falhar num dia, os marcos daquele dia não são reenviados (o resumo da semana seguinte mostra tudo de novo).
 - **Link:** grave `GP_LINK_APP` com o endereço do app no Bitrix (abra o app e copie o endereço, algo como `https://amorimglobal.bitrix24.com.br/marketplace/app/<número>/`). Sem a variável, o aviso diz "Abra o app Gestão de Pessoas no Bitrix".
 - **E-mail:** os avisos saem como notificação do Bitrix (`im.notify.system.add`). O Bitrix manda por e-mail as notificações não lidas conforme a configuração de notificações de cada pessoa. Confirme no portal se isso atende ao "e-mail de lembrete" da 4.4. Um e-mail próprio precisaria de um serviço de envio (SMTP), que o app ainda não tem.
+- **Rodar de novo no mesmo dia reenvia:** um "Run" manual no painel da Vercel manda de novo os avisos do dia (a rotina não guarda o que já enviou). Para testar, use o `?simular=1` abaixo.
+- **Parâmetros:** o servidor usa os padrões (7 dias para agendar o 1:1, 7 dias para a leitura), porque a Configuração do app fica no Bitrix e só o navegador lê. Se o RH mudar esses números na Configuração, os avisos e o painel da CEO podem divergir da tela em um ou dois dias.
 - **Feriados:** o servidor conhece os feriados nacionais. Os de SP e Salvador ficam na Configuração do app, que só o navegador lê. Por isso, um prazo que cai num feriado local pode gerar o aviso um dia antes da tela.
 - **Para conferir sem enviar:**
 

@@ -86,7 +86,7 @@
     const o = {
       id: String(it.id), titulo: it.title || "", stageId: it.stageId || "",
       estagio: e.estagioPorId[it.stageId] || codigoDoEstagio(it.stageId || ""),
-      criadoEm: it.createdTime || "", atualizadoEm: it.updatedTime || "",
+      criadoEm: it.createdTime || "", atualizadoEm: it.updatedTime || "", movidoEm: it.movedTime || "",
       criadoPor: String(it.createdBy || ""), responsavel: String(it.assignedById || ""),
       membroId: e.campoPai && it[e.campoPai] ? String(it[e.campoPai]) : "",
     };
@@ -110,6 +110,18 @@
       f[e.campos[ch]] = escreverValor(def, dados[ch], e.enums[ch]);
     });
     return f;
+  }
+
+  /** Etapas de um funil de negócios. crm.dealcategory.stage.list não traz SEMANTICS (portal, 10/2026):
+      no Bitrix, a etapa de sucesso é a WON e as de fracasso vêm depois dela na ordem. */
+  function etapasDoFunil(lista) {
+    const etapas = (lista || []).slice().sort((a, b) => Number(a.SORT || 0) - Number(b.SORT || 0));
+    const ganha = etapas.find((x) => x.SEMANTICS === "S") || etapas.find((x) => /(^|:)WON$/.test(String(x.STATUS_ID)));
+    return etapas.map(function (x) {
+      let sem = x.SEMANTICS || "";
+      if (!sem && ganha) sem = x === ganha ? "S" : Number(x.SORT || 0) > Number(ganha.SORT || 0) ? "F" : "";
+      return { id: x.STATUS_ID, nome: x.NAME, semantica: sem };
+    });
   }
 
   /** Sem configuração gravada: acha os processos pelo título.
@@ -137,5 +149,5 @@
     return cfg;
   }
 
-  return { dataBitrix, lerValor, escreverValor, estruturaDoProcesso, aplicarMetadados, normalizar, montarCampos, descobrirEstrutura, codigoDoEstagio };
+  return { dataBitrix, lerValor, escreverValor, estruturaDoProcesso, aplicarMetadados, normalizar, montarCampos, descobrirEstrutura, codigoDoEstagio, etapasDoFunil };
 });

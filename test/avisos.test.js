@@ -137,3 +137,44 @@ test("rotina: segredo, simulação sem enviar e envio pelo Bitrix", async () => 
   assert.deepEqual(bx.estado.avisos.map((a) => a.USER_ID), [3]);
   assert.match(bx.estado.avisos[0].MESSAGE, /^\[Gestão de Pessoas\] Venceu o prazo de uma pendência:\n• Completar a Ficha de Ana \(prazo 20\/10, 1 dia de atraso\)/);
 });
+
+test("ninguém recebe aviso sobre os próprios registros, nem quando é do RH ou aprova", () => {
+  // a Júlia (111) está no RH e a equipe do Marcos tem ele mesmo como coordenação: o aviso de 14 dias iria ao RH
+  const d0 = dadosDemo();
+  const ctx = dom.indexar({
+    hoje: "2026-10-21", eu: { id: "" }, config: {}, usuarios: d0.usuarios, departamentos: d0.departamentos,
+    registros: Object.assign(d0.registros, { membros: d0.registros.membros.map((m) => (m.lideranca === "4" ? Object.assign(m, { coordenacao: "4" }) : m)) }),
+    feriados: { nacionais: calc.feriadosNacionais(2026) },
+  });
+  const p = avisos.planejar({ ctx, rhIds: ["6", "111"], naoAvisar: ["1"] });
+  const julia = p.mensagens.filter((m) => m.para === "111");
+  assert.ok(julia.length >= 1, "a Júlia recebe como RH");
+  julia.forEach((m) => assert.ok(!/Júlia/.test(m.texto), "a Júlia recebeu aviso sobre ela mesma: " + m.texto));
+  assert.ok(p.mensagens.some((m) => m.para === "6" && /Júlia/.test(m.texto)), "o resto do RH recebe");
+});
+
+test("aprovação do próprio encerramento nunca vira aviso para a pessoa", () => {
+  const d0 = dadosDemo();
+  // pedido de encerramento da Carla (que também é membro), com ela mesma como coordenação responsável
+  d0.registros.membros.push({ id: "70", titulo: "Carla Mendes", responsavel: "3", estagio: "ATIVO", lideranca: "2", coordenacao: "2" });
+  d0.registros.encerramentos.push({ id: "900", membroId: "70", estagio: "AG_COORD", coordenacao: "3", solicitante: "2", movidoEm: "2026-09-20T10:00:00-03:00", criadoEm: "2026-09-20T10:00:00-03:00" });
+  const ctx = dom.indexar({ hoje: "2026-10-13", eu: { id: "" }, config: {}, usuarios: d0.usuarios, departamentos: d0.departamentos, registros: d0.registros, feriados: { nacionais: calc.feriadosNacionais(2026) } });
+  const p = avisos.planejar({ ctx, rhIds: ["6"], naoAvisar: ["1"] });
+  p.mensagens.filter((m) => m.para === "3").forEach((m) => assert.ok(!/encerramento de Carla/.test(m.texto), m.texto));
+});
+
+test("rotina: a CEO só em GP_CEO_IDS (sem GP_EXCECOES_IDS) não recebe nada, mesmo chefiando a raiz com equipe", async () => {
+  const bx = await portalComAna();
+  const portal = await abrirPortal(bx.chamar);
+  // como a sincronização faz em produção: a coordenação (Livia, 2) também tem item, na equipe da CEO
+  await portal.criar("membros", { titulo: "Livia Prado", responsavel: "2", estagio: "ATIVO", lideranca: "1", coordenacao: "1" });
+  await portal.criar("ciclo", { titulo: "1:1", membroId: (await portal.listar("membros", { assignedById: 2 }))[0].id, responsavel: "2", estagio: "NEW", trimestre: "2026-T4", fimTrimestre: "2026-12-31", prazoEvidencias: "2027-01-15" });
+  const env = { CRON_SECRET: "s3gredo", BITRIX_WEBHOOK_URL: "https://x/rest/1/abc/", GP_AVISAR_IDS: "6,1", GP_CEO_IDS: "1" };
+  for (const hoje of ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-26"]) {
+    const r = resposta();
+    await handler({ headers: { authorization: "Bearer s3gredo" }, url: "/api/avisos" }, r, { env, chamar: bx.chamar, hoje });
+    assert.equal(r.statusCode, 200, JSON.stringify(r.corpo));
+  }
+  assert.ok(bx.estado.avisos.length > 0);
+  assert.ok(!bx.estado.avisos.some((a) => a.USER_ID === 1), "a CEO recebeu: " + JSON.stringify(bx.estado.avisos.filter((a) => a.USER_ID === 1)));
+});

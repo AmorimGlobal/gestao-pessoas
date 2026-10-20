@@ -6,12 +6,13 @@
 //   BITRIX_WEBHOOK_URL  webhook de entrada com escopos crm, user, department e im
 //   CRON_SECRET         a Vercel manda "Authorization: Bearer <CRON_SECRET>" nas chamadas do cron
 //   GP_AVISAR_IDS       IDs do RH (resumo do RH e avisos de 14 dias quando a liderança é a coordenação)
-//   GP_EXCECOES_IDS     IDs de quem fica fora do app (ex.: a CEO): nunca recebem aviso
+//   GP_CEO_IDS          IDs da CEO: nunca recebe aviso
+//   GP_EXCECOES_IDS     IDs de quem fica fora do app: nunca recebem aviso
 //   GP_LINK_APP         opcional: endereço do app no Bitrix, vai no fim de cada aviso
 //
 // ?simular=1 devolve as mensagens do dia sem enviar (com o mesmo segredo do cron).
 "use strict";
-const { criarChamadaWebhook, hojeSaoPaulo, idsDe } = require("../lib/bitrix-servidor.js");
+const { criarChamadaWebhook, hojeSaoPaulo, idsDe, foraDoApp } = require("../lib/bitrix-servidor.js");
 const { montarContexto } = require("../lib/contexto-servidor.js");
 const avisos = require("../lib/avisos.js");
 
@@ -32,7 +33,7 @@ module.exports = async function handler(req, res, injetado) {
   try {
     const hoje = inj.hoje || hojeSaoPaulo();
     const { ctx, portal } = await montarContexto(inj.chamar || criarChamadaWebhook(env.BITRIX_WEBHOOK_URL), hoje);
-    const plano = avisos.planejar({ ctx, rhIds: idsDe(env.GP_AVISAR_IDS), naoAvisar: idsDe(env.GP_EXCECOES_IDS), link: env.GP_LINK_APP || "" });
+    const plano = avisos.planejar({ ctx, rhIds: idsDe(env.GP_AVISAR_IDS), naoAvisar: foraDoApp(env), link: env.GP_LINK_APP || "" });
     const porTipo = {};
     plano.mensagens.forEach((m) => { porTipo[m.tipo] = (porTipo[m.tipo] || 0) + 1; });
     const resumo = { ok: true, hoje, diaUtil: plano.diaUtil, semanal: plano.semanal, mensagens: plano.mensagens.length, porTipo };
