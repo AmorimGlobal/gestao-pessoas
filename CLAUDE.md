@@ -54,7 +54,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 78 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 90 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -86,6 +86,6 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - trava do encerramento no servidor;
   - avisos da 4.4;
   - painel da CEO pelo servidor.
-- **Falta ligar na Vercel:** as variáveis da seção 3 de `docs/configuracao-bitrix.md` (`BITRIX_WEBHOOK_URL`, `CRON_SECRET`, `GP_AVISAR_IDS`, `GP_EXCECOES_IDS`, `GP_CEO_IDS`, `BITRIX_EVENTO_TOKEN`, `GP_LINK_APP`) e o webhook de saída. Sem elas, `/api/*` responde 503.
+- **Falta ligar na Vercel:** as variáveis da seção 3 de `docs/configuracao-bitrix.md` (`BITRIX_WEBHOOK_URL`, `CRON_SECRET`, `GP_AVISAR_IDS`, `GP_CEO_IDS` (obrigatória), `GP_EXCECOES_IDS`, `BITRIX_EVENTO_TOKEN`, `GP_LINK_APP`) e o webhook de saída. Sem elas, `/api/*` responde 503.
 - **Aguardando o RH (Luciele):** a confirmação da arquitetura, as decisões da 6.1 (níveis, feriados locais, links, modelos SCI, critérios de situação) e a pergunta da 6.3 para Operações.
 - **Pendências e riscos:** `docs/tabela-2.7-e-validacoes.md`.
