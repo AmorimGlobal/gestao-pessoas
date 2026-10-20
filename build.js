@@ -15,6 +15,8 @@ const js = arquivosJs.map((f) => "/* ---- " + f + " ---- */\n" + fs.readFileSync
 const css = fs.readFileSync(path.join(src, "styles.css"), "utf8");
 let html = fs.readFileSync(path.join(src, "index.html"), "utf8");
 if (js.indexOf("</script") >= 0) throw new Error("O JS não pode conter </script> (quebra a página).");
+// Só compila (não executa): erro de sintaxe derruba o build, e a Vercel mantém a versão anterior no ar
+try { new Function(js); } catch (e) { throw new Error("Erro de sintaxe no JS do app: " + e.message); }
 html = html.replace("/*__CSS__*/", () => css).replace("/*__JS__*/", () => js);
 
 fs.mkdirSync(path.join(raiz, "dist"), { recursive: true });
