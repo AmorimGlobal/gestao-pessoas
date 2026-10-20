@@ -12,7 +12,7 @@
 //   GP_AVISAR_IDS        IDs do RH que recebem o aviso de solicitação enviada ao RH
 //   GP_EXCECOES_IDS      IDs de quem fica fora do app (ex.: a CEO): nunca recebem aviso
 "use strict";
-const { criarChamadaWebhook, abrirPortal, hojeSaoPaulo, idsDe } = require("../lib/bitrix-servidor.js");
+const { criarChamadaWebhook, abrirPortal, hojeSaoPaulo, idsDe, lerCorpo, pegar } = require("../lib/bitrix-servidor.js");
 const trava = require("../lib/trava-encerramento.js");
 
 const PROCESSOS = ["membros", "feedbacks", "planos", "encerramentos"];
@@ -24,33 +24,6 @@ function responder(res, status, corpo) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
   res.end(JSON.stringify(corpo));
-}
-
-/** O Bitrix manda application/x-www-form-urlencoded com chaves "data[FIELDS][ID]" */
-async function lerCorpo(req) {
-  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) return req.body;
-  let texto = typeof req.body === "string" ? req.body : Buffer.isBuffer(req.body) ? req.body.toString("utf8") : null;
-  if (texto === null) {
-    texto = await new Promise((ok, falha) => {
-      let acc = "";
-      req.on("data", (c) => { acc += c; });
-      req.on("end", () => ok(acc));
-      req.on("error", falha);
-    });
-  }
-  const t = String(texto || "").trim();
-  if (t.charAt(0) === "{") { try { return JSON.parse(t); } catch (e) { return {}; } }
-  const o = {};
-  new URLSearchParams(t).forEach((v, k) => { o[k] = v; });
-  return o;
-}
-/** pegar(corpo, "data", "FIELDS", "ID"): aceita o corpo aninhado ou com chaves planas */
-function pegar(corpo, ...chaves) {
-  let v = corpo;
-  for (const k of chaves) v = v && typeof v === "object" ? v[k] : undefined;
-  if (v !== undefined) return v;
-  const plana = chaves[0] + chaves.slice(1).map((k) => "[" + k + "]").join("");
-  return corpo ? corpo[plana] : undefined;
 }
 
 async function portalEmCache(chamar, agora) {

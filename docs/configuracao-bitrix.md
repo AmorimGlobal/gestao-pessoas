@@ -107,7 +107,11 @@ Configure em CRM → Configurações → Permissões. Para cada um dos 9 process
 Mais duas permissões:
 
 - **Funil 77 (HR \| Requisição de Vagas):** a Liderança precisa de **leitura** para a aba Recrutamento mostrar as vagas que ela pediu. O app filtra pelo e-mail do solicitante (`UF_CRM_RV_EMAIL`).
-- **CEO:** veja o ponto de atenção 3 em `tabela-2.7-e-validacoes.md`. O app calcula os números no navegador da CEO, então ela precisa de leitura. Se ela não puder abrir os registros, o painel dela tem de vir do BI Builder ou de um resumo calculado no servidor.
+- **CEO:** **nenhuma** permissão nos 9 processos. O painel dela é calculado no servidor (`api/painel.js`), que devolve só números. Para ligar, grave na Vercel:
+  - `GP_CEO_IDS` com o ID de usuário da CEO;
+  - `GP_CATEGORIA_VAGAS`, opcional (padrão 77), para o tempo de preenchimento de vaga.
+  
+  Use o mesmo `BITRIX_WEBHOOK_URL` da seção 3. Sem essas variáveis, a visão da CEO mostra o aviso "Os números do painel não puderam ser carregados".
 
 ## 5. Campos obrigatórios por estágio — à mão
 

@@ -352,6 +352,13 @@
       notificacoes: [],
       notificar: async function (ids, mensagem) { this.notificacoes.push({ ids, mensagem }); },
       registrarDossie: async () => {},
+      /** Na demonstração o resumo da CEO é calculado aqui, com a mesma função do servidor */
+      painelServidor: async (ctx) => {
+        await atraso();
+        // 50-dominio.js carrega depois deste arquivo: no navegador já está em GP na hora da chamada
+        const D = (typeof window !== "undefined" && window.GP && window.GP.dominio) || require("./50-dominio.js");
+        return D.resumoPainel(D.painelGeral(ctx));
+      },
       comentarios: [],
       comentar: async function (chave, id, texto) { this.comentarios.push({ chave, id, texto }); },
       lerPreferencia: (nome) => { try { return localStorage.getItem("gp_demo_" + euId + "_" + nome); } catch (e) { return null; } },

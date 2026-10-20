@@ -52,6 +52,17 @@
     return c;
   }
 
+  /** Painel da CEO: números calculados no servidor (no Bitrix) ou aqui (demonstração). Não trava a abertura. */
+  function carregarResumoCEO(repo, ctx) {
+    E.resumoCEO = null;
+    E.resumoCEOErro = "";
+    repo.painelServidor(ctx).then(function (r) { E.resumoCEO = r; ui.render(); }, function (e) {
+      console.error(e);
+      E.resumoCEOErro = (repo.mensagemErro ? repo.mensagemErro(e) : "") || (e && e.message) || String(e);
+      ui.render();
+    });
+  }
+
   async function iniciar() {
     ui.render();
     const q = new URLSearchParams(location.search);
@@ -85,6 +96,7 @@
       ctx.ausencias = await repo.ausencias(ids.slice(0, 400), hoje, calc.addDias(hoje, 13 * 7 + 7)).catch(() => []);
 
       Object.assign(E, { eu, config, ctx, estrutura: { origem: est.origem, ausentes: est.ausentes || [] } });
+      if (papeis.ceo) carregarResumoCEO(repo, ctx);
       E.visoes = ui.visoesDisponiveis(papeis);
       let guardada = null;
       try { guardada = localStorage.getItem("gp_visao_" + eu.id); } catch (e) { /* sem storage */ }

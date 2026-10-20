@@ -97,6 +97,10 @@
   const reg = GP.registros;
   const dataBitrix = reg.dataBitrix;
 
+  function semPermissao(e) {
+    return !!e && (e.codigo === "ACCESS_DENIED" || /access denied|not allowed|permission|acesso negado/i.test(String(e.descricao || e.message || "")));
+  }
+
   function lerJSON(txt, padrao) {
     if (txt && typeof txt === "object") return txt;
     try { return txt ? JSON.parse(txt) : padrao; } catch (e) { return padrao; }
@@ -216,9 +220,13 @@
         }, "items");
         return itens.map(function (it) { return normalizar(chave, it); });
       },
+      /** Um processo sem permissão de leitura (ex.: a CEO, ou a liderança em Finalistas) vem vazio
+          em vez de derrubar o app inteiro */
       listarTodos: async function () {
         const r = {};
-        for (const p of schema.PROCESSOS) r[p.chave] = await repo.listar(p.chave);
+        for (const p of schema.PROCESSOS) {
+          try { r[p.chave] = await repo.listar(p.chave); } catch (e) { if (!semPermissao(e)) throw e; r[p.chave] = []; }
+        }
         return r;
       },
       criar: async function (chave, dados) {
@@ -295,6 +303,16 @@
         const cmds = {};
         ids.forEach(function (id) { cmds["n" + id] = ["im.notify.system.add", { USER_ID: Number(id), MESSAGE: "[Gestão de Pessoas] " + mensagem }]; });
         await bxLote(cmds);
+      },
+      /** Painel da CEO: só números, calculados no servidor (api/painel.js). O servidor confere quem
+          pediu pelo token do Bitrix desta sessão, sem precisar de leitura da CEO nos processos. */
+      painelServidor: async function () {
+        const auth = BX24.getAuth ? BX24.getAuth() : null;
+        if (!auth || !auth.access_token) throw new Error("o Bitrix não entregou o token de acesso desta sessão");
+        const r = await fetch("/api/painel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auth: auth.access_token }) });
+        const j = await r.json().catch(function () { return {}; });
+        if (!r.ok || !j.ok) throw new Error(j.erro || "o servidor respondeu " + r.status);
+        return j.resumo;
       },
       /** O download do dossiê fica registrado: comentário na timeline do item Membros (4.4) */
       registrarDossie: async function (membroId, eu) {

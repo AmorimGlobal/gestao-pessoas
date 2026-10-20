@@ -11,10 +11,8 @@
 //
 // ?simular=1 devolve as mensagens do dia sem enviar (com o mesmo segredo do cron).
 "use strict";
-const calc = require("../src/js/10-calc.js");
-const dom = require("../src/js/50-dominio.js");
-const schema = require("../src/js/20-schema.js");
-const { criarChamadaWebhook, abrirPortal, hojeSaoPaulo, idsDe } = require("../lib/bitrix-servidor.js");
+const { criarChamadaWebhook, hojeSaoPaulo, idsDe } = require("../lib/bitrix-servidor.js");
+const { montarContexto } = require("../lib/contexto-servidor.js");
 const avisos = require("../lib/avisos.js");
 
 function responder(res, status, corpo) {
@@ -22,18 +20,6 @@ function responder(res, status, corpo) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
   res.end(JSON.stringify(corpo));
-}
-
-/** Lê o portal inteiro e monta o mesmo contexto que a tela usa */
-async function montarContexto(chamar, hoje) {
-  const portal = await abrirPortal(chamar);
-  const registros = {};
-  for (const p of schema.PROCESSOS) registros[p.chave] = portal.est[p.chave] ? await portal.listar(p.chave) : [];
-  const [usuarios, departamentos] = [await portal.usuarios(), await portal.departamentos()];
-  const ano = Number(hoje.slice(0, 4));
-  const nacionais = [ano - 1, ano, ano + 1].reduce((acc, a) => acc.concat(calc.feriadosNacionais(a)), []);
-  const ctx = dom.indexar({ hoje, eu: { id: "" }, config: {}, usuarios, departamentos, registros, feriados: { nacionais } });
-  return { ctx, portal };
 }
 
 module.exports = async function handler(req, res, injetado) {

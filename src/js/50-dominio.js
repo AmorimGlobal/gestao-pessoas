@@ -670,6 +670,44 @@
     return { ano, ciclos, feedbacks: fbs, tipos, classificados: ciclos.filter((c) => c.item && c.item.classificacao).length };
   }
 
+  /* ================================================================ painel geral do RH e da CEO (4.4, 4.6, 4.8) */
+  function painelGeral(ctx) {
+    const todos = membrosAtivos(ctx.registros.membros || []);
+    const ind = indicadoresEquipe(ctx, todos, {});
+    // áreas = departamentos com liderança e equipe
+    const areas = (ctx.departamentos || []).filter((d) => d.chefe && equipeDe(ctx, d.chefe).length).map((d) => {
+      const equipe = equipeDe(ctx, d.chefe);
+      return { depto: d, lideranca: pessoa(ctx, d.chefe), equipe, nEquipe: equipe.length, ind: indicadoresEquipe(ctx, equipe, { uid: d.chefe }) };
+    }).sort((a, b) => a.depto.nome.localeCompare(b.depto.nome, "pt-BR"));
+    const emDia = areas.filter((a) => a.ind.situacao.chave === "em-dia").length;
+    // Rotatividade: saídas (encerramentos concluídos) nos últimos 12 meses ÷ membros ativos (aproximação até existir a foto mensal)
+    const ini12 = calc.addDias(ctx.hoje, -365);
+    const saidas = (ctx.registros.encerramentos || []).filter((e) => e.estagio === "SUCCESS" && (e.concluidaEm || "") >= ini12);
+    const aPedido = saidas.filter((e) => /pedido/i.test(e.motivoSaida || "")).length;
+    const vagas = vagasDe(ctx, null);
+    const ini6 = calc.addDias(ctx.hoje, -182);
+    const tempos = vagas.filter((v) => v.fechada && v.fechadaEm >= ini6 && v.tempoParaFechar !== null).map((v) => v.tempoParaFechar);
+    return {
+      todos, nMembros: todos.length, ind, areas, areasEmDia: calc.percentual(emDia, areas.length),
+      rotatividade: calc.percentual(saidas.length, todos.length + saidas.length), saidas: saidas.length, aPedido, decisao: saidas.length - aPedido,
+      tempoVaga: calc.mediana(tempos), vagasAbertas: vagas.filter((v) => !v.semantica).length,
+      emOnboarding: todos.filter((m) => m.estagio === "NEW").length,
+      encerramentosAndamento: (ctx.registros.encerramentos || []).filter((e) => ["SUCCESS", "FAIL"].indexOf(e.estagio) < 0).length,
+    };
+  }
+  /** Só números, prazos e nomes de áreas e lideranças: é o que a CEO recebe (4.4: sem o conteúdo
+      escrito dos registros e sem nomes de membros). Serve também de resposta do servidor (api/painel.js). */
+  function resumoPainel(g) {
+    const pct = (p) => ({ n: p.n, d: p.d, valor: p.valor, texto: p.texto, curto: p.curto });
+    const indicadores = (i) => ({ um1a1: pct(i.um1a1), feedback90: pct(i.feedback90), atrasadas: i.atrasadas, situacao: { chave: i.situacao.chave, rotulo: i.situacao.rotulo, cor: i.situacao.cor } });
+    return {
+      nMembros: g.nMembros, ind: indicadores(g.ind), areasEmDia: pct(g.areasEmDia),
+      areas: g.areas.map((a) => ({ depto: { id: a.depto.id, nome: a.depto.nome }, lideranca: { id: a.lideranca.id, nome: a.lideranca.nome }, nEquipe: a.nEquipe, ind: indicadores(a.ind) })),
+      rotatividade: pct(g.rotatividade), saidas: g.saidas, aPedido: g.aPedido, decisao: g.decisao,
+      tempoVaga: g.tempoVaga, vagasAbertas: g.vagasAbertas, emOnboarding: g.emOnboarding, encerramentosAndamento: g.encerramentosAndamento,
+    };
+  }
+
   return {
     MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE,
     indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancasDoSetor, membrosVisiveis,
@@ -677,6 +715,6 @@
     cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
     verificarRegistros, destinoEncerramento, aprovadorDe,
     pendenciasDe, ordenarPendencias, aprovacoesPendentes, filaRH,
-    indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, agendaEquipe, dicas, anoDoMembro,
+    indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, agendaEquipe, dicas, anoDoMembro, painelGeral, resumoPainel,
   };
 });

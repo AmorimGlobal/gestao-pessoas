@@ -97,6 +97,7 @@
   }
   function inicioCEO() {
     const g = geral();
+    if (!g) return faixa(saudacao(), "Visão geral", null, "") + semResumoCEO();
     return faixa(saudacao(), "Visão geral", [
       { valor: g.ind.um1a1.curto, rotulo: "1:1 do trimestre agendados" },
       { valor: g.areasEmDia.texto.split(" · ")[1] || g.areasEmDia.texto, rotulo: "áreas em dia" },
@@ -235,39 +236,25 @@
   }
 
   /* ---------------- RH e CEO: painel geral (4.4, 4.6, 4.8) ---------------- */
+  /** RH: o painel completo, calculado aqui. CEO: só o resumo de números, que no Bitrix vem do
+      servidor (api/painel.js), porque a CEO não tem leitura nos processos (ponto de atenção 3). */
   function geral() {
-    const ctx = E().ctx;
-    const todos = dom.membrosAtivos(ctx.registros.membros || []);
-    const ind = dom.indicadoresEquipe(ctx, todos, {});
-    // áreas = departamentos com liderança e equipe
-    const areas = (ctx.departamentos || []).filter((d) => d.chefe && dom.equipeDe(ctx, d.chefe).length).map((d) => {
-      const equipe = dom.equipeDe(ctx, d.chefe);
-      return { depto: d, lideranca: dom.pessoa(ctx, d.chefe), equipe, ind: dom.indicadoresEquipe(ctx, equipe, { uid: d.chefe }) };
-    }).sort((a, b) => a.depto.nome.localeCompare(b.depto.nome, "pt-BR"));
-    const emDia = areas.filter((a) => a.ind.situacao.chave === "em-dia").length;
-    // Rotatividade: saídas (encerramentos concluídos) nos últimos 12 meses ÷ membros ativos (aproximação até existir a foto mensal)
-    const ini12 = calc.addDias(ctx.hoje, -365);
-    const saidas = (ctx.registros.encerramentos || []).filter((e) => e.estagio === "SUCCESS" && (e.concluidaEm || "") >= ini12);
-    const aPedido = saidas.filter((e) => /pedido/i.test(e.motivoSaida || "")).length;
-    const vagas = dom.vagasDe(ctx, null);
-    const ini6 = calc.addDias(ctx.hoje, -182);
-    const tempos = vagas.filter((v) => v.fechada && v.fechadaEm >= ini6 && v.tempoParaFechar !== null).map((v) => v.tempoParaFechar);
-    return {
-      todos, ind, areas, areasEmDia: calc.percentual(emDia, areas.length),
-      rotatividade: calc.percentual(saidas.length, todos.length + saidas.length), saidas: saidas.length, aPedido, decisao: saidas.length - aPedido,
-      tempoVaga: calc.mediana(tempos), vagasAbertas: vagas.filter((v) => !v.semantica).length,
-      emOnboarding: todos.filter((m) => m.estagio === "NEW").length,
-      encerramentosAndamento: (ctx.registros.encerramentos || []).filter((e) => ["SUCCESS", "FAIL"].indexOf(e.estagio) < 0).length,
-    };
+    if (E().visao === "ceo") return E().resumoCEO || null;
+    return dom.painelGeral(E().ctx);
+  }
+  function semResumoCEO() {
+    const erro = E().resumoCEOErro;
+    return '<div class="card">' + (erro ? '<div class="aviso-atencao">Os números do painel não puderam ser carregados: ' + esc(erro) + "</div>" : '<p class="muted">Carregando os números do painel…</p>') + "</div>";
   }
   function painelGeral(rh, aba0) {
     const ctx = E().ctx;
     const g = geral();
+    if (!g) return faixa("Painel geral", ctx.tri.rotulo, null, "") + semResumoCEO();
     const aba = aba0 || (rh ? "hoje" : "indicadores");
     const lista = (rh ? [{ chave: "hoje", rotulo: "Hoje", rota: "#/painel/hoje" }] : [])
       .concat([{ chave: "indicadores", rotulo: "Indicadores", rota: "#/painel/indicadores" }, { chave: "setores", rotulo: "Setores e retenção", rota: "#/painel/setores" }])
       .concat(rh ? [{ chave: "processos", rotulo: "Processos e cadastros", rota: "#/painel/processos" }] : []);
-    let h = faixa(rh ? "Painel do RH" : "Painel geral", g.todos.length + " membros · " + ctx.tri.rotulo, null, atencaoHoje(g)) + c.abas(lista, aba);
+    let h = faixa(rh ? "Painel do RH" : "Painel geral", g.nMembros + " membros · " + ctx.tri.rotulo, null, atencaoHoje(g)) + c.abas(lista, aba);
     if (aba === "hoje" && rh) h += abaHoje(g);
     else if (aba === "setores") h += abaSetores(g, rh);
     else if (aba === "processos" && rh) h += abaProcessos(g);
@@ -311,11 +298,11 @@
   }
   function abaSetores(g, rh) {
     return '<div class="card"><h3>Setores e áreas<span class="extra muted">ordem alfabética</span></h3><div class="tabela-wrap"><table class="tabela"><thead><tr><th>Área</th><th>Liderança</th><th class="n">Membros</th><th>1:1 do tri</th><th>Feedback 90 dias</th><th class="n">Atrasadas</th><th>Situação</th></tr></thead><tbody>' +
-      g.areas.map((a) => "<tr" + (rh ? ' class="clicavel" data-rota="#/equipe/lideranca/' + esc(a.lideranca.id) + '"' : "") + "><td><b>" + esc(a.depto.nome) + "</b></td><td>" + esc(a.lideranca.nome) + '</td><td class="n">' + a.equipe.length +
+      g.areas.map((a) => "<tr" + (rh ? ' class="clicavel" data-rota="#/equipe/lideranca/' + esc(a.lideranca.id) + '"' : "") + "><td><b>" + esc(a.depto.nome) + "</b></td><td>" + esc(a.lideranca.nome) + '</td><td class="n">' + a.nEquipe +
         '</td><td class="num">' + esc(a.ind.um1a1.texto) + '</td><td class="num">' + esc(a.ind.feedback90.texto) + '</td><td class="n">' + a.ind.atrasadas + "</td><td>" + c.tag(a.ind.situacao.rotulo, a.ind.situacao.cor) + "</td></tr>").join("") +
       "</tbody></table></div></div>" +
       '<div class="card"><h3>Membros por liderança<span class="extra muted">faixa de referência 3 a 7 (a definir pelo RH)</span></h3>' +
-      g.areas.map((a) => { const n = a.equipe.length; const fora = n < 3 || n > 7; return '<div class="barra-bloco"><div class="barra-topo"><span class="rot">' + esc(a.lideranca.nome) + '</span><span class="val' + (fora ? " suave" : "") + '">' + n + "</span></div><div class=\"barra\"><div class=\"preench\" style=\"width:" + Math.min(100, n * 10) + '%"></div></div></div>'; }).join("") + "</div>";
+      g.areas.map((a) => { const n = a.nEquipe; const fora = n < 3 || n > 7; return '<div class="barra-bloco"><div class="barra-topo"><span class="rot">' + esc(a.lideranca.nome) + '</span><span class="val' + (fora ? " suave" : "") + '">' + n + "</span></div><div class=\"barra\"><div class=\"preench\" style=\"width:" + Math.min(100, n * 10) + '%"></div></div></div>'; }).join("") + "</div>";
   }
   function abaHoje(g) {
     const ctx = E().ctx;

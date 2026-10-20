@@ -69,10 +69,11 @@ Com o app, a liderança vê o que o protótipo mostra, e as regras de cálculo d
 
 1. **Responsável = membro.** É o que faz a visibilidade por departamento funcionar (2.4). O Bitrix, porém, costuma avisar o Responsável quando um item é criado. Se não for possível desligar esse aviso só para estes processos, a alternativa é Responsável = liderança e o vínculo com o Membro pela relação. Nesse caso, a troca de liderança exigiria reatribuir os itens, coisa que o app pode fazer.
 2. **Membro sem acesso.** A função "Membros e demais usuários" precisa estar sem nenhuma permissão nesses 9 processos. Do contrário, o membro abre os próprios registros pelo CRM.
-3. **CEO.** O app calcula os números no navegador de quem está usando. Para a CEO ver o painel geral, ela precisa de leitura nos processos, e com essa leitura conseguiria abrir os registros escritos pelo CRM. Há duas opções:
-   - montar o painel dela no BI Builder;
-   - uma rotina no servidor que grava um resumo diário só com números.
-   **Até decidir, não dê leitura à CEO.** A visão de CEO funciona na demonstração.
+3. **CEO.** O app calcula os números no navegador de quem está usando, e a CEO não deve ter leitura nos processos: com ela, abriria os registros escritos pelo CRM. Por isso o painel dela vem do servidor (`api/painel.js`):
+   - o app manda o token da sessão do Bitrix;
+   - a função confere no portal quem é a pessoa e se ela está em `GP_CEO_IDS`;
+   - a função devolve só os números (`dom.resumoPainel`), sem nomes de membros e sem conteúdo.
+   **Não dê leitura à CEO nos processos.** O BI Builder continua opcional, se o RH quiser os gráficos nativos.
 4. **Nada foi testado contra o portal real.** Os testes rodam com dados de demonstração e com um Bitrix simulado. Antes de liberar, rodar no ambiente de teste:
    - a criação de campos (`userfieldconfig.add`);
    - os estágios novos (`crm.status.add`);
