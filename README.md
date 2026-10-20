@@ -19,7 +19,7 @@ Depois abra `dist/index.html` no navegador. Na faixa amarela do topo dá para en
 | Comando | O que faz |
 |---|---|
 | `node build.js` | Junta `src/` em `dist/index.html` e gera `api/app.js`. Rode depois de qualquer mudança em `src/`. |
-| `node --test test/*.test.js` | Testes das regras de cálculo, do provisionamento e das regras de negócio. |
+| `node --test test/*.test.js` | Testes das regras de cálculo, do provisionamento, das regras de negócio e das rotinas do servidor, contra um Bitrix simulado. |
 | `node tools/provisionar.js --webhook <url> --simular` | Mostra o que seria criado no Bitrix. Sem `--simular`, cria. |
 
 Não há dependências para instalar.
@@ -30,8 +30,22 @@ A Vercel publica a cada push na `main`, em **https://gestao-pessoas-bice.vercel.
 
 No Bitrix, o app é cadastrado como aplicativo local, com a URL da Vercel e os escopos `crm`, `user`, `department`, `userfieldconfig`, `im` e `calendar`. Depois, um administrador abre o app, vai em **Configuração** e clica em **Criar ou completar a estrutura**.
 
+### Rotinas no servidor
+
+O que não pode rodar no navegador de quem abre o app fica em funções da Vercel, que falam com o Bitrix pelo webhook de entrada:
+
+| Função | Quando roda | O que faz |
+|---|---|---|
+| `api/sincronizar.js` | Todo dia às 6h | Mantém o processo Membros igual à estrutura da empresa (entradas, mudanças de área e saídas) |
+| `api/avisos.js` | Todo dia às 8h | Avisos da 4.4: resumo semanal, dia do atraso, lembrete de 7 dias e aviso de 14 dias à coordenação |
+| `api/eventos.js` | A cada item criado ou alterado (webhook de saída) | Trava do encerramento no servidor (4.1), qualquer que seja a origem da solicitação |
+| `api/painel.js` | Quando a CEO abre o app | Números do painel geral, sem ela ter leitura nos processos |
+| `api/status.js` | Tela de Configuração | Diz quais rotinas estão ligadas, sem mostrar valores |
+
+Cada uma liga quando as variáveis dela estão gravadas na Vercel. Sem elas, responde 503. A lista das variáveis e o passo a passo estão em [docs/configuracao-bitrix.md](docs/configuracao-bitrix.md). No app, **Configuração → Rotinas no servidor** mostra o que já está ligado.
+
 ## Documentação
 
 - [CLAUDE.md](CLAUDE.md): arquitetura, convenções e armadilhas do código.
-- [docs/configuracao-bitrix.md](docs/configuracao-bitrix.md): o que configurar à mão no Bitrix (permissões, robôs, trava do encerramento).
+- [docs/configuracao-bitrix.md](docs/configuracao-bitrix.md): o que configurar no Bitrix e na Vercel (permissões, robôs, rotinas do servidor, trava do encerramento).
 - [docs/tabela-2.7-e-validacoes.md](docs/tabela-2.7-e-validacoes.md): o retorno do TI para o RH (tabela 2.7, validações da 6.2 e pontos de atenção).
