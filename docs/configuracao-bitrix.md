@@ -69,6 +69,30 @@ O RH recebe uma notificação com o resumo, e cada item ganha um comentário no 
 
 Para testar sem esperar o dia seguinte: Vercel → projeto → Settings → Cron Jobs → **Run**. A resposta mostra quantos itens foram criados, atualizados e encerrados.
 
+### Avisos da 4.4 (rotina das 8h)
+
+A rotina `api/avisos.js` roda todo dia às 8h (horário de Brasília, com a margem de até 59 minutos do plano Hobby). Ela usa as mesmas variáveis da sincronização e calcula as pendências com a mesma regra da tela "O que depende de você":
+
+| Aviso | Quando | Para quem |
+|---|---|---|
+| Resumo semanal | Primeiro dia útil da semana (segunda, ou terça se a segunda for feriado) | Cada liderança e coordenação com pendências, em **uma** mensagem. O RH recebe também a fila do RH e o total de atrasadas |
+| Venceu o prazo | No dia útil em que a pendência atrasa | Quem responde por ela, numa mensagem só com tudo o que venceu |
+| Lembrete de 7 dias | No dia útil em que o atraso chega a 7 dias | Quem responde, um lembrete por pendência, com o nome, a data original e o link |
+| Aviso de 14 dias | No dia útil em que o atraso chega a 14 dias | A coordenação do membro. Se a coordenação é quem responde, ou não há coordenação, vai para o RH |
+
+- **Destinatários:** o membro e quem está em `GP_EXCECOES_IDS` (a CEO) nunca recebem. Os avisos não levam conteúdo de feedback, leitura ou plano, só o nome da pendência e as datas.
+- **Uma vez só, sem guardar estado:** cada marco sai no dia útil em que é cruzado. O que cruzar no fim de semana ou num feriado sai no dia útil seguinte. Se a rotina falhar num dia, os marcos daquele dia não são reenviados (o resumo da semana seguinte mostra tudo de novo).
+- **Link:** grave `GP_LINK_APP` com o endereço do app no Bitrix (abra o app e copie o endereço, algo como `https://amorimglobal.bitrix24.com.br/marketplace/app/<número>/`). Sem a variável, o aviso diz "Abra o app Gestão de Pessoas no Bitrix".
+- **E-mail:** os avisos saem como notificação do Bitrix (`im.notify.system.add`). O Bitrix manda por e-mail as notificações não lidas conforme a configuração de notificações de cada pessoa. Confirme no portal se isso atende ao "e-mail de lembrete" da 4.4. Um e-mail próprio precisaria de um serviço de envio (SMTP), que o app ainda não tem.
+- **Feriados:** o servidor conhece os feriados nacionais. Os de SP e Salvador ficam na Configuração do app, que só o navegador lê. Por isso, um prazo que cai num feriado local pode gerar o aviso um dia antes da tela.
+- **Para conferir sem enviar:**
+
+  ```
+  curl -H "Authorization: Bearer <CRON_SECRET>" "https://gestao-pessoas-bice.vercel.app/api/avisos?simular=1"
+  ```
+
+  A resposta lista as mensagens do dia sem enviar nenhuma.
+
 ## 4. Funções de acesso (2.4) — à mão
 
 Configure em CRM → Configurações → Permissões. Para cada um dos 9 processos:
@@ -135,7 +159,6 @@ Algumas decisões do app que diferem do texto da especificação:
 
 Ainda sem robô nem código, a decidir:
 
-- **Avisos da 4.4:** resumo semanal às segundas, e-mail com 7 dias de atraso e aviso à coordenação com 14 dias.
 - **Criação da leitura ao concluir a tarefa "Entrega":** precisa do modelo de tarefa e de um processo de negócio nas tarefas.
 
 ## 7. Trava do encerramento no servidor (4.1) — webhook de saída
