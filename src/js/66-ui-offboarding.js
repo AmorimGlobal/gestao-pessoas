@@ -330,6 +330,7 @@
         enviadaRHEm: estagio === "ENVIADA_RH" ? ctx.hoje : "", estagio,
       });
       if (estagio === "ENVIADA_RH") await GP.app.avisarRH("Nova solicitação de encerramento de contrato enviada ao RH (" + m.nome + ").");
+      if (estagio === "AG_COORD") await avisarAprovador(e, m);
       ui.navegar("#/offboarding/encerramento/" + e.id);
       return e;
     }, { mensagem: rascunho ? "Rascunho salvo." : estagio === "BLOQUEADA" ? "Solicitação bloqueada: confira o que falta." : estagio === "ENVIADA_RH" ? "Solicitação enviada ao RH." : "Solicitação enviada para a coordenação." });
@@ -362,8 +363,16 @@
         primeiraVerificacao: e.primeiraVerificacao || (ver.ok ? "Aceita na 1ª verificação" : "Bloqueada na 1ª verificação"), enviadaRHEm: estagio === "ENVIADA_RH" ? ctx.hoje : e.enviadaRHEm,
       });
       if (estagio === "ENVIADA_RH") await GP.app.avisarRH("Nova solicitação de encerramento de contrato enviada ao RH (" + m.nome + ").");
+      if (estagio === "AG_COORD") await avisarAprovador(Object.assign({}, e, { estagio }), m);
     }, { mensagem: estagio === "BLOQUEADA" ? "Bloqueada: confira o que falta." : estagio === "AG_COORD" ? "Enviada para a aprovação da coordenação." : "Enviada ao RH.", fechar: false });
   };
+  /** "Aguardando coordenação": avisa quem aprova (a coordenação responsável, ou o RH quando ela é quem pediu) */
+  async function avisarAprovador(e, m) {
+    const a = dom.aprovadorDe(E().ctx, e);
+    const texto = "Uma solicitação de encerramento de contrato aguarda a sua aprovação (" + m.nome + "). Abra o app Gestão de Pessoas.";
+    if (a.rh) await GP.app.avisarRH(texto);
+    else await GP.app.avisar([a.id], texto);
+  }
   ui.acoes["decidir-encerramento"] = function (el) {
     const dec = el.dataset.decisao;
     if (dec === "aprovar") {
@@ -386,8 +395,15 @@
     const f = document.getElementById("form-decisao");
     if (!ui.validar(f, ["comentario"])) return;
     const d = ui.lerForm(f);
-    const e = E().ctx.idx.porId.encerramentos[el.dataset.id];
-    ui.salvar(el, () => ui.atualizar("encerramentos", e.id, { estagio: "NEW", adendos: ui.novoAdendo(e.adendos, "Devolvida para ajuste", d.comentario) }), { mensagem: "Solicitação devolvida." });
+    const ctx = E().ctx;
+    const e = ctx.idx.porId.encerramentos[el.dataset.id];
+    const m = dom.infoMembro(ctx, ctx.idx.membro[e.membroId]);
+    ui.salvar(el, async () => {
+      await ui.atualizar("encerramentos", e.id, { estagio: "NEW", adendos: ui.novoAdendo(e.adendos, "Devolvida para ajuste", d.comentario) });
+      // 3.5.3: recusado volta para Rascunho com o comentário e notifica a liderança (o comentário fica no app, não no aviso)
+      const quem = e.solicitante || e.autor;
+      if (quem && quem !== E().eu.id) await GP.app.avisar([quem], "A solicitação de encerramento de contrato de " + m.nome + " voltou para rascunho com um comentário. Abra o app Gestão de Pessoas para ajustar.");
+    }, { mensagem: "Solicitação devolvida." });
   };
   ui.acoes["liberar-encerramento"] = function (el) {
     ui.abrirPainel({

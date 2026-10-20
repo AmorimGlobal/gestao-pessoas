@@ -120,6 +120,11 @@
   GP.app = {
     iniciar,
     marcarTourVisto: function () { if (E.repo) E.repo.gravarPreferencia("gp_tour_visto", "1"); },
+    /** Aviso a pessoas específicas (nunca ao membro: quem chama passa lideranças, coordenações ou RH).
+        Falha no aviso nunca impede a gravação. */
+    avisar: async function (ids, mensagem) {
+      try { await E.repo.notificar((ids || []).filter(Boolean), mensagem); } catch (e) { console.warn("Aviso não enviado:", e); }
+    },
     /** Aviso ao RH (e a quem mais for passado). Falha no aviso nunca impede a gravação. */
     avisarRH: async function (mensagem, extras) {
       try {
