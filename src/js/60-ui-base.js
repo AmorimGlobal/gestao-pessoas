@@ -269,9 +269,45 @@
       (GP.marca && GP.marca.logoBranco ? '<img src="' + GP.marca.logoBranco + '" alt="Amorim">' : "") +
       '<div class="app">Gestão de Pessoas</div></div><nav class="nav" aria-label="Menu">' + menu() + "</nav>" +
       '<div class="rodape">' + c.pessoa({ nome: estado.eu.nome, foto: estado.eu.foto }, "", 26).replace('class="nome"', 'class="nome" style="color:#fff"') +
-      '<div style="margin-top:8px">' + seletor + "</div></div></aside>" +
-      '<main class="principal">' + (demo ? faixaDemo() : "") + avisoEstrutura() + '<div class="conteudo">' + conteudo + "</div></main></div>";
+      '<div style="margin-top:8px">' + seletor + "</div>" +
+      (souAdmin() ? '<button class="btn peq sec" style="margin-top:10px;width:100%" data-acao="abrir-ver-como">' + icone("equipe", 13) + " Ver como outra pessoa</button>" : "") +
+      "</div></aside>" +
+      '<main class="principal">' + faixaVerComo() + (demo ? faixaDemo() : "") + avisoEstrutura() + '<div class="conteudo">' + conteudo + "</div></main></div>";
   }
+  /* ---------------- ver como outra pessoa (só administrador; somente leitura) ---------------- */
+  const souAdmin = () => !!((estado.euReal || estado.eu || {}).admin);
+  function faixaVerComo() {
+    if (!estado.verComo) return "";
+    return '<div class="faixa-demo nao-imprimir" style="background:var(--navy);color:#fff"><b>Vendo como ' + esc(estado.verComo.nome) + "</b> (" + esc(VISOES[estado.visao] || "sem papel no app") +
+      '). Nada é gravado neste modo. <button class="btn peq" data-acao="sair-ver-como">Voltar para a minha visão</button></div>';
+  }
+  acoes["abrir-ver-como"] = function () {
+    const ctx = estado.ctx;
+    const cfg = (estado.config && estado.config.papeis) || {};
+    const lista = (l) => (l || []).map((p) => String(p.id));
+    const rh = lista(cfg.rh), coord = lista(cfg.coordenacao), ceo = lista(cfg.ceo);
+    const chefes = {};
+    (ctx.departamentos || []).forEach((d) => { if (d.chefe) chefes[d.chefe] = true; });
+    const papel = (id) => [rh.indexOf(id) >= 0 && "RH", coord.indexOf(id) >= 0 && "coordenação", ceo.indexOf(id) >= 0 && "CEO", chefes[id] && "liderança"].filter(Boolean).join(", ");
+    const real = (estado.euReal || estado.eu).id;
+    const opcoes = (ctx.usuarios || []).filter((u) => u.id !== real && ((u.departamentos || []).length || papel(u.id)) && (!u.tipo || u.tipo === "employee"))
+      .sort((a, b) => (!!papel(b.id) - !!papel(a.id)) || a.nome.localeCompare(b.nome, "pt-BR"))
+      .map((u) => ({ valor: u.id, rotulo: u.nome + (papel(u.id) ? " · " + papel(u.id) : "") }));
+    abrirPainel({
+      titulo: "Ver como outra pessoa", sub: "O app abre com a equipe, os papéis e as pendências da pessoa escolhida. É só para conferir: neste modo nada é gravado.",
+      corpo: '<div id="form-ver-como">' + c.campo({ nome: "uid", rotulo: "Pessoa", tipo: "lista", opcoes, valor: estado.verComo ? estado.verComo.id : "" }) + "</div>",
+      rodape: '<button class="btn" data-acao="aplicar-ver-como">Ver como esta pessoa</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+    });
+  };
+  acoes["aplicar-ver-como"] = async function () {
+    const f = document.getElementById("form-ver-como");
+    if (!validar(f, ["uid"])) return;
+    const uid = lerForm(f).uid;
+    fecharPainel(true);
+    await GP.app.verComo(uid);
+  };
+  acoes["sair-ver-como"] = async function () { await GP.app.verComo(""); };
+
   function faixaDemo() {
     const papel = new URLSearchParams(location.search).get("papel") || "lideranca";
     return '<div class="faixa-demo nao-imprimir"><b>Demonstração</b> com os 6 casos do protótipo, hoje = ' + calc.fmtDataAno(estado.ctx.hoje) +
@@ -307,7 +343,7 @@
       return;
     }
     if (estado.semAcesso) {
-      app.innerHTML = '<div class="conteudo"><div class="card" style="max-width:560px;margin:60px auto;text-align:center"><h3 style="justify-content:center">Gestão de Pessoas</h3>' +
+      app.innerHTML = faixaVerComo() + '<div class="conteudo"><div class="card" style="max-width:560px;margin:60px auto;text-align:center"><h3 style="justify-content:center">Gestão de Pessoas</h3>' +
         '<p class="muted">Este app é usado pelas lideranças, coordenações e pelo RH para as rotinas de gestão das equipes. Seu usuário não chefia um departamento no Bitrix nem tem um papel no app.</p>' +
         '<p class="muted">Se você lidera uma equipe, peça ao RH para atualizar a estrutura da empresa no Bitrix.</p></div></div>';
       return;

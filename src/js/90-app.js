@@ -57,10 +57,29 @@
     return c;
   }
 
+  /** Ausências das pessoas visíveis (e da própria pessoa), nas próximas 13 semanas */
+  async function carregarAusencias(repo, ctx, uid) {
+    const papeis = dom.papeis(ctx, uid);
+    const visiveis = dom.membrosVisiveis(ctx, uid).map((m) => m.responsavel).concat([uid]);
+    const ids = papeis.rh ? (ctx.usuarios || []).map((u) => u.id) : visiveis;
+    ctx.ausencias = await repo.ausencias(ids.slice(0, 400), ctx.hoje, calc.addDias(ctx.hoje, 13 * 7 + 7)).catch(() => []);
+  }
+
+  /** Repositório que lê como o original e recusa toda gravação (ver como outra pessoa) */
+  function somenteLeitura(repo) {
+    const r = Object.create(repo);
+    const recusa = async function () { throw { codigo: "", descricao: "você está vendo o app como outra pessoa, e neste modo nada é gravado" }; };
+    ["criar", "atualizar", "notificar", "comentar", "agendarPendencia", "registrarDossie", "salvarConfig", "provisionar"].forEach((m) => { if (typeof repo[m] === "function") r[m] = recusa; });
+    r.gravarPreferencia = function () {};
+    return r;
+  }
+
   /** Painel da CEO: números calculados no servidor (no Bitrix) ou aqui (demonstração). Não trava a abertura. */
   function carregarResumoCEO(repo, ctx) {
     E.resumoCEO = null;
     E.resumoCEOErro = "";
+    // vendo como a CEO: quem vê é um administrador, que já lê os registros; o cálculo é feito aqui
+    if (E.verComo) { E.resumoCEO = dom.resumoPainel(dom.painelGeral(ctx)); return; }
     repo.painelServidor(ctx).then(function (r) { E.resumoCEO = r; ui.render(); }, function (e) {
       console.error(e);
       E.resumoCEOErro = (repo.mensagemErro ? repo.mensagemErro(e) : "") || (e && e.message) || String(e);
@@ -100,11 +119,8 @@
         hoje, eu, config, usuarios, departamentos, registros, vagas, ausencias: [],
         feriados: { nacionais: fer1.concat(fer2) },
       });
-      // Ausências das pessoas visíveis (e da própria liderança), nas próximas 13 semanas
       const papeis = dom.papeis(ctx, eu.id);
-      const visiveis = dom.membrosVisiveis(ctx, eu.id).map((m) => m.responsavel).concat([eu.id]);
-      const ids = papeis.rh ? (usuarios || []).map((u) => u.id) : visiveis;
-      ctx.ausencias = await repo.ausencias(ids.slice(0, 400), hoje, calc.addDias(hoje, 13 * 7 + 7)).catch(() => []);
+      await carregarAusencias(repo, ctx, eu.id);
 
       Object.assign(E, { eu, config, ctx, estrutura: { origem: est.origem, ausentes: est.ausentes || [] } });
       if (papeis.ceo) carregarResumoCEO(repo, ctx);
@@ -128,8 +144,38 @@
     }
   }
 
+  /** Administrador vê o app como outra pessoa (uid) ou volta para a própria visão (uid vazio). Somente leitura. */
+  async function verComo(uid) {
+    const real = E.euReal || E.eu;
+    if (!real || !real.admin) return;
+    const ctx = E.ctx;
+    const repoReal = E.repoReal || E.repo;
+    let eu;
+    if (!uid || String(uid) === String(real.id)) {
+      eu = real;
+      Object.assign(E, { eu, euReal: null, verComo: null, repo: repoReal, repoReal: null });
+    } else {
+      const p = dom.pessoa(ctx, uid);
+      eu = { id: String(uid), nome: p.nome, foto: p.foto, email: p.email, admin: false };
+      Object.assign(E, { eu, euReal: real, verComo: eu, repo: somenteLeitura(repoReal), repoReal });
+    }
+    ctx.eu = eu;
+    const papeis = dom.papeis(ctx, eu.id);
+    E.visoes = ui.visoesDisponiveis(papeis);
+    E.visao = E.visoes[0] || "lideranca";
+    E.semAcesso = !E.visoes.length && !eu.admin;
+    if (!E.visoes.length) E.visoes = ["lideranca"];
+    location.hash = "#/inicio";
+    E.carregando = true;
+    ui.render();
+    await carregarAusencias(repoReal, ctx, eu.id);
+    if (papeis.ceo) carregarResumoCEO(repoReal, ctx);
+    E.carregando = false;
+    ui.render();
+  }
+
   GP.app = {
-    iniciar,
+    iniciar, verComo,
     marcarTourVisto: function () { if (E.repo) E.repo.gravarPreferencia("gp_tour_visto", "1"); },
     /** Aviso a pessoas específicas (nunca ao membro: quem chama passa lideranças, coordenações ou RH).
         Falha no aviso nunca impede a gravação. */
