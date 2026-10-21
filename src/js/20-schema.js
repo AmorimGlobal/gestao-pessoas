@@ -346,9 +346,18 @@
 
   /* ---------- códigos ---------- */
   function nomeCampo(typeId, sufixo) { return "UF_CRM_" + typeId + "_" + sufixo; }
-  /** UF_CRM_41_DATA_INGRESSO -> ufCrm41DataIngresso (formato da API crm.item.*) */
+  /** Nome do campo na API crm.item.* (como o portal devolveu em 21/10/2026):
+        UF_CRM_57_DATA_INGRESSO -> ufCrm57DataIngresso
+        UF_CRM_63_DATA_1A1      -> ufCrm_63_DATA_1A1   (sufixo com número: o Bitrix não converte)
+        UF_CRM_13_1784744093102 -> ufCrm13_1784744093102 (campo criado na tela, nome só com número)
+      É só a reserva: o app usa o nome que o próprio crm.item.fields devolve (upperName, 35-registros.js). */
   function camelDoCampo(nomeMaiusculo) {
-    return String(nomeMaiusculo).split("_").map((p, i) => {
+    const nome = String(nomeMaiusculo);
+    const so = /^UF_CRM_(\d+)_(\d+)$/.exec(nome);
+    if (so) return "ufCrm" + so[1] + "_" + so[2];
+    const m = /^UF_CRM_(\d+)_(.+)$/.exec(nome);
+    if (m && /\d/.test(m[2])) return "ufCrm_" + m[1] + "_" + m[2];
+    return nome.split("_").map((p, i) => {
       const l = p.toLowerCase();
       return i === 0 ? l : l.charAt(0).toUpperCase() + l.slice(1);
     }).join("");

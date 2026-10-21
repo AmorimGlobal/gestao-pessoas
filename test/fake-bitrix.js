@@ -121,7 +121,7 @@ function criarBitrixFalso(opcoes) {
         const t = tipoPorEti(params.entityTypeId);
         const fields = {};
         estado.campos.filter((f) => t && f.entityId === "CRM_" + t.id).forEach((f) => {
-          fields[camelDoCampo(f.fieldName)] = Object.assign({ type: f.userTypeId, isMultiple: f.multiple === "Y" },
+          fields[camelDoCampo(f.fieldName)] = Object.assign({ type: f.userTypeId, isMultiple: f.multiple === "Y", upperName: f.fieldName },
             f.enum ? { items: f.enum.map((e) => ({ ID: String(e.id), VALUE: e.value })) } : {});
         });
         return { dados: { fields }, proximo: null };

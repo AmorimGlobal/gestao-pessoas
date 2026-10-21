@@ -67,4 +67,10 @@ test("navegador: descobre os processos, grava e lê um item com lista, pessoa, d
   assert.equal(lista.length, 1);
   assert.equal(lista[0].cidade, "São Paulo (SP)");
   assert.equal(lista[0].estagioNome, "Ativo");
+  // campos com número no nome: o Bitrix devolve ufCrm_<id>_DATA_1A1, e o app usa esse nome (upperName)
+  const c = await repo.criar("ciclo", { titulo: "1:1", membroId: m.id, responsavel: "100", trimestre: "2026-T4", data1a1: "2026-10-22", comb1Texto: "Revisar o parecer", anterior1: "Cumprido" });
+  assert.equal(c.data1a1, "2026-10-22");
+  assert.equal(c.comb1Texto, "Revisar o parecer");
+  assert.equal(c.anterior1, "Cumprido");
+  assert.ok(repo.estrutura().ciclo.campos.data1a1.indexOf("ufCrm_") === 0, repo.estrutura().ciclo.campos.data1a1);
 });

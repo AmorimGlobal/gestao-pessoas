@@ -83,7 +83,12 @@ test("sem escopo userfieldconfig, o erro aparece (não é engolido)", async () =
 
 test("códigos camelCase iguais aos do portal", () => {
   assert.equal(schema.camelDoCampo("UF_CRM_41_VENCIMENTO_LEGAL"), "ufCrm41VencimentoLegal");
-  assert.equal(schema.codigoCampo(41, "COMB_1_TEXTO"), "ufCrm41Comb1Texto");
+  // nomes reais do portal (crm.item.fields em 21/10/2026): com número no sufixo, o Bitrix não converte
+  assert.equal(schema.codigoCampo(63, "COMB_1_TEXTO"), "ufCrm_63_COMB_1_TEXTO");
+  assert.equal(schema.codigoCampo(69, "AL1_DATA"), "ufCrm_69_AL1_DATA");
+  assert.equal(schema.codigoCampo(63, "DATA_1A1"), "ufCrm_63_DATA_1A1");
+  assert.equal(schema.codigoCampo(63, "TRIMESTRE"), "ufCrm63Trimestre");
+  assert.equal(schema.camelDoCampo("UF_CRM_13_1784744093102"), "ufCrm13_1784744093102");
   // sufixos únicos por processo
   for (const p of schema.PROCESSOS) {
     const s = p.campos.map((c) => c.sufixo);

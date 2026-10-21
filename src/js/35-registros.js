@@ -56,19 +56,29 @@
   /* ---------- estrutura de um processo ---------- */
   /** p = processo do esquema; c = { entityTypeId, typeId, campoPai, estagios: {codigo: STATUS_ID} } */
   function estruturaDoProcesso(p, c) {
-    const defs = {}, campos = {}, nomes = {}, estagioPorId = {};
-    p.campos.forEach(function (d) { defs[d.chave] = d; campos[d.chave] = schema.codigoCampo(c.typeId, d.sufixo); });
+    const defs = {}, campos = {}, nomesCampos = {}, nomes = {}, estagioPorId = {};
+    p.campos.forEach(function (d) {
+      defs[d.chave] = d;
+      nomesCampos[d.chave] = schema.nomeCampo(c.typeId, d.sufixo);
+      campos[d.chave] = schema.codigoCampo(c.typeId, d.sufixo); // reserva, até ler o crm.item.fields
+    });
     p.estagios.forEach(function (e) { nomes[e.codigo] = e.nome; });
     Object.keys(c.estagios || {}).forEach(function (cod) { estagioPorId[c.estagios[cod]] = cod; });
     return {
       eti: c.entityTypeId, typeId: c.typeId, campoPai: c.campoPai, estagios: c.estagios || {},
-      estagioPorId, nomes, campos, defs, enums: {}, presentes: new Set(),
+      estagioPorId, nomes, campos, nomesCampos, defs, enums: {}, presentes: new Set(),
     };
   }
-  /** Aplica a resposta de crm.item.fields: quais campos existem e os IDs das listas. Devolve as chaves ausentes. */
+  /** Aplica a resposta de crm.item.fields: o nome de cada campo na API, quais existem e os IDs das listas.
+      O nome vem do upperName que o portal devolve, porque a conversão do Bitrix muda conforme o nome
+      (UF_CRM_63_DATA_1A1 vira ufCrm_63_DATA_1A1). Devolve as chaves ausentes. */
   function aplicarMetadados(e, fields) {
     const ausentes = [];
+    const porNome = {};
+    Object.keys(fields || {}).forEach(function (k) { const u = fields[k] && fields[k].upperName; if (u) porNome[String(u).toUpperCase()] = k; });
     Object.keys(e.campos).forEach(function (ch) {
+      const real = e.nomesCampos && porNome[e.nomesCampos[ch]];
+      if (real) e.campos[ch] = real;
       const f = (fields || {})[e.campos[ch]];
       if (!f) { ausentes.push(ch); return; }
       e.presentes.add(ch);
