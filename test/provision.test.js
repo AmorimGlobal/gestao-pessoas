@@ -148,7 +148,7 @@ test("estado do portal em 21/10: rodar de novo completa estágios e campo sem re
   const sem = ["REALIZADO", "EVID_ATRASO", "ENC_PENDENTE", "ENC_ATRASO", "ENVIADA_RH", "EM_ANALISE", "APROVADA", "CONVERSA_OK", "POS", "MAR_ABERTO"];
   bx.estado.status = bx.estado.status.filter((s) => sem.indexOf(provisionCodigo(s.STATUS_ID)) < 0);
   const tM = config.processos.membros.typeId;
-  bx.estado.campos = bx.estado.campos.filter((f) => f.fieldName !== "UF_CRM_" + tM + "_CIDADE_REF");
+  bx.estado.campos = bx.estado.campos.filter((f) => f.fieldName !== "UF_CRM_" + tM + "_CIDADE_FER");
   bx.estado.atualizacoesDeTipo = 0;
   const r = await provisionar({ chamar: bx.chamar, configAtual: config });
   assert.deepEqual(r.falhas, []);

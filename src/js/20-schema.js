@@ -83,7 +83,9 @@
         c("contrato", "CONTRATO", "lista", "Modelo de contrato", { opcoes: OPCOES.contrato }),
         c("nivel", "NIVEL", "texto", "Nível", { ajuda: "Nível atual na Arquitetura de Cargos." }),
         c("senioridade", "SENIORIDADE", "lista", "Senioridade", { opcoes: OPCOES.senioridade, ajuda: "Usada no patamar das fases do onboarding." }),
-        c("cidade", "CIDADE_REF", "lista", "Cidade de referência para feriados", { opcoes: OPCOES.cidade, ajuda: "Salvador (BA) para quem mora na Bahia. São Paulo (SP) para todos os outros." }),
+        // CIDADE_FER, e não CIDADE_REF: a 1ª tentativa no portal (21/10/2026) falhou no meio e deixou o nome
+        // UF_CRM_57_CIDADE_REF preso no Bitrix (qualquer outro nome é aceito com o mesmo conteúdo)
+        c("cidade", "CIDADE_FER", "lista", "Cidade de referência para feriados", { opcoes: OPCOES.cidade, ajuda: "Salvador (BA) para quem mora na Bahia. São Paulo (SP) para todos os outros." }),
         c("ocultarAniversario", "OCULTAR_ANIV", "simNao", "Ocultar aniversário na Agenda da equipe", { ajuda: "Marcado pelo RH quando a pessoa pede." }),
         c("planejamentoId", "PLANEJAMENTO_ID", "texto", "Planejamento da função (ID)"),
         c("carreira", "CARREIRA", "textoLongo", "Histórico de movimentações (Carreira)", { ajuda: "Uma linha por movimentação: data · de um nível para outro. Registrado pelo RH depois da calibração." }),
