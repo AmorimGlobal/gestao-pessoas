@@ -289,7 +289,7 @@
 
   ui.acoes["importar-config"] = function () {
     ui.abrirPainel({
-      titulo: "Importar configuração", sub: "Cole o JSON gravado por tools/provisionar.js --saida.",
+      titulo: "Importar configuração", sub: "Cole o JSON gravado por tools/provisionar.js --saida. Se ele trouxer papéis, feriados, níveis, links ou parâmetros, eles também entram; o que não vier fica como está.",
       corpo: '<div id="form-import">' + c.campo({ nome: "json", rotulo: "Configuração (JSON)", tipo: "textoLongo", linhas: 14 }) + "</div>",
       rodape: '<button class="btn" data-acao="salvar-import">Importar</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
     });
@@ -297,8 +297,14 @@
   ui.acoes["salvar-import"] = function (el) {
     let novo;
     try { novo = JSON.parse(ui.lerForm(document.getElementById("form-import")).json); } catch (e) { ui.erroNoPainel("JSON inválido: " + e.message); return; }
-    if (!novo || !novo.processos) { ui.erroNoPainel("O JSON precisa ter a chave \"processos\"."); return; }
-    const cfg = Object.assign({}, E().config || {}, { processos: novo.processos, solucaoId: novo.solucaoId, provisionadoEm: novo.provisionadoEm });
+    if (!novo || typeof novo !== "object") { ui.erroNoPainel("O JSON precisa ser um objeto."); return; }
+    const atual = E().config || {};
+    const cfg = Object.assign({}, atual);
+    if (novo.processos) Object.assign(cfg, { processos: novo.processos, solucaoId: novo.solucaoId, provisionadoEm: novo.provisionadoEm });
+    // papéis, feriados, links e parâmetros: entra só o que veio no arquivo
+    ["papeis", "feriadosLocais", "links", "parametros", "recrutamento"].forEach((k) => { if (novo[k] && typeof novo[k] === "object") cfg[k] = Object.assign({}, atual[k] || {}, novo[k]); });
+    if (Array.isArray(novo.niveis)) cfg.niveis = novo.niveis;
+    if (!novo.processos && !["papeis", "feriadosLocais", "links", "parametros", "recrutamento", "niveis"].some((k) => novo[k])) { ui.erroNoPainel("Nada para importar: o JSON não tem processos, papéis, feriados, níveis, links nem parâmetros."); return; }
     gravarConfig(cfg, el, "Configuração importada. Recarregue o app.");
   };
 })(window);
