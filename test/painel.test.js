@@ -32,7 +32,7 @@ test("resumo da CEO: os mesmos números do painel do RH, sem nomes de membros ne
 
 test("token: pergunta ao mesmo portal do webhook, nunca a outro endereço", async () => {
   const pedidos = [];
-  const fetchFalso = async (url, op) => { pedidos.push({ url, corpo: JSON.parse(op.body) }); return { json: async () => ({ result: { ID: "1" } }) }; };
+  const fetchFalso = async (url, op) => { pedidos.push({ url, corpo: Object.fromEntries(new URLSearchParams(op.body)) }); return { json: async () => ({ result: { ID: "1" } }) }; };
   assert.equal(await usuarioDoToken("https://amorimglobal.bitrix24.com.br/rest/1/abc/", "tk", fetchFalso), "1");
   assert.equal(pedidos[0].url, "https://amorimglobal.bitrix24.com.br/rest/user.current.json");
   assert.equal(pedidos[0].corpo.auth, "tk");

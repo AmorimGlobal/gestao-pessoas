@@ -17,7 +17,8 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
   - `api/painel.js`: números da CEO, que não tem leitura nos processos.
   
   Todos calculam com as mesmas regras do navegador (`src/js/50-dominio.js`, `35-registros.js`). Variáveis e passo a passo: `docs/configuracao-bitrix.md`.
-- **Fora do Bitrix** (página aberta direto no navegador, ou `?demo=1`) o app roda em **demonstração**, com os 6 casos do protótipo e hoje = 08/10/2026. Os parâmetros são `?papel=lideranca|coordenacao|rh|ceo`, `?hoje=AAAA-MM-DD` e `?tour=0`.
+- **Acesso:** a versão publicada (`api/app.js`) só sai para um POST do Bitrix com sessão confirmada no portal (`lib/acesso.js`). Ela é marcada com `window.GP_SO_BITRIX` pelo `build.js` e nunca cai na demonstração.
+- **Fora do Bitrix, só no `dist/index.html` local** (aberto direto no navegador, ou `?demo=1`), o app roda em **demonstração**, com os 6 casos do protótipo e hoje = 08/10/2026. Os parâmetros são `?papel=lideranca|coordenacao|rh|ceo`, `?hoje=AAAA-MM-DD` e `?tour=0`.
 
 ## Estrutura
 
@@ -33,6 +34,7 @@ src/js/35-registros.js conversão item do Bitrix (ufCrm<id>…, stageId, parentI
 src/js/40-bitrix.js   repositório Bitrix (BX24): paginação, lote, pessoas, agenda, vagas, painel da CEO (fetch /api/painel)
 src/js/45-demo.js     repositório de demonstração (mesma interface) + dados dos 6 casos     [Node + navegador]
 src/js/55-sync.js     sincronização com a estrutura da empresa: entradas, mudanças de liderança e saídas  [Node + navegador]
+lib/acesso.js         a página e as chamadas do app só saem com a sessão do Bitrix confirmada no portal
 lib/bitrix-servidor.js  webhook de entrada: chamar/paginar, abrirPortal (listar/obter/criar/atualizar/comentar/notificar), vagas, token da sessão
 lib/contexto-servidor.js o mesmo ctx da tela, montado no servidor
 lib/sincronizacao-servidor.js  a sincronização no servidor

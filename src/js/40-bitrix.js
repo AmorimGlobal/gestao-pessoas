@@ -316,7 +316,8 @@
       },
       /** Rotinas do servidor ligadas na Vercel (api/status.js): só sim/não, nunca os valores */
       statusServidor: async function () {
-        const r = await fetch("/api/status", { cache: "no-store" });
+        const auth = BX24.getAuth ? BX24.getAuth() : null;
+        const r = await fetch("/api/status", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auth: (auth && auth.access_token) || "" }) });
         if (!r.ok) throw new Error("o servidor respondeu " + r.status);
         return r.json();
       },

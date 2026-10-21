@@ -26,6 +26,12 @@ Configure o app em Bitrix24 → Recursos para desenvolvedores → Outros → Apl
 
 O app chama `BX24.installFinish()` na primeira abertura.
 
+**O link só abre pelo Bitrix.** Quando o Bitrix abre o app, ele manda o token da sessão de quem está logado. Antes de entregar a página, a Vercel pergunta ao portal de quem é esse token (`lib/acesso.js`). Aberto direto no navegador, o link mostra "Acesso só pelo Bitrix24", e a versão publicada não tem demonstração.
+
+- **Portal:** é o do `BITRIX_WEBHOOK_URL`, ou `GP_PORTAL` se for gravada. Sem nenhuma das duas, vale `amorimglobal.bitrix24.com.br`.
+- **Endpoints:** as chamadas do app ao servidor (`/api/painel` e `/api/status`) também exigem o token.
+- **Demonstração:** fica só no `dist/index.html` local.
+
 ## 2. Criar a estrutura (o app faz)
 
 Há duas formas, e as duas usam o mesmo código (`src/js/30-provision.js`). As duas são idempotentes: rodar de novo só cria o que faltar.

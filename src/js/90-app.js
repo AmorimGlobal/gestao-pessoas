@@ -24,10 +24,15 @@
     recrutamento: { categoria: 77 },
   };
 
+  function emIframe() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
   function dentroDoBitrix() {
+    // versão publicada (window.GP_SO_BITRIX, marcada pelo build.js): nunca cai na demonstração
+    if (window.GP_SO_BITRIX) return true;
     const q = new URLSearchParams(location.search);
     if (q.get("demo") === "1") return false;
-    try { return window.self !== window.top; } catch (e) { return true; }
+    return emIframe();
   }
   function carregarSDK() {
     return new Promise(function (ok, falha) {
@@ -64,6 +69,12 @@
   }
 
   async function iniciar() {
+    // Fora do Bitrix, a versão publicada não abre (o servidor já barra; isto cobre a página salva ou copiada)
+    if (window.GP_SO_BITRIX && !emIframe()) {
+      Object.assign(E, { carregando: false, foraDoBitrix: true });
+      ui.render();
+      return;
+    }
     ui.render();
     const q = new URLSearchParams(location.search);
     try {

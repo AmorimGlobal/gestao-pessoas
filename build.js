@@ -22,18 +22,15 @@ html = html.replace("/*__CSS__*/", () => css).replace("/*__JS__*/", () => js);
 fs.mkdirSync(path.join(raiz, "dist"), { recursive: true });
 fs.writeFileSync(path.join(raiz, "dist", "index.html"), html);
 
+// Versão publicada: só abre dentro do Bitrix (sem a demonstração). A dist/ local continua com a demonstração.
+const marcaProducao = "<script>window.GP_SO_BITRIX = true;</script>";
+if (html.indexOf("<head>") < 0) throw new Error("src/index.html sem <head>: não dá para marcar a versão publicada.");
+const htmlProducao = html.replace("<head>", () => "<head>\n" + marcaProducao);
 const handler = "// GERADO por build.js a partir de src/. Não edite à mão.\n" +
-  "// O Bitrix24 abre o app local com POST; hospedagem estática só responde GET.\n" +
-  "const HTML = " + JSON.stringify(html) + ";\n\n" +
-  "module.exports = function handler(req, res) {\n" +
-  "  if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }\n" +
-  "  if (req.method !== 'GET' && req.method !== 'POST') { res.statusCode = 405; res.end(); return; }\n" +
-  "  res.setHeader('Content-Type', 'text/html; charset=utf-8');\n" +
-  "  res.setHeader('Cache-Control', 'no-store');\n" +
-  "  res.removeHeader('X-Frame-Options');\n" +
-  "  res.statusCode = 200;\n" +
-  "  res.end(HTML);\n" +
-  "};\n";
+  "// O Bitrix24 abre o app local com POST; a página só sai depois de o portal confirmar a sessão (lib/acesso.js).\n" +
+  "const { atenderPagina } = require(\"../lib/acesso.js\");\n" +
+  "const HTML = " + JSON.stringify(htmlProducao) + ";\n\n" +
+  "module.exports = function handler(req, res) { return atenderPagina(req, res, HTML); };\n";
 fs.mkdirSync(path.join(raiz, "api"), { recursive: true });
 fs.writeFileSync(path.join(raiz, "api", "app.js"), handler);
 

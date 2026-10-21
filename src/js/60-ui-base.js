@@ -301,6 +301,11 @@
         '</div><p class="muted">Recarregue a página. Se o erro continuar, mostre esta mensagem ao TI.</p></div></div>';
       return;
     }
+    if (estado.foraDoBitrix) {
+      app.innerHTML = '<div class="conteudo"><div class="card" style="max-width:560px;margin:60px auto;text-align:center"><h3 style="justify-content:center">Acesso só pelo Bitrix24</h3>' +
+        '<p class="muted">O Gestão de Pessoas abre só dentro do Bitrix24 da Amorim, com o seu login. Entre no Bitrix e abra o app pelo menu.</p></div></div>';
+      return;
+    }
     if (estado.semAcesso) {
       app.innerHTML = '<div class="conteudo"><div class="card" style="max-width:560px;margin:60px auto;text-align:center"><h3 style="justify-content:center">Gestão de Pessoas</h3>' +
         '<p class="muted">Este app é usado pelas lideranças, coordenações e pelo RH para as rotinas de gestão das equipes. Seu usuário não chefia um departamento no Bitrix nem tem um papel no app.</p>' +
