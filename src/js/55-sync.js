@@ -52,11 +52,37 @@
     // Quem está fora do app (CEO e exceções) também não recebe avisos (4.4: a CEO nunca recebe)
     const plano = { criar: [], atualizar: [], encerrar: [], conferir: [], alerta: "", naoAvisar: Array.from(fora) };
 
+    // Setor sem chefe no Bitrix (coordenado por supervisores adjuntos, que a API não informa):
+    // a estrutura não diz a coordenação nem a liderança de quem chefia uma área. Aí vale o que
+    // está no item do Membros, e uma pessoa nova herda a coordenação que as outras do mesmo
+    // departamento têm. A liderança nunca é herdada: sem estrutura clara, vai para o RH conferir.
+    const deptoDe = (id) => { const u = ativos[id]; return u && (u.departamentos || [])[0] ? String(u.departamentos[0]) : ""; };
+    function herdar(u, campo) {
+      const d = (u.departamentos || [])[0];
+      if (!d) return "";
+      const conta = {};
+      membros.forEach((m) => {
+        if (FINAIS.indexOf(m.estagio) >= 0 || m.responsavel === String(u.id) || deptoDe(m.responsavel) !== String(d) || !m[campo]) return;
+        if (deptoPorId[d] && deptoPorId[d].chefe === m.responsavel) return;
+        conta[m[campo]] = (conta[m[campo]] || 0) + 1;
+      });
+      return Object.keys(conta).sort((a, b) => conta[b] - conta[a])[0] || "";
+    }
+
     (entrada.usuarios || []).forEach((u) => {
       if (!elegivel(u)) return;
-      const lideranca = liderancaDe(deptoPorId, u);
-      const coordenacao = dom.coordenacaoPelaEstrutura(deptoPorId, u.id, u.departamentos);
       const m = itemDe[u.id];
+      const lid = dom.liderancaNaEstrutura(deptoPorId, u.id, u.departamentos);
+      const coo = dom.coordenacaoNaEstrutura(deptoPorId, u.id, u.departamentos);
+      const lideranca = lid.certa ? lid.id : String((m && m.lideranca) || "");
+      const coordenacao = coo.certa ? coo.id : String((m && m.coordenacao) || "") || herdar(u, "coordenacao");
+      const faltas = [];
+      if (!lid.certa && !lideranca) faltas.push("a liderança direta");
+      if (!coo.certa && !coordenacao) faltas.push("a coordenação");
+      const semChefe = lid.semChefe || coo.semChefe;
+      if (faltas.length && (!m || FINAIS.indexOf(m.estagio) < 0)) {
+        plano.conferir.push({ usuario: u, membro: m || null, motivo: (semChefe ? semChefe.nome : "o departamento") + " não tem chefe no Bitrix: defina " + faltas.join(" e ") + " em Configuração → Setores sem chefe no Bitrix" });
+      }
       if (!m) {
         const ingresso = calc.dataValida(u.registro) ? String(u.registro).slice(0, 10) : hoje;
         const novo = calc.diffDias(ingresso, hoje) < DIAS_ONBOARDING;
@@ -67,9 +93,10 @@
         plano.conferir.push({ usuario: u, membro: m, motivo: "usuário ativo no Bitrix com o item Membros em \"" + (m.estagioNome || m.estagio) + "\"" });
         return;
       }
+      // incerto (setor sem chefe): nunca troca o que está gravado; só preenche o vazio herdado
       const mudancas = {};
-      if (lideranca && lideranca !== String(m.lideranca || "")) mudancas.lideranca = lideranca;
-      if (coordenacao && coordenacao !== String(m.coordenacao || "")) mudancas.coordenacao = coordenacao;
+      if (lideranca && lideranca !== String(m.lideranca || "") && (lid.certa || !m.lideranca)) mudancas.lideranca = lideranca;
+      if (coordenacao && coordenacao !== String(m.coordenacao || "") && (coo.certa || !m.coordenacao)) mudancas.coordenacao = coordenacao;
       if (Object.keys(mudancas).length) plano.atualizar.push({ usuario: u, membro: m, mudancas, antes: { lideranca: m.lideranca, coordenacao: m.coordenacao } });
     });
 
@@ -90,7 +117,6 @@
     }
     return plano;
   }
-  function liderancaDe(deptoPorId, u) { return dom.liderancaPelaEstrutura(deptoPorId, u.id, u.departamentos); }
 
   /**
    * ops = { criarMembro(dados) -> item, criarOnboarding(dados), atualizarMembro(id, dados),

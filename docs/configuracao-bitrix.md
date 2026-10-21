@@ -64,7 +64,14 @@ O processo Membros acompanha a estrutura do Bitrix sozinho:
 - **Quem muda de departamento:** tem a liderança e a coordenação atualizadas.
 - **Quem é desativado:** vai para Encerrado.
 
-O RH recebe uma notificação com o resumo, e cada item ganha um comentário no histórico. Ficam de fora a CEO e quem estiver em **Configuração → Papéis → Fora do app**. Se a execução tentar encerrar mais de 30% das pessoas de uma vez, ela retém as saídas e pede confirmação.
+O RH recebe uma notificação com o resumo, e cada item ganha um comentário no histórico.
+
+**Setores sem chefe no Bitrix.** No organograma, Solutions é coordenado por supervisores adjuntos e Gestão não tem chefe. A API do Bitrix só informa o chefe de cada departamento, não os adjuntos. Por isso, nesses setores:
+
+- A coordenação dos membros e a liderança direta de quem chefia cada área vêm do item do Membros. Quem grava é o RH, em **Configuração → Setores sem chefe no Bitrix**: para cada área, escolha a coordenação responsável.
+- A sincronização não troca esses valores. Quem entrar depois numa área herda a coordenação dela. A liderança direta de quem não tem chefe claro nunca é herdada: a pessoa aparece em "Para o RH conferir".
+- A coordenação que não chefia departamento (supervisora adjunta) precisa estar em Papéis → Coordenação. Ela vê o setor pelas áreas que coordena.
+- O jeito definitivo, pela especificação (1.1), é cadastrar a coordenação como chefe do setor no Bitrix. Quando isso acontecer, a estrutura volta a decidir sozinha. Ficam de fora a CEO e quem estiver em **Configuração → Papéis → Fora do app**. Se a execução tentar encerrar mais de 30% das pessoas de uma vez, ela retém as saídas e pede confirmação.
 
 - **Primeira carga e quando quiser:** Configuração → **Ver o que mudaria** (prévia) e depois **Sincronizar agora** (usa o login do administrador).
 - **Todo dia às 6h:** a rotina `api/sincronizar.js` na Vercel. Ela só liga depois que estas variáveis forem configuradas em Vercel → Settings → Environment Variables, seguidas de um Redeploy:

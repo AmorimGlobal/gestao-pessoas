@@ -90,51 +90,70 @@
   }
 
   /** Liderança direta pela estrutura (1.1): o chefe do departamento da pessoa. Se a própria
-      pessoa é a chefe (ou o departamento não tem chefe), sobe até o primeiro chefe acima.
-      Assim a liderança de uma área entra na equipe da coordenação do setor. */
-  function liderancaPelaEstrutura(deptoPorId, userId, deptosDoUsuario) {
+      pessoa é a chefe, sobe até o primeiro chefe acima (a liderança de uma área entra na equipe
+      da coordenação do setor).
+      "certa" = false quando o caminho passa por um departamento sem chefe. É o caso de um setor
+      coordenado por supervisores adjuntos (Solutions), que a API do Bitrix não informa: aí vale
+      o que está gravado no item do Membros (liderancaEfetiva). semChefe = esse departamento. */
+  function liderancaNaEstrutura(deptoPorId, userId, deptosDoUsuario) {
     let d = deptoPorId[(deptosDoUsuario || [])[0]];
     const vistos = {};
+    let semChefe = null;
     while (d && !vistos[d.id]) {
       vistos[d.id] = true;
-      if (d.chefe && d.chefe !== String(userId)) return d.chefe;
+      if (d.chefe && d.chefe !== String(userId)) return { id: d.chefe, certa: !semChefe, semChefe };
+      if (!d.chefe && !semChefe) semChefe = d;
       d = d.pai ? deptoPorId[d.pai] : null;
     }
-    return "";
+    return { id: "", certa: false, semChefe };
   }
+  function liderancaPelaEstrutura(deptoPorId, userId, deptosDoUsuario) { return liderancaNaEstrutura(deptoPorId, userId, deptosDoUsuario).id; }
   /** Coordenação responsável: o chefe do setor, isto é, o departamento logo abaixo da raiz
-      (a CEO fica acima de todos os setores). Para a própria coordenação, a liderança acima dela. */
-  function coordenacaoPelaEstrutura(deptoPorId, userId, deptosDoUsuario) {
+      (a CEO fica acima de todos os setores). Para a própria coordenação, a liderança acima dela.
+      Setor sem chefe no Bitrix: incerta, sem palpite (vale o item do Membros). */
+  function coordenacaoNaEstrutura(deptoPorId, userId, deptosDoUsuario) {
     let d = deptoPorId[(deptosDoUsuario || [])[0]];
     const cadeia = [], vistos = {};
     while (d && !vistos[d.id]) { vistos[d.id] = true; cadeia.push(d); d = d.pai ? deptoPorId[d.pai] : null; }
     const setor = cadeia.length >= 2 ? cadeia[cadeia.length - 2] : cadeia[0];
-    if (setor && setor.chefe && setor.chefe !== String(userId)) return setor.chefe;
-    return liderancaPelaEstrutura(deptoPorId, userId, deptosDoUsuario);
+    if (!setor) return { id: "", certa: false, setor: null, semChefe: null };
+    if (setor.chefe && setor.chefe !== String(userId)) return { id: setor.chefe, certa: true, setor, semChefe: null };
+    if (setor.chefe) return Object.assign({ setor }, liderancaNaEstrutura(deptoPorId, userId, deptosDoUsuario));
+    return { id: "", certa: false, setor, semChefe: setor };
+  }
+  function coordenacaoPelaEstrutura(deptoPorId, userId, deptosDoUsuario) { return coordenacaoNaEstrutura(deptoPorId, userId, deptosDoUsuario).id; }
+
+  /** Liderança direta de um item do Membros: a estrutura quando ela é clara; senão, o campo
+      "Liderança direta" do item (gravado pelo RH ou em Configuração → Setores sem chefe). */
+  function liderancaEfetiva(ctx, m) {
+    const u = ctx.idx.usuario[m.responsavel];
+    if (!(ctx.departamentos || []).length || !u || !(u.departamentos || []).length) return String(m.lideranca || "");
+    const e = liderancaNaEstrutura(ctx.idx.depto, u.id, u.departamentos);
+    return e.certa ? e.id : (String(m.lideranca || "") || e.id);
+  }
+  function coordenacaoEfetiva(ctx, m) {
+    const u = ctx.idx.usuario[m.responsavel];
+    if (!(ctx.departamentos || []).length || !u || !(u.departamentos || []).length) return String(m.coordenacao || "");
+    const e = coordenacaoNaEstrutura(ctx.idx.depto, u.id, u.departamentos);
+    return e.certa ? e.id : String(m.coordenacao || "");
   }
 
   /** Membros da equipe direta: quem tem a pessoa como liderança direta pela estrutura.
       Sem estrutura no Bitrix (ou membro sem departamento), cai para o campo "Liderança direta". */
   function equipeDe(ctx, uid) {
     const id = String(uid);
-    const temEstrutura = (ctx.departamentos || []).length > 0;
-    const equipe = (ctx.registros.membros || []).filter((m) => {
-      if (m.responsavel === id) return false;
-      const u = ctx.idx.usuario[m.responsavel];
-      if (!temEstrutura || !u || !(u.departamentos || []).length) return m.lideranca === id;
-      return liderancaPelaEstrutura(ctx.idx.depto, u.id, u.departamentos) === id;
-    });
-    return membrosAtivos(equipe);
+    return membrosAtivos((ctx.registros.membros || []).filter((m) => m.responsavel !== id && liderancaEfetiva(ctx, m) === id));
   }
-  /** Coordenação: lideranças dos subdepartamentos, cada uma com a sua equipe */
+  /** Coordenação: lideranças dos subdepartamentos que ela chefia, cada uma com a sua equipe. Quem
+      coordena um setor sem chefe no Bitrix (supervisora adjunta) chega ao setor pelos membros que
+      têm ela como coordenação responsável. */
   function liderancasDoSetor(ctx, uid) {
     const id = String(uid);
     const subs = deptosChefiados(ctx, id).reduce((acc, d) => acc.concat(descendentes(ctx, d)), []);
     const chefes = [];
-    subs.forEach((d) => {
-      const dep = ctx.idx.depto[d];
-      if (dep && dep.chefe && dep.chefe !== id && chefes.indexOf(dep.chefe) < 0) chefes.push(dep.chefe);
-    });
+    const incluir = (c) => { if (c && c !== id && chefes.indexOf(c) < 0) chefes.push(c); };
+    subs.forEach((d) => { const dep = ctx.idx.depto[d]; if (dep) incluir(dep.chefe); });
+    membrosAtivos(ctx.registros.membros || []).forEach((m) => { if (coordenacaoEfetiva(ctx, m) === id) incluir(liderancaEfetiva(ctx, m)); });
     return chefes.map((c) => ({ lideranca: pessoa(ctx, c), equipe: equipeDe(ctx, c) }))
       .sort((a, b) => a.lideranca.nome.localeCompare(b.lideranca.nome, "pt-BR"));
   }
@@ -671,6 +690,52 @@
     return { ano, ciclos, feedbacks: fbs, tipos, classificados: ciclos.filter((c) => c.item && c.item.classificacao).length };
   }
 
+  /* ================================================================ setores sem chefe no Bitrix (1.1) */
+  /** Departamentos sem chefe (fora a raiz), cada um com os grupos que precisam de coordenação gravada
+      no Membros: quem está direto nele e cada departamento logo abaixo (área), com a subárvore.
+      Para cada grupo: os membros, quantos estão com coordenação ou liderança incerta e o valor que
+      a maioria deles já tem gravado. */
+  function setoresSemChefe(ctx) {
+    const deptos = ctx.departamentos || [];
+    const ativos = membrosAtivos(ctx.registros.membros || []);
+    const deptoDo = (m) => { const u = ctx.idx.usuario[m.responsavel]; return u && (u.departamentos || [])[0] ? String(u.departamentos[0]) : ""; };
+    const maioria = (lista) => {
+      const conta = {};
+      lista.filter(Boolean).forEach((v) => { conta[v] = (conta[v] || 0) + 1; });
+      return Object.keys(conta).sort((a, b) => conta[b] - conta[a])[0] || "";
+    };
+    return deptos.filter((d) => !d.chefe && d.pai && ctx.idx.depto[d.pai]).map((s) => {
+      const grupos = [{ depto: s, direto: true, ids: [s.id] }].concat(deptos.filter((f) => f.pai === s.id).map((f) => ({ depto: f, direto: false, ids: [f.id].concat(descendentes(ctx, f.id)) })));
+      grupos.forEach((g) => {
+        g.membros = ativos.filter((m) => g.ids.indexOf(deptoDo(m)) >= 0);
+        g.incertos = g.membros.filter((m) => {
+          const u = ctx.idx.usuario[m.responsavel];
+          return !liderancaNaEstrutura(ctx.idx.depto, u.id, u.departamentos).certa || !coordenacaoNaEstrutura(ctx.idx.depto, u.id, u.departamentos).certa;
+        });
+        g.coordenacao = maioria(g.incertos.map((m) => m.coordenacao));
+        g.chefe = g.direto ? "" : (g.depto.chefe || "");
+      });
+      return { depto: s, grupos: grupos.filter((g) => g.membros.length) };
+    }).filter((s) => s.grupos.length);
+  }
+  /** O que gravar no Membros quando o grupo passa a ter a coordenação `coord`: a coordenação de quem
+      está com ela incerta e a liderança de quem está com ela incerta (a chefe da área e quem está
+      direto no setor respondem à coordenação). A própria coordenação não muda o próprio item. */
+  function mudancasSetorSemChefe(ctx, grupo, coord) {
+    const c = String(coord || "");
+    const lista = [];
+    if (!c) return lista;
+    grupo.incertos.forEach((m) => {
+      if (m.responsavel === c) return;
+      const u = ctx.idx.usuario[m.responsavel];
+      const d = {};
+      if (!coordenacaoNaEstrutura(ctx.idx.depto, u.id, u.departamentos).certa && String(m.coordenacao || "") !== c) d.coordenacao = c;
+      if (!liderancaNaEstrutura(ctx.idx.depto, u.id, u.departamentos).certa && String(m.lideranca || "") !== c) d.lideranca = c;
+      if (Object.keys(d).length) lista.push({ membro: m, dados: d });
+    });
+    return lista;
+  }
+
   /* ================================================================ checagem antes de ligar o app (5.3) */
   const EMAIL_PESSOAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|icloud|me|uol|bol|terra|ig)\.(com|com\.br)$/i;
   /** Os testes que o TI roda antes de liberar o app, sobre os dados já carregados. O 5º teste (exemplos
@@ -697,12 +762,22 @@
     (ctx.departamentos || []).forEach((d) => { if (d.chefe) chefes[d.chefe] = true; });
     const lids = {};
     ativos.forEach((m) => { if (m.lideranca) lids[m.lideranca] = true; });
-    Object.keys(lids).forEach((l) => { if (!chefes[l]) p2.push(pessoa(ctx, l).nome + " é liderança direta no Membros, mas não chefia nenhum departamento"); });
+    // quem lidera pelo item do Membros num setor sem chefe (supervisora adjunta) não precisa chefiar departamento
+    const porSetorSemChefe = {};
     ativos.forEach((m) => {
       const u = ctx.idx.usuario[m.responsavel];
-      if (!u || !m.lideranca || !(u.departamentos || []).length) return;
-      const pela = liderancaPelaEstrutura(ctx.idx.depto, u.id, u.departamentos);
-      if (pela && pela !== m.lideranca) p2.push(u.nome + ": a liderança direta no Membros é " + pessoa(ctx, m.lideranca).nome + ", e pela estrutura é " + pessoa(ctx, pela).nome);
+      if (m.lideranca && u && (u.departamentos || []).length && !liderancaNaEstrutura(ctx.idx.depto, u.id, u.departamentos).certa) porSetorSemChefe[m.lideranca] = true;
+    });
+    Object.keys(lids).forEach((l) => { if (!chefes[l] && !porSetorSemChefe[l]) p2.push(pessoa(ctx, l).nome + " é liderança direta no Membros, mas não chefia nenhum departamento"); });
+    ativos.forEach((m) => {
+      const u = ctx.idx.usuario[m.responsavel];
+      if (!u || !(u.departamentos || []).length) return;
+      const l = liderancaNaEstrutura(ctx.idx.depto, u.id, u.departamentos);
+      const c = coordenacaoNaEstrutura(ctx.idx.depto, u.id, u.departamentos);
+      if (l.certa && m.lideranca && l.id !== m.lideranca) p2.push(u.nome + ": a liderança direta no Membros é " + pessoa(ctx, m.lideranca).nome + ", e pela estrutura é " + pessoa(ctx, l.id).nome);
+      const falta = [!l.certa && !m.lideranca ? "liderança direta" : "", !c.certa && !m.coordenacao ? "coordenação" : ""].filter(Boolean);
+      const sem = l.semChefe || c.semChefe;
+      if (falta.length) p2.push(u.nome + ": " + (sem ? sem.nome : "o departamento") + " não tem chefe no Bitrix e o item do Membros está sem " + falta.join(" e "));
     });
     const p3 = usuarios.filter((u) => !u.email || EMAIL_PESSOAL.test(u.email)).map((u) => u.nome + (u.email ? ": e-mail pessoal no cadastro" : ": sem e-mail"));
     const p4 = [];
@@ -765,11 +840,11 @@
 
   return {
     MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE,
-    indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancasDoSetor, membrosVisiveis,
+    indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancaNaEstrutura, coordenacaoNaEstrutura, liderancaEfetiva, coordenacaoEfetiva, liderancasDoSetor, membrosVisiveis,
     feriadosDe, feriadosDoMembro, feedbackValido, feedbacksDo, editavel, ultimoFeedback,
     cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
     verificarRegistros, destinoEncerramento, aprovadorDe,
     pendenciasDe, ordenarPendencias, aprovacoesPendentes, filaRH,
-    indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, agendaEquipe, dicas, anoDoMembro, painelGeral, resumoPainel, checagemImplantacao,
+    indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, agendaEquipe, dicas, anoDoMembro, painelGeral, resumoPainel, checagemImplantacao, setoresSemChefe, mudancasSetorSemChefe,
   };
 });

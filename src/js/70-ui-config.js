@@ -54,6 +54,7 @@
         lista.map((u) => '<span class="tag azul">' + esc(u.nome || "ID " + u.id) + ' <a href="#" data-acao="remover-papel" data-papel="' + p[0] + '" data-id="' + esc(u.id) + '" aria-label="Remover">✕</a></span>').join("") +
         '<button class="btn peq sec" data-acao="adicionar-papel" data-papel="' + p[0] + '">' + icone("mais", 13) + " Adicionar</button></div></div>";
     }).join("") + '<p class="muted" style="font-size:12px;margin:0">Liderança não precisa de cadastro: é quem chefia um departamento na estrutura da empresa (1.1).</p></div>';
+    h += semChefeHtml(cfg);
     // Sincronização com a estrutura da empresa (55-sync.js)
     h += '<div class="card"><h3>Sincronização com a estrutura da empresa</h3>' +
       '<p class="muted" style="margin-top:0">Mantém o processo Membros igual à estrutura do Bitrix. Quem entra ganha o item (e o onboarding, se entrou há menos de 90 dias). Quem muda de departamento tem a liderança e a coordenação atualizadas. Quem é desativado vai para Encerrado. O RH recebe um aviso com o resumo, e cada item ganha um comentário no histórico.</p>' +
@@ -75,6 +76,47 @@
       c.campo({ nome: "categoriaVagas", rotulo: "Funil de vagas (CATEGORY_ID dos negócios)", tipo: "numero", valor: (cfg.recrutamento || {}).categoria || 77, ajuda: "Hoje: HR | Requisição de Vagas (77). Troque quando o funil de R&S existir." }) + "</div>" +
       '<button class="btn" data-acao="salvar-config">Salvar os cadastros</button></div></div>';
     return h;
+  };
+
+  /* ---------------- setores sem chefe no Bitrix (1.1) ---------------- */
+  function semChefeHtml(cfg) {
+    const ctx = E().ctx;
+    const setores = dom.setoresSemChefe(ctx);
+    if (!setores.length) return "";
+    const coord = ((cfg.papeis || {}).coordenacao || []).map((p) => String(p.id));
+    const usuarios = (ctx.usuarios || []).slice().sort((a, b) => {
+      const ca = coord.indexOf(a.id) >= 0, cb = coord.indexOf(b.id) >= 0;
+      return ca !== cb ? (ca ? -1 : 1) : a.nome.localeCompare(b.nome, "pt-BR");
+    }).map((u) => ({ valor: u.id, rotulo: u.nome + (coord.indexOf(u.id) >= 0 ? " · coordenação" : "") }));
+    return '<div class="card"><h3>Setores sem chefe no Bitrix</h3>' +
+      '<p class="muted" style="margin-top:0">Estes departamentos não têm chefe na estrutura da empresa. É o caso de um setor coordenado por supervisores adjuntos, que a API do Bitrix não informa. Escolha a coordenação responsável de cada área. O app grava a coordenação dos membros e a liderança direta de quem chefia a área e de quem está direto no setor. A sincronização diária mantém esses valores e repete o mesmo para quem entrar depois na área.</p>' +
+      setores.map((s, i) => '<div class="grupo-form" id="semchefe-' + i + '"><div class="rotulo-grupo">' + esc(s.depto.nome) + "</div>" +
+        '<div class="tabela-wrap"><table class="tabela"><tbody>' + s.grupos.map((g, j) =>
+          "<tr><td><b>" + esc(g.direto ? "Direto em " + s.depto.nome : g.depto.nome) + '</b><div class="muted" style="font-size:12px">' + plural(g.membros.length, "membro", "membros") +
+          (g.chefe ? " · chefe " + esc(dom.pessoa(ctx, g.chefe).nome) : "") + (g.incertos.length ? " · " + g.incertos.length + " sem coordenação pela estrutura" : "") + "</div></td>" +
+          '<td style="min-width:260px">' + c.campo({ nome: "g" + j, rotulo: "Coordenação responsável", tipo: "lista", opcoes: usuarios, valor: g.coordenacao, opcional: true }) + "</td></tr>").join("") +
+        "</tbody></table></div>" +
+        '<button class="btn" data-acao="aplicar-semchefe" data-setor="' + i + '">Gravar em ' + esc(s.depto.nome) + "</button></div>").join("") + "</div>";
+  }
+  ui.acoes["aplicar-semchefe"] = function (el) {
+    const ctx = E().ctx;
+    const s = dom.setoresSemChefe(ctx)[Number(el.dataset.setor)];
+    if (!s) return;
+    const d = ui.lerForm(document.getElementById("semchefe-" + el.dataset.setor));
+    const mudancas = [];
+    s.grupos.forEach((g, j) => { dom.mudancasSetorSemChefe(ctx, g, d["g" + j]).forEach((x) => mudancas.push(x)); });
+    if (!mudancas.length) { ui.avisar("Nada a gravar: os itens do Membros já estão assim."); return; }
+    if (!window.confirm("Gravar a coordenação de " + s.depto.nome + " em " + plural(mudancas.length, "item", "itens") + " do Membros?")) return;
+    const quando = calc.fmtDataAno(ctx.hoje);
+    ui.salvar(el, async () => {
+      for (const x of mudancas) {
+        await ui.atualizar("membros", x.membro.id, x.dados);
+        const partes = [];
+        if (x.dados.coordenacao) partes.push("coordenação: " + dom.pessoa(ctx, x.dados.coordenacao).nome);
+        if (x.dados.lideranca) partes.push("liderança direta: " + dom.pessoa(ctx, x.dados.lideranca).nome);
+        try { await E().repo.comentar("membros", x.membro.id, "Definido em Configuração → Setores sem chefe no Bitrix (" + s.depto.nome + ") por " + E().eu.nome + " em " + quando + ": " + partes.join("; ") + "."); } catch (e) { /* o comentário não impede a gravação */ }
+      }
+    }, { mensagem: plural(mudancas.length, "item atualizado", "itens atualizados") + " no Membros.", fechar: false });
   };
 
   /* ---------------- checagem antes de ligar o app (5.3) ---------------- */
