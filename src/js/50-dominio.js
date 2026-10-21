@@ -89,36 +89,45 @@
     };
   }
 
-  /** Liderança direta pela estrutura (1.1): o chefe do departamento da pessoa. Se a própria
-      pessoa é a chefe, sobe até o primeiro chefe acima (a liderança de uma área entra na equipe
-      da coordenação do setor).
-      "certa" = false quando o caminho passa por um departamento sem chefe. É o caso de um setor
-      coordenado por supervisores adjuntos (Solutions), que a API do Bitrix não informa: aí vale
-      o que está gravado no item do Membros (liderancaEfetiva). semChefe = esse departamento. */
-  function liderancaNaEstrutura(deptoPorId, userId, deptosDoUsuario) {
-    let d = deptoPorId[(deptosDoUsuario || [])[0]];
-    const vistos = {};
-    let semChefe = null;
-    while (d && !vistos[d.id]) {
-      vistos[d.id] = true;
-      if (d.chefe && d.chefe !== String(userId)) return { id: d.chefe, certa: !semChefe, semChefe };
-      if (!d.chefe && !semChefe) semChefe = d;
-      d = d.pai ? deptoPorId[d.pai] : null;
-    }
-    return { id: "", certa: false, semChefe };
+  /** Departamento principal de quem está em mais de um (25 pessoas no portal em 21/10/2026): o mais
+      específico, isto é, o mais fundo na árvore. Empate: o primeiro da lista do Bitrix. */
+  function deptoPrincipal(deptoPorId, deptosDoUsuario) {
+    const prof = (id) => { let n = 0, d = deptoPorId[id]; const vistos = {}; while (d && d.pai && !vistos[d.id]) { vistos[d.id] = true; n++; d = deptoPorId[d.pai]; } return n; };
+    let melhor = null, pMelhor = -1;
+    (deptosDoUsuario || []).map(String).forEach((id) => { if (!deptoPorId[id]) return; const p = prof(id); if (p > pMelhor) { melhor = id; pMelhor = p; } });
+    return melhor;
+  }
+  function cadeiaAteRaiz(deptoPorId, inicio) {
+    const cadeia = [], vistos = {};
+    let d = deptoPorId[inicio];
+    while (d && !vistos[d.id]) { vistos[d.id] = true; cadeia.push(d); d = d.pai ? deptoPorId[d.pai] : null; }
+    return cadeia;
+  }
+  /** Liderança direta pela estrutura (1.1): o chefe do departamento da pessoa. Departamento sem chefe
+      (Relacionamento, SDR...) ou a própria pessoa como chefe: sobe até o primeiro chefe acima. Assim a
+      liderança de uma área entra na equipe de quem está acima dela.
+      "certa" = false só quando não há chefe nenhum no caminho: aí vale o item do Membros. */
+  function liderancaNaEstrutura(deptoPorId, userId, deptosDoUsuario, inicio) {
+    const cadeia = cadeiaAteRaiz(deptoPorId, inicio || deptoPrincipal(deptoPorId, deptosDoUsuario));
+    const semChefe = cadeia.find((d) => !d.chefe) || null;
+    const achou = cadeia.find((d) => d.chefe && d.chefe !== String(userId));
+    return achou ? { id: achou.chefe, certa: true, semChefe } : { id: "", certa: false, semChefe };
   }
   function liderancaPelaEstrutura(deptoPorId, userId, deptosDoUsuario) { return liderancaNaEstrutura(deptoPorId, userId, deptosDoUsuario).id; }
-  /** Coordenação responsável: o chefe do setor, isto é, o departamento logo abaixo da raiz
-      (a CEO fica acima de todos os setores). Para a própria coordenação, a liderança acima dela.
-      Setor sem chefe no Bitrix: incerta, sem palpite (vale o item do Membros). */
+  /** Coordenação responsável: o primeiro chefe de cima para baixo no caminho da pessoa, abaixo da raiz.
+      Com o setor chefiado (Customer Services, Marketing), é a chefe do setor. Com o setor sem chefe
+      (Solutions, Gestão), é a chefe da área (Immigration, International Law, Administrativo...).
+      Quando a pessoa é essa chefe: a liderança acima dela. Só a raiz no caminho: a chefe da raiz. */
   function coordenacaoNaEstrutura(deptoPorId, userId, deptosDoUsuario) {
-    let d = deptoPorId[(deptosDoUsuario || [])[0]];
-    const cadeia = [], vistos = {};
-    while (d && !vistos[d.id]) { vistos[d.id] = true; cadeia.push(d); d = d.pai ? deptoPorId[d.pai] : null; }
-    const setor = cadeia.length >= 2 ? cadeia[cadeia.length - 2] : cadeia[0];
-    if (!setor) return { id: "", certa: false, setor: null, semChefe: null };
-    if (setor.chefe && setor.chefe !== String(userId)) return { id: setor.chefe, certa: true, setor, semChefe: null };
-    if (setor.chefe) return Object.assign({ setor }, liderancaNaEstrutura(deptoPorId, userId, deptosDoUsuario));
+    const cadeia = cadeiaAteRaiz(deptoPorId, deptoPrincipal(deptoPorId, deptosDoUsuario));
+    if (!cadeia.length) return { id: "", certa: false, setor: null, semChefe: null };
+    const raiz = cadeia[cadeia.length - 1];
+    const abaixo = cadeia.slice(0, -1).reverse(); // do setor para baixo
+    const setor = abaixo[0] || raiz;
+    const topo = abaixo.find((d) => d.chefe);
+    if (topo && topo.chefe !== String(userId)) return { id: topo.chefe, certa: true, setor, semChefe: null };
+    if (topo) return Object.assign({ setor }, liderancaNaEstrutura(deptoPorId, userId, deptosDoUsuario, topo.id));
+    if (raiz.chefe && raiz.chefe !== String(userId)) return { id: raiz.chefe, certa: true, setor, semChefe: null };
     return { id: "", certa: false, setor, semChefe: setor };
   }
   function coordenacaoPelaEstrutura(deptoPorId, userId, deptosDoUsuario) { return coordenacaoNaEstrutura(deptoPorId, userId, deptosDoUsuario).id; }
@@ -698,13 +707,15 @@
   function setoresSemChefe(ctx) {
     const deptos = ctx.departamentos || [];
     const ativos = membrosAtivos(ctx.registros.membros || []);
-    const deptoDo = (m) => { const u = ctx.idx.usuario[m.responsavel]; return u && (u.departamentos || [])[0] ? String(u.departamentos[0]) : ""; };
+    const deptoDo = (m) => { const u = ctx.idx.usuario[m.responsavel]; return (u && deptoPrincipal(ctx.idx.depto, u.departamentos)) || ""; };
     const maioria = (lista) => {
       const conta = {};
       lista.filter(Boolean).forEach((v) => { conta[v] = (conta[v] || 0) + 1; });
       return Object.keys(conta).sort((a, b) => conta[b] - conta[a])[0] || "";
     };
-    return deptos.filter((d) => !d.chefe && d.pai && ctx.idx.depto[d.pai]).map((s) => {
+    // o mais alto sem chefe: um sem chefe dentro de outro sem chefe já entra como área do de cima
+    const paiSemChefe = (d) => { const p = ctx.idx.depto[d.pai]; return !!(p && !p.chefe && p.pai && ctx.idx.depto[p.pai]); };
+    return deptos.filter((d) => !d.chefe && d.pai && ctx.idx.depto[d.pai] && !paiSemChefe(d)).map((s) => {
       const grupos = [{ depto: s, direto: true, ids: [s.id] }].concat(deptos.filter((f) => f.pai === s.id).map((f) => ({ depto: f, direto: false, ids: [f.id].concat(descendentes(ctx, f.id)) })));
       grupos.forEach((g) => {
         g.membros = ativos.filter((m) => g.ids.indexOf(deptoDo(m)) >= 0);
@@ -715,7 +726,7 @@
         g.coordenacao = maioria(g.incertos.map((m) => m.coordenacao));
         g.chefe = g.direto ? "" : (g.depto.chefe || "");
       });
-      return { depto: s, grupos: grupos.filter((g) => g.membros.length) };
+      return { depto: s, grupos: grupos.filter((g) => g.incertos.length) };
     }).filter((s) => s.grupos.length);
   }
   /** O que gravar no Membros quando o grupo passa a ter a coordenação `coord`: a coordenação de quem
@@ -840,7 +851,7 @@
 
   return {
     MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE,
-    indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancaNaEstrutura, coordenacaoNaEstrutura, liderancaEfetiva, coordenacaoEfetiva, liderancasDoSetor, membrosVisiveis,
+    indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, deptoPrincipal, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancaNaEstrutura, coordenacaoNaEstrutura, liderancaEfetiva, coordenacaoEfetiva, liderancasDoSetor, membrosVisiveis,
     feriadosDe, feriadosDoMembro, feedbackValido, feedbacksDo, editavel, ultimoFeedback,
     cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
     verificarRegistros, destinoEncerramento, aprovadorDe,

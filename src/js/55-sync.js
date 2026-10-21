@@ -56,9 +56,9 @@
     // a estrutura não diz a coordenação nem a liderança de quem chefia uma área. Aí vale o que
     // está no item do Membros, e uma pessoa nova herda a coordenação que as outras do mesmo
     // departamento têm. A liderança nunca é herdada: sem estrutura clara, vai para o RH conferir.
-    const deptoDe = (id) => { const u = ativos[id]; return u && (u.departamentos || [])[0] ? String(u.departamentos[0]) : ""; };
+    const deptoDe = (id) => { const u = ativos[id]; return (u && dom.deptoPrincipal(deptoPorId, u.departamentos)) || ""; };
     function herdar(u, campo) {
-      const d = (u.departamentos || [])[0];
+      const d = dom.deptoPrincipal(deptoPorId, u.departamentos);
       if (!d) return "";
       const conta = {};
       membros.forEach((m) => {

@@ -76,12 +76,12 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
 - **Datas:** strings ISO `AAAA-MM-DD`, cálculo em UTC (`GP.calc`). Dia N = início + (N − 1). Prazo em dia não útil passa para o próximo dia útil (feriados nacionais mais os de SP/BA pela cidade de referência).
 - **Bloqueio de 48 h** (4.1): a tela respeita o prazo (`dom.editavel`). Depois dele, só adendo, com data, autor e justificativa. O bloqueio "de verdade" é o robô e a permissão por estágio no Bitrix (docs).
 - **Leitura de entrega** (4.8): só onboarding, plano e "marcada como relevante". Não é indicador. A nota do trimestre é a classificação da liderança em 4 níveis.
-- **Equipe = liderança direta pela estrutura** (`dom.liderancaNaEstrutura`): é o chefe do departamento da pessoa ou, se ela mesma é a chefe, o primeiro chefe acima. Por isso a liderança de uma área está na equipe da coordenação. A sincronização (`55-sync.js`) usa a mesma regra para preencher "Liderança direta" e "Coordenação responsável".
-- **Setor sem chefe no Bitrix** (Solutions, coordenado por supervisoras adjuntas que a API não informa; Gestão): quando o caminho passa por um departamento sem chefe, a resposta é "incerta".
-  - Nesse caso vale o que está no item do Membros (`dom.liderancaEfetiva`/`coordenacaoEfetiva`).
-  - O RH grava em Configuração → Setores sem chefe no Bitrix.
-  - A sincronização nunca troca um valor incerto. Ela herda só a coordenação para quem entra na área; a liderança nunca é herdada.
-  - A coordenação sem chefia vê o setor pelos membros que têm ela como coordenação (`liderancasDoSetor`).
+- **Equipe e coordenação vêm da estrutura do Bitrix** (`dom.liderancaNaEstrutura`/`coordenacaoNaEstrutura`), conferidas contra o portal em 21/10/2026:
+  - **Liderança direta:** o chefe do departamento da pessoa. Se o departamento não tem chefe (Relacionamento, SDR...) ou a pessoa é a chefe, sobe até o primeiro chefe acima.
+  - **Coordenação:** o primeiro chefe de cima para baixo no caminho, abaixo da raiz. Em setor com chefe (Customer Services, Marketing) é a chefe do setor. Em setor sem chefe (Solutions, Gestão) é a chefe da área (Immigration, International Law, Administrativo...). Para a própria coordenação, a liderança acima.
+  - **Mais de um departamento:** vale o mais específico, o mais fundo na árvore (`dom.deptoPrincipal`).
+  - **Os "supervisores adjuntos" do organograma** aparecem na API lotados direto no setor, e na prática chefiam as áreas.
+  - **Sem chefe nenhum no caminho:** vale o item do Membros, a sincronização não troca e manda para o RH conferir (Configuração → Setores sem chefe no Bitrix, que só aparece nesse caso).
 - **`build.js` compila o JS (`new Function`) antes de gravar**: um erro de sintaxe derruba o build, e a Vercel mantém a versão anterior no ar.
 - **Mudou o esquema?** Altere `20-schema.js`, rode os testes, rode o provisionamento (simulação primeiro) e reconstrua.
 

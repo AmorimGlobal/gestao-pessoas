@@ -1,5 +1,8 @@
-// Estrutura oficial com setores sem chefe no Bitrix (organograma de 21/10/2026): Solutions é coordenado
-// por supervisoras adjuntas, que a API não informa, e Gestão não tem chefe. Customer Services tem chefe.
+// Estrutura com a forma do portal em 21/10/2026 (department.get), com nomes de pessoas fictícios:
+// - Solutions e Gestão sem chefe; as áreas abaixo têm chefe (Immigration, International Law...).
+// - As "supervisoras adjuntas" de Solutions aparecem na API lotadas direto em Solutions e chefiam áreas.
+// - Subgrupos sem chefe (Relacionamento, Acompanhamento, SDR) respondem ao chefe acima.
+// - Gente em mais de um departamento: vale o mais específico.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const calc = require("../src/js/10-calc.js");
@@ -7,102 +10,106 @@ const dom = require("../src/js/50-dominio.js");
 const sync = require("../src/js/55-sync.js");
 
 const HOJE = "2026-10-21";
+const D = (id, nome, pai, chefe) => ({ id, nome, pai: pai || "", chefe: chefe || "" });
 const DEPTOS = [
-  { id: "1", nome: "AMORIM", pai: "", chefe: "1" },
-  { id: "10", nome: "Solutions", pai: "1", chefe: "" },
-  { id: "11", nome: "Imigração", pai: "10", chefe: "3" },
-  { id: "12", nome: "Tributário", pai: "10", chefe: "4" },
-  { id: "20", nome: "Customer Services", pai: "1", chefe: "20" },
-  { id: "21", nome: "Atendimento", pai: "20", chefe: "22" },
-  { id: "30", nome: "Gestão", pai: "1", chefe: "" },
-  { id: "31", nome: "Administrativo & Financeiro", pai: "30", chefe: "5" },
+  D("1", "AMORIM", "", "1"),
+  D("183", "Solutions", "1"),
+  D("207", "Immigration", "183", "40"),
+  D("493", "Europeia", "207", "41"),
+  D("509", "Relacionamento", "493"),
+  D("497", "EUA+", "207", "40"),
+  D("525", "Desenvolvimento", "497", "43"),
+  D("687", "Acompanhamento", "525"),
+  D("215", "International Law", "183", "44"),
+  D("601", "Famílias Internacionais", "215", "44"),
+  D("211", "Customer Services", "1", "20"),
+  D("443", "SDR", "211"),
+  D("475", "Gestão", "1"),
+  D("477", "Administrativo & Financeiro", "475", "5"),
+  D("833", "Comitê de Inovação", "475", "1"),
 ];
-const u = (id, nome, depto) => ({ id, nome, departamentos: [depto], tipo: "employee", registro: "2024-01-10", email: nome.split(" ")[0].toLowerCase() + "@amorimglobal.com" });
+const u = (id, nome, deptos) => ({ id, nome, departamentos: deptos, tipo: "employee", registro: "2024-01-10", email: id + "@amorimglobal.com" });
 const USUARIOS = [
-  u("1", "Giselle Amorim", "1"), u("40", "Taily Fiori", "10"), u("41", "Rafaela Osorio", "10"),
-  u("3", "Carla Mendes", "11"), u("100", "Ana Ribeiro", "11"), u("101", "Bruno Teixeira", "11"),
-  u("4", "Marcos Lima", "12"), u("102", "Daniela Rocha", "12"),
-  u("20", "Michelle Tavares", "20"), u("22", "Pedro Basile", "21"), u("200", "Igor Santos", "21"),
-  u("5", "Juliana Soares", "31"), u("300", "Kátia Moraes", "31"),
+  u("1", "Clara CEO", ["833", "1"]),
+  u("40", "Tatiana Coord", ["183", "207", "497"]),   // adjunta de Solutions, chefe de Immigration e EUA+
+  u("41", "Renata Regional", ["493", "183"]),        // adjunta de Solutions, chefe de Europeia
+  u("43", "Vera Dev", ["525", "497"]),               // chefe de Desenvolvimento
+  u("44", "Marina Law", ["601", "215"]),             // chefe de International Law
+  u("100", "Ana Relac", ["509"]),
+  u("101", "Ari Acomp", ["687", "497"]),
+  u("102", "Gil Familias", ["601", "215"]),
+  u("20", "Mila CS", ["833", "211"]),
+  u("200", "Sara SDR", ["443"]),
+  u("5", "Julia Adm", ["477"]),
+  u("300", "Kim Adm", ["477"]),
+  u("301", "Leti Gestao", ["475"]),
 ];
+const porDepto = {};
+DEPTOS.forEach((d) => { porDepto[d.id] = d; });
+const est = (id) => {
+  const usr = USUARIOS.find((x) => x.id === id);
+  return [dom.liderancaPelaEstrutura(porDepto, id, usr.departamentos), dom.coordenacaoPelaEstrutura(porDepto, id, usr.departamentos)];
+};
 
-/** Roda a sincronização como a primeira carga faria e devolve os itens do Membros resultantes */
-function primeiraCarga() {
+test("liderança direta e coordenação pela estrutura real", () => {
+  assert.deepEqual(est("100"), ["41", "40"]); // Relacionamento (sem chefe) -> Europeia; coordenação = chefe de Immigration
+  assert.deepEqual(est("41"), ["40", "40"]);  // a chefe de Europeia responde à chefe de Immigration
+  assert.deepEqual(est("40"), ["1", "1"]);    // a chefe de Immigration responde à CEO
+  assert.deepEqual(est("101"), ["43", "40"]); // Acompanhamento (mais específico que EUA+) -> Desenvolvimento
+  assert.deepEqual(est("43"), ["40", "40"]);
+  assert.deepEqual(est("102"), ["44", "44"]); // International Law
+  assert.deepEqual(est("44"), ["1", "1"]);
+  assert.deepEqual(est("200"), ["20", "20"]); // SDR (sem chefe) -> Customer Services
+  assert.deepEqual(est("20"), ["1", "1"]);    // também no Comitê de Inovação, chefiado pela CEO: o resultado é o mesmo
+  assert.deepEqual(est("300"), ["5", "5"]);   // Gestão sem chefe: a chefe da área coordena
+  assert.deepEqual(est("5"), ["1", "1"]);
+  assert.deepEqual(est("301"), ["1", "1"]);   // direto em Gestão: a CEO
+});
+
+test("departamento principal: o mais específico; empate fica com o primeiro da lista", () => {
+  assert.equal(dom.deptoPrincipal(porDepto, ["687", "497"]), "687");
+  assert.equal(dom.deptoPrincipal(porDepto, ["183", "207", "497"]), "497");
+  assert.equal(dom.deptoPrincipal(porDepto, ["833", "211"]), "833");
+  assert.equal(dom.deptoPrincipal(porDepto, ["999"]), null);
+});
+
+test("1ª carga: todo mundo com liderança e coordenação, nada para conferir, nada de setor sem chefe", () => {
   const plano = sync.planejar({ hoje: HOJE, usuarios: USUARIOS, departamentos: DEPTOS, membros: [], excecoes: [], ceos: ["1"] });
-  let seq = 500;
-  const membros = plano.criar.map((c) => ({ id: String(++seq), titulo: c.usuario.nome, responsavel: c.usuario.id, estagio: c.estagio, lideranca: c.lideranca, coordenacao: c.coordenacao }));
-  return { plano, membros };
-}
-function contexto(membros) {
-  return dom.indexar({
+  assert.equal(plano.criar.length, USUARIOS.length - 1); // a CEO fica de fora
+  assert.deepEqual(plano.conferir, []);
+  const membros = plano.criar.map((c, i) => ({ id: String(500 + i), titulo: c.usuario.nome, responsavel: c.usuario.id, estagio: c.estagio, lideranca: c.lideranca, coordenacao: c.coordenacao }));
+  const ctx = dom.indexar({
     hoje: HOJE, eu: { id: "40" }, config: { papeis: { coordenacao: [{ id: "40" }, { id: "41" }], ceo: [{ id: "1" }] } },
     usuarios: USUARIOS, departamentos: DEPTOS, registros: { membros }, feriados: { nacionais: calc.feriadosNacionais(2026) },
   });
-}
-const de = (membros, uid) => membros.find((m) => m.responsavel === uid);
-
-test("1ª carga: onde há chefe, a estrutura decide; em setor sem chefe, nada de palpite e o RH confere", () => {
-  const { plano, membros } = primeiraCarga();
-  assert.deepEqual([de(membros, "100").lideranca, de(membros, "100").coordenacao], ["3", ""]); // Ana: liderança clara, coordenação não
-  assert.deepEqual([de(membros, "3").lideranca, de(membros, "3").coordenacao], ["", ""]);     // Carla chefia uma área de Solutions
-  assert.deepEqual([de(membros, "200").lideranca, de(membros, "200").coordenacao], ["22", "20"]); // Customer Services tem chefe
-  assert.deepEqual([de(membros, "20").lideranca, de(membros, "20").coordenacao], ["1", "1"]); // a chefe do setor responde à CEO
-  assert.ok(!de(membros, "1"), "a CEO não ganha item");
-  const conferir = plano.conferir.map((x) => x.usuario.id);
-  ["3", "100", "4", "102", "40", "41", "5", "300"].forEach((id) => assert.ok(conferir.indexOf(id) >= 0, "faltou conferir " + id));
-  assert.match(plano.conferir.find((x) => x.usuario.id === "3").motivo, /Solutions não tem chefe no Bitrix/);
-  assert.ok(conferir.indexOf("200") < 0 && conferir.indexOf("20") < 0);
+  assert.deepEqual(dom.setoresSemChefe(ctx), []);
+  assert.deepEqual(dom.equipeDe(ctx, "40").map((m) => m.titulo).sort(), ["Renata Regional", "Vera Dev"]);
+  assert.deepEqual(dom.equipeDe(ctx, "41").map((m) => m.titulo), ["Ana Relac"]);
+  // a coordenação de Immigration vê as lideranças abaixo dela, inclusive as das regiões
+  assert.deepEqual(dom.liderancasDoSetor(ctx, "40").map((l) => l.lideranca.nome).sort(), ["Renata Regional", "Vera Dev"]);
+  assert.deepEqual(dom.membrosVisiveis(ctx, "40").map((m) => m.titulo).sort(), ["Ana Relac", "Ari Acomp", "Renata Regional", "Vera Dev"]);
+  const estrutura = dom.checagemImplantacao(ctx).find((x) => x.chave === "estrutura");
+  assert.deepEqual(estrutura.problemas, []);
+  // a segunda execução não muda nada
+  const plano2 = sync.planejar({ hoje: HOJE, usuarios: USUARIOS, departamentos: DEPTOS, membros, excecoes: [], ceos: ["1"] });
+  assert.equal(plano2.criar.length + plano2.atualizar.length + plano2.encerrar.length, 0);
 });
 
-test("Configuração → Setores sem chefe: cada área ganha a sua coordenação, e a chefe da área responde a ela", () => {
-  const { membros } = primeiraCarga();
-  const ctx = contexto(membros);
-  const setores = dom.setoresSemChefe(ctx);
-  assert.deepEqual(setores.map((s) => s.depto.nome), ["Solutions", "Gestão"]);
-  const sol = setores[0];
-  assert.deepEqual(sol.grupos.map((g) => (g.direto ? "direto" : g.depto.nome)), ["direto", "Imigração", "Tributário"]);
-  const escolha = { direto: "1", Imigração: "40", Tributário: "41" };
-  sol.grupos.forEach((g) => dom.mudancasSetorSemChefe(ctx, g, escolha[g.direto ? "direto" : g.depto.nome]).forEach((x) => Object.assign(x.membro, x.dados)));
-  assert.deepEqual([de(membros, "3").lideranca, de(membros, "3").coordenacao], ["40", "40"]);
-  assert.deepEqual([de(membros, "100").lideranca, de(membros, "100").coordenacao], ["3", "40"]); // a liderança da Ana continua a Carla
-  assert.deepEqual([de(membros, "4").lideranca, de(membros, "102").coordenacao], ["41", "41"]);
-  assert.deepEqual([de(membros, "40").lideranca, de(membros, "40").coordenacao], ["1", "1"]); // as adjuntas respondem à CEO
-
-  const ctx2 = contexto(membros);
-  assert.deepEqual(dom.equipeDe(ctx2, "40").map((m) => m.titulo), ["Carla Mendes"]);
-  assert.deepEqual(dom.equipeDe(ctx2, "3").map((m) => m.titulo).sort(), ["Ana Ribeiro", "Bruno Teixeira"]);
-  const setorTaily = dom.liderancasDoSetor(ctx2, "40");
-  assert.deepEqual(setorTaily.map((l) => l.lideranca.nome), ["Carla Mendes"]);
-  assert.equal(setorTaily[0].equipe.length, 2);
-  assert.deepEqual(dom.membrosVisiveis(ctx2, "40").map((m) => m.titulo).sort(), ["Ana Ribeiro", "Bruno Teixeira", "Carla Mendes"]);
-  const p = dom.papeis(ctx2, "40");
-  assert.equal(p.coordenacao && p.lideranca, true);
-  // a checagem não reclama de Solutions, só de Gestão, que ainda não foi definida
-  const estrutura = dom.checagemImplantacao(ctx2).find((x) => x.chave === "estrutura");
-  assert.ok(!estrutura.problemas.some((t) => /Solutions|Taily|Rafaela/.test(t)), estrutura.problemas.join(" | "));
-  assert.ok(estrutura.problemas.some((t) => /Gestão não tem chefe/.test(t)));
-});
-
-test("sincronização seguinte: não desfaz o que foi definido e repete a coordenação para quem entra na área", () => {
-  const { membros } = primeiraCarga();
-  const ctx = contexto(membros);
-  const sol = dom.setoresSemChefe(ctx)[0];
-  const escolha = { direto: "1", Imigração: "40", Tributário: "41" };
-  sol.grupos.forEach((g) => dom.mudancasSetorSemChefe(ctx, g, escolha[g.direto ? "direto" : g.depto.nome]).forEach((x) => Object.assign(x.membro, x.dados)));
-  const novos = USUARIOS.concat([u("103", "Eduardo Martins", "11"), u("42", "Nova Adjunta", "10")]);
-  const plano = sync.planejar({ hoje: HOJE, usuarios: novos, departamentos: DEPTOS, membros, excecoes: [], ceos: ["1"] });
-  assert.ok(!plano.atualizar.some((a) => ["3", "100", "4", "40"].indexOf(a.usuario.id) >= 0), JSON.stringify(plano.atualizar.map((a) => [a.usuario.id, a.mudancas])));
-  const eduardo = plano.criar.find((c) => c.usuario.id === "103");
-  assert.deepEqual([eduardo.lideranca, eduardo.coordenacao], ["3", "40"]); // coordenação herdada da área
-  assert.ok(!plano.conferir.some((x) => x.usuario.id === "103"));
-  const nova = plano.criar.find((c) => c.usuario.id === "42");
-  assert.equal(nova.lideranca, "", "liderança nunca é herdada");
-  assert.ok(plano.conferir.some((x) => x.usuario.id === "42"));
-});
-
-test("Customer Services (com chefe) segue a estrutura como antes", () => {
-  const { membros } = primeiraCarga();
-  const ctx = contexto(membros);
-  assert.deepEqual(dom.equipeDe(ctx, "22").map((m) => m.titulo), ["Igor Santos"]);
-  assert.deepEqual(dom.liderancasDoSetor(ctx, "20").map((l) => l.lideranca.nome), ["Pedro Basile"]);
+test("sem chefe nenhum no caminho: vale o item do Membros, a sincronização não troca e o RH confere", () => {
+  const deptos = [D("1", "Raiz"), D("2", "Setor"), D("3", "Área", "2")].map((d) => (d.id === "2" ? Object.assign(d, { pai: "1" }) : d));
+  const usuarios = [u("7", "Pessoa A", ["3"]), u("8", "Pessoa B", ["3"])];
+  const plano = sync.planejar({ hoje: HOJE, usuarios, departamentos: deptos, membros: [], excecoes: [], ceos: [] });
+  assert.equal(plano.conferir.length, 2);
+  assert.match(plano.conferir[0].motivo, /não tem chefe no Bitrix/);
+  const membros = [
+    { id: "1", titulo: "Pessoa A", responsavel: "7", estagio: "ATIVO", lideranca: "9", coordenacao: "9" },
+    { id: "2", titulo: "Pessoa B", responsavel: "8", estagio: "ATIVO", lideranca: "", coordenacao: "" },
+  ];
+  const plano2 = sync.planejar({ hoje: HOJE, usuarios, departamentos: deptos, membros, excecoes: [], ceos: [] });
+  assert.ok(!plano2.atualizar.some((a) => a.membro.id === "1"), "não desfaz o que foi gravado");
+  const b = plano2.atualizar.find((a) => a.membro.id === "2");
+  assert.deepEqual(b.mudancas, { coordenacao: "9" }); // herda a coordenação de quem está na mesma área; a liderança não
+  const ctx = dom.indexar({ hoje: HOJE, eu: { id: "9" }, config: {}, usuarios, departamentos: deptos, registros: { membros }, feriados: { nacionais: [] } });
+  assert.deepEqual(dom.equipeDe(ctx, "9").map((m) => m.titulo), ["Pessoa A"]);
+  assert.equal(dom.setoresSemChefe(ctx).length, 1);
 });
