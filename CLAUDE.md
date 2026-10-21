@@ -86,9 +86,15 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
 - **`build.js` compila o JS (`new Function`) antes de gravar**: um erro de sintaxe derruba o build, e a Vercel mantém a versão anterior no ar.
 - **Mudou o esquema?** Altere `20-schema.js`, rode os testes, rode o provisionamento (simulação primeiro) e reconstrua.
 
-## Estado (20/10/2026)
+## Estado (21/10/2026)
 
-- **Portal:** a estrutura foi criada no portal (9 processos, solução automatizada id 3). A 1ª execução recusou 10 estágios e 1 campo. A correção (`895d35c`) está no ar e falta rodar de novo: **Configuração → Simular** (deve mostrar cerca de `crm.status.add` 10 e `userfieldconfig.add` 1) e depois **Criar ou completar**.
+- **Portal:**
+  - A estrutura está completa: 9 processos, todos os estágios e todos os campos. A cidade de referência é `UF_CRM_57_CIDADE_FER`, porque o código `CIDADE_REF` ficou preso no Bitrix depois de uma tentativa que falhou.
+  - A primeira carga do Membros foi feita por script com webhook, sem notificações: 59 itens (55 Ativos e 4 em Onboarding) e 4 onboardings.
+  - Ficaram de fora a CEO (13) e as contas 1363, 90881, 545 e 96647.
+- **Falta o administrador:**
+  - Importar `config-importar.json` em Configuração → Importar configuração (papéis e feriados). O arquivo está fora do Git.
+  - Gravar `.env` na Vercel: preencher `BITRIX_WEBHOOK_URL` e `BITRIX_EVENTO_TOKEN` e fazer um Redeploy. O arquivo está fora do Git.
 - **Feito e testado em demonstração e no Bitrix falso:**
   - sincronização com a estrutura;
   - trava do encerramento no servidor;
