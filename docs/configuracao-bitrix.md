@@ -26,7 +26,7 @@ Configure o app em Bitrix24 → Recursos para desenvolvedores → Outros → Apl
 
 O app chama `BX24.installFinish()` na primeira abertura.
 
-**Ver como outra pessoa.** Um administrador do Bitrix tem, no rodapé do menu, o botão "Ver como outra pessoa". O app abre com a equipe, os papéis e as pendências de quem foi escolhido (uma liderança, a coordenação, o RH ou a CEO), para conferir o que cada um enxerga. Neste modo nada é gravado, e a faixa no topo leva de volta à própria visão. A visão de RH depende de a pessoa estar em Papéis → RH.
+**Ver como outra pessoa.** Um administrador do Bitrix, ou quem está em Papéis → RH (desde 23/10/2026, a Luciele), tem no rodapé do menu o botão "Ver como outra pessoa". O app abre com a equipe, os papéis e as pendências de quem foi escolhido (uma liderança, a coordenação, o RH ou a CEO), para conferir o que cada um enxerga. Neste modo nada é gravado, e a faixa no topo leva de volta à própria visão. A visão de RH depende de a pessoa estar em Papéis → RH.
 
 **O link só abre pelo Bitrix.** Quando o Bitrix abre o app, ele manda o token da sessão de quem está logado. Antes de entregar a página, a Vercel pergunta ao portal de quem é esse token (`lib/acesso.js`). Aberto direto no navegador, o link mostra "Acesso só pelo Bitrix24", e a versão publicada não tem demonstração.
 

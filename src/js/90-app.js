@@ -144,10 +144,10 @@
     }
   }
 
-  /** Administrador vê o app como outra pessoa (uid) ou volta para a própria visão (uid vazio). Somente leitura. */
+  /** Administrador ou RH vê o app como outra pessoa (uid) ou volta para a própria visão (uid vazio). Somente leitura. */
   async function verComo(uid) {
     const real = E.euReal || E.eu;
-    if (!real || !real.admin) return;
+    if (!real || !ui.podeVerComo()) return;
     const ctx = E.ctx;
     const repoReal = E.repoReal || E.repo;
     let eu;

@@ -270,12 +270,16 @@
       '<div class="app">Gestão de Pessoas</div></div><nav class="nav" aria-label="Menu">' + menu() + "</nav>" +
       '<div class="rodape">' + c.pessoa({ nome: estado.eu.nome, foto: estado.eu.foto }, "", 26).replace('class="nome"', 'class="nome" style="color:#fff"') +
       '<div style="margin-top:8px">' + seletor + "</div>" +
-      (souAdmin() ? '<button class="btn peq sec" style="margin-top:10px;width:100%" data-acao="abrir-ver-como">' + icone("equipe", 13) + " Ver como outra pessoa</button>" : "") +
+      (podeVerComo() ? '<button class="btn peq sec" style="margin-top:10px;width:100%" data-acao="abrir-ver-como">' + icone("equipe", 13) + " Ver como outra pessoa</button>" : "") +
       "</div></aside>" +
       '<main class="principal">' + faixaVerComo() + (demo ? faixaDemo() : "") + avisoEstrutura() + '<div class="conteudo">' + conteudo + "</div></main></div>";
   }
-  /* ---------------- ver como outra pessoa (só administrador; somente leitura) ---------------- */
-  const souAdmin = () => !!((estado.euReal || estado.eu || {}).admin);
+  /* ---------------- ver como outra pessoa (administrador ou RH; somente leitura) ---------------- */
+  /** Administrador do Bitrix ou quem está em Papéis -> RH (o RH já vê todas as equipes; o modo não grava nada) */
+  function podeVerComo() {
+    const real = estado.euReal || estado.eu || {};
+    return !!(real.admin || (estado.ctx && real.id && dom.papeis(estado.ctx, real.id).rh));
+  }
   function faixaVerComo() {
     if (!estado.verComo) return "";
     return '<div class="faixa-demo nao-imprimir" style="background:var(--navy);color:#fff"><b>Vendo como ' + esc(estado.verComo.nome) + "</b> (" + esc(VISOES[estado.visao] || "sem papel no app") +
@@ -406,7 +410,7 @@
   };
 
   GP.ui = {
-    estado, rotas, acoes, c, render, navegar, abrirPainel, fecharPainel, erroNoPainel, avisar, lerForm, validar,
+    estado, rotas, acoes, c, render, podeVerComo, navegar, abrirPainel, fecharPainel, erroNoPainel, avisar, lerForm, validar,
     salvar, criar, atualizar, aplicarNoContexto, novoAdendo, agoraISO, visoesDisponiveis, membrosDaVisao, minhaEquipe, podeVerConteudo, VISOES,
   };
 })(window);
