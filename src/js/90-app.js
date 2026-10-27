@@ -65,11 +65,10 @@
     ctx.ausencias = await repo.ausencias(ids.slice(0, 400), ctx.hoje, calc.addDias(ctx.hoje, 13 * 7 + 7)).catch(() => []);
   }
 
-  /** Repositório que lê como o original e recusa toda gravação (ver como outra pessoa) */
-  function somenteLeitura(repo) {
+  /** Agindo como outra pessoa: grava normalmente (pedido do RH em 27/10/2026), só não mexe nas
+      preferências pessoais de quem está sendo representado (tour, dicas) */
+  function emNomeDe(repo) {
     const r = Object.create(repo);
-    const recusa = async function () { throw { codigo: "", descricao: "você está vendo o app como outra pessoa, e neste modo nada é gravado" }; };
-    ["criar", "atualizar", "notificar", "comentar", "agendarPendencia", "registrarDossie", "salvarConfig", "provisionar"].forEach((m) => { if (typeof repo[m] === "function") r[m] = recusa; });
     r.gravarPreferencia = function () {};
     return r;
   }
@@ -144,7 +143,9 @@
     }
   }
 
-  /** Administrador ou RH vê o app como outra pessoa (uid) ou volta para a própria visão (uid vazio). Somente leitura. */
+  /** Administrador ou RH abre o app como outra pessoa (uid), com as permissões dela no app, ou volta para a
+      própria visão (uid vazio). O que for gravado sai em nome da pessoa; o histórico do Bitrix registra quem gravou
+      de fato (o login é sempre o de quem está usando), e os adendos dizem "registrado por". */
   async function verComo(uid) {
     const real = E.euReal || E.eu;
     if (!real || !ui.podeVerComo()) return;
@@ -157,7 +158,7 @@
     } else {
       const p = dom.pessoa(ctx, uid);
       eu = { id: String(uid), nome: p.nome, foto: p.foto, email: p.email, admin: false };
-      Object.assign(E, { eu, euReal: real, verComo: eu, repo: somenteLeitura(repoReal), repoReal });
+      Object.assign(E, { eu, euReal: real, verComo: eu, repo: emNomeDe(repoReal), repoReal });
     }
     ctx.eu = eu;
     const papeis = dom.papeis(ctx, eu.id);

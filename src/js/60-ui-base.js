@@ -231,7 +231,8 @@
   /** Texto do adendo: data, autor e justificativa automáticos (4.1) */
   function novoAdendo(atual, justificativa, texto) {
     const agora = new Date();
-    const carimbo = calc.fmtDataAno(estado.ctx.hoje) + " " + String(agora.getHours()).padStart(2, "0") + ":" + String(agora.getMinutes()).padStart(2, "0") + " · " + estado.eu.nome;
+    const carimbo = calc.fmtDataAno(estado.ctx.hoje) + " " + String(agora.getHours()).padStart(2, "0") + ":" + String(agora.getMinutes()).padStart(2, "0") + " · " + estado.eu.nome +
+      (estado.verComo && estado.euReal ? " (registrado por " + estado.euReal.nome + ")" : "");
     return (atual ? atual + "\n\n" : "") + "[" + carimbo + "]\nJustificativa: " + justificativa.trim() + "\n" + texto.trim();
   }
   function agoraISO() { return new Date().toISOString(); }
@@ -283,7 +284,7 @@
   function faixaVerComo() {
     if (!estado.verComo) return "";
     return '<div class="faixa-demo nao-imprimir" style="background:var(--navy);color:#fff"><b>Vendo como ' + esc(estado.verComo.nome) + "</b> (" + esc(VISOES[estado.visao] || "sem papel no app") +
-      '). Nada é gravado neste modo. <button class="btn peq" data-acao="sair-ver-como">Voltar para a minha visão</button></div>';
+      "). O que você registrar fica em nome dela; o histórico do Bitrix mostra que foi você. " + '<button class="btn peq" data-acao="sair-ver-como">Voltar para a minha visão</button></div>';
   }
   acoes["abrir-ver-como"] = function () {
     const ctx = estado.ctx;
@@ -298,7 +299,7 @@
       .sort((a, b) => (!!papel(b.id) - !!papel(a.id)) || a.nome.localeCompare(b.nome, "pt-BR"))
       .map((u) => ({ valor: u.id, rotulo: u.nome + (papel(u.id) ? " · " + papel(u.id) : "") }));
     abrirPainel({
-      titulo: "Ver como outra pessoa", sub: "O app abre com a equipe, os papéis e as pendências da pessoa escolhida. É só para conferir: neste modo nada é gravado.",
+      titulo: "Ver como outra pessoa", sub: "O app abre como a pessoa escolhida, com a equipe, os papéis e as pendências dela, e você pode registrar em nome dela. O histórico do Bitrix mostra que foi você.",
       corpo: '<div id="form-ver-como">' + c.campo({ nome: "uid", rotulo: "Pessoa", tipo: "lista", opcoes, valor: estado.verComo ? estado.verComo.id : "" }) + "</div>",
       rodape: '<button class="btn" data-acao="aplicar-ver-como">Ver como esta pessoa</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
     });

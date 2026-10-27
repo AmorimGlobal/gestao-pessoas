@@ -82,7 +82,7 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - **Mais de um departamento:** vale o mais específico, o mais fundo na árvore (`dom.deptoPrincipal`).
   - **Os "supervisores adjuntos" do organograma** aparecem na API lotados direto no setor, e na prática chefiam as áreas.
   - **Sem chefe nenhum no caminho:** vale o item do Membros, a sincronização não troca e manda para o RH conferir (Configuração → Setores sem chefe no Bitrix, que só aparece nesse caso).
-- **Ver como outra pessoa** (`GP.app.verComo`, para administrador do Bitrix ou papel RH, `ui.podeVerComo`): troca `E.eu` e as visões pela pessoa escolhida, com `E.repo` em somente leitura (toda gravação é recusada). O original fica em `E.euReal` e `E.repoReal`. A CEO, nesse modo, tem o resumo calculado no navegador.
+- **Ver como outra pessoa** (`GP.app.verComo`, para administrador do Bitrix ou papel RH, `ui.podeVerComo`): troca `E.eu` e as visões pela pessoa escolhida. Desde 27/10/2026 **grava normalmente** (pedido do RH): o registro sai em nome da pessoa, o histórico do Bitrix mostra quem gravou de fato (o login é de quem usa), e o adendo diz "registrado por". O original fica em `E.euReal` e `E.repoReal`. A CEO, nesse modo, tem o resumo calculado no navegador.
 - **`build.js` compila o JS (`new Function`) antes de gravar**: um erro de sintaxe derruba o build, e a Vercel mantém a versão anterior no ar.
 - **Mudou o esquema?** Altere `20-schema.js`, rode os testes, rode o provisionamento (simulação primeiro) e reconstrua.
 
