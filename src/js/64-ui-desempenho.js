@@ -28,6 +28,11 @@
   /* ================================================================ TELA DESEMPENHO */
   ui.rotas.desempenho = function (partes) {
     if (partes[0] === "leitura" && partes[1]) return telaLeitura(partes[1]);
+    // Reunião de 29/10/2026: a aba saiu do app até 2027. O código fica para quando o projeto voltar.
+    if (!dom.DESEMPENHO_ATIVO) {
+      if (partes[0] === "ciclo" && partes[1]) return GP.ui.rotas.rotinas(["ciclo", partes[1]]);
+      return '<div class="card" style="max-width:640px"><h3>Desempenho</h3><p class="muted">A avaliação de desempenho saiu do app em outubro de 2026 e volta em 2027, como um projeto próprio. As entregas do onboarding são avaliadas no <a href="#/onboarding">Onboarding</a>, e os O2O, 1:1 e feedbacks ficam em <a href="#/rotinas">Feedbacks</a>.</p></div>';
+    }
     if (partes[0] === "ciclo" && partes[1]) return telaEvidencias(partes[1]);
     const ctx = E().ctx;
     const membros = ui.membrosDaVisao();
@@ -65,15 +70,17 @@
   function telaLeitura(id) {
     const ctx = E().ctx;
     const l = ctx.idx.porId.leituras[id];
-    if (!l) return c.voltar("#/desempenho", "Desempenho") + '<div class="card">' + c.vazio("Leitura não encontrada.") + "</div>";
+    if (!l) return c.voltar("#/inicio", "Início") + '<div class="card">' + c.vazio("Leitura não encontrada.") + "</div>";
     const m = dom.infoMembro(ctx, ctx.idx.membro[l.membroId] || {});
     const travada = l.leitura && l.lidaEm && calc.diffDias(l.lidaEm, ctx.hoje) > 2;
     const plano = l.planoId ? ctx.idx.porId.planos[l.planoId] : null;
-    let h = c.voltar("#/desempenho", "Desempenho") + c.cabecalho("desempenho", l.titulo || "Entrega", "<span>" + esc(m.nome) + "</span><span>" + esc(l.origem || "") + "</span>" + (l.leitura ? "<span>" + c.tag(l.leitura, COR_LEITURA[l.leitura]) + "</span>" : ""),
+    // sem a aba Desempenho (29/10/2026), volta para onde a entrega pertence
+    const volta = l.onboardingId ? ["#/onboarding/" + l.onboardingId, "Onboarding"] : plano ? ["#/rotinas/plano/" + plano.id, "Plano de melhoria"] : dom.DESEMPENHO_ATIVO ? ["#/desempenho", "Desempenho"] : ["#/membro/" + l.membroId, "Card do membro"];
+    let h = c.voltar(volta[0], volta[1]) + c.cabecalho("desempenho", l.titulo || "Entrega", "<span>" + esc(m.nome) + "</span><span>" + esc(l.origem || "") + "</span>" + (l.leitura ? "<span>" + c.tag(l.leitura, COR_LEITURA[l.leitura]) + "</span>" : ""),
       l.tarefaId ? '<button class="btn sec" data-acao="abrir-tarefa" data-id="' + esc(l.tarefaId) + '">' + icone("externo", 14) + " Abrir a tarefa</button>" : (l.tarefaLink ? '<a class="btn sec" target="_blank" rel="noopener" href="' + esc(l.tarefaLink) + '">' + icone("externo", 14) + " Abrir a tarefa</a>" : ""));
     h += '<div class="card">' + c.dados([["Pronta quando", l.prontaQuando], ["Prazo da tarefa", calc.fmtDataAno(l.prazoTarefa)], ["Concluída em", calc.fmtDataAno(l.concluidaEm)], ["No prazo", l.noPrazo],
       ["Voltou para ajuste", l.ajustes === null || l.ajustes === undefined ? "" : String(l.ajustes)], ["Complexidade", l.complexidade], ["Fase do onboarding", l.fase], ["Trimestre", (calc.trimestrePorChave(l.trimestre) || {}).rotulo],
-      plano ? ["Plano de alinhamento", '<a href="#/offboarding/plano/' + esc(plano.id) + '">abrir o plano</a>', true] : null]) + "</div>";
+      plano ? ["Plano de melhoria", '<a href="#/rotinas/plano/' + esc(plano.id) + '">abrir o plano</a>', true] : null]) + "</div>";
     if (l.leitura) {
       h += '<div class="card"><h3>Leitura registrada</h3>' + c.dados([["Leitura", l.leitura + " (" + calc.NOTA_LEITURA[l.leitura] + ")"], ["Lida em", calc.fmtDataAno(l.lidaEm)], ["Por", dom.pessoa(ctx, l.autor).nome]]) +
         (l.comentario ? '<div style="margin-top:12px">' + c.textoRegistro("Comentário interno", l.comentario) + "</div>" : "") +

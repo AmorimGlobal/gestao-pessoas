@@ -19,9 +19,15 @@
     links: {
       manual: "https://drive.google.com/file/d/1fZNxcYlnxcGshaoWlYZ9pjLljZOVkqcL/view",
       formVaga: "https://b24-ljukko.bitrix24.site/crm_form_4nlpe/",
+      // o formulário de offboarding vem do RH (reunião de 29/10/2026); até lá a solicitação é pelo app
+      formOffboarding: "",
     },
     parametros: { carencia1a1: 7, prazoLeitura: 7 },
     recrutamento: { categoria: 77 },
+    // esteira "HR | Offboarding", criada em 29/10/2026 por amorim-api/offboarding-bitrix
+    offboarding: { categoria: 79 },
+    // glossário de competências comportamentais do RH (Configuração → Cadastros)
+    competencias: [],
   };
 
   function emIframe() {
@@ -53,6 +59,8 @@
     c.links = Object.assign({}, CONFIG_PADRAO.links, (cfg && cfg.links) || {});
     c.parametros = Object.assign({}, CONFIG_PADRAO.parametros, (cfg && cfg.parametros) || {});
     c.recrutamento = Object.assign({}, CONFIG_PADRAO.recrutamento, (cfg && cfg.recrutamento) || {});
+    c.offboarding = Object.assign({}, CONFIG_PADRAO.offboarding, (cfg && cfg.offboarding) || {});
+    c.competencias = Array.isArray(cfg && cfg.competencias) ? cfg.competencias : [];
     c.feriadosLocais = Object.assign({}, CONFIG_PADRAO.feriadosLocais, (cfg && cfg.feriadosLocais) || {});
     return c;
   }
@@ -114,14 +122,20 @@
         repo.usuarios(), repo.departamentos(), repo.listarTodos(), repo.feriadosNacionais(ano), repo.feriadosNacionais(ano + 1),
       ]);
       const vagas = await repo.vagas(config.recrutamento.categoria).catch((e) => ({ etapas: [], negocios: [], historico: [], erro: repo.mensagemErro(e) }));
+      // A esteira de offboarding só é lida por quem pode: o RH e o administrador (as lideranças não têm leitura no funil)
+      const ehRH = eu.admin || ((config.papeis && config.papeis.rh) || []).some((p) => String(p.id) === String(eu.id));
+      const catOff = Number(config.offboarding.categoria) || 0;
+      const offboarding = Object.assign({ etapas: [], negocios: [] }, ehRH && catOff && repo.offboarding ? await repo.offboarding(catOff).catch((e) => ({ etapas: [], negocios: [], erro: repo.mensagemErro(e) })) : {}, { categoria: catOff });
       const ctx = dom.indexar({
-        hoje, eu, config, usuarios, departamentos, registros, vagas, ausencias: [],
+        hoje, eu, config, usuarios, departamentos, registros, vagas, offboarding, ausencias: [],
         feriados: { nacionais: fer1.concat(fer2) },
+        // processo novo que ainda não foi criado no portal: a tela avisa em vez de falhar
+        recursos: { mensal: repo.temProcesso ? repo.temProcesso("mensal") : true },
       });
       const papeis = dom.papeis(ctx, eu.id);
       await carregarAusencias(repo, ctx, eu.id);
 
-      Object.assign(E, { eu, config, ctx, estrutura: { origem: est.origem, ausentes: est.ausentes || [] } });
+      Object.assign(E, { eu, config, ctx, estrutura: { origem: est.origem, ausentes: est.ausentes || [], processosFaltando: est.processosFaltando || [] }, acessoNegado: repo.acessoNegado || [] });
       if (papeis.ceo) carregarResumoCEO(repo, ctx);
       E.visoes = ui.visoesDisponiveis(papeis);
       let guardada = null;
@@ -135,6 +149,10 @@
       const visto = repo.lerPreferencia("gp_tour_visto");
       if (!visto && q.get("tour") !== "0") E.tourPasso = 0;
       ui.render();
+      // RH e administrador: confere no servidor se a permissão do CRM esconde registros (aviso no topo)
+      if (repo.modo === "bitrix" && ui.podeVerComo() && repo.contagemServidor) {
+        repo.contagemServidor().then((t) => { if (t) { E.contagem = t; ui.render(); } }, (e) => console.warn("Contagem no servidor indisponível:", e));
+      }
     } catch (e) {
       console.error(e);
       E.carregando = false;

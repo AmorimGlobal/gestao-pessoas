@@ -97,16 +97,20 @@
     const aba = partes[1] || "resumo";
     if (aba === "dossie") return dossie(m);
     const fbs = dom.feedbacksDo(ctx, m.id);
+    const mensais = dom.mensaisDo(ctx, m.id);
     const ciclos = (ctx.idx.porMembro.ciclo[m.id] || []).slice().sort((a, b) => (a.trimestre < b.trimestre ? 1 : -1));
     const planos = ctx.idx.porMembro.planos[m.id] || [];
     const obs = ctx.idx.porMembro.onboarding[m.id] || [];
     const encs = ctx.idx.porMembro.encerramentos[m.id] || [];
     const lid = dom.pessoa(ctx, m.lideranca), coord = dom.pessoa(ctx, m.coordenacao);
     const cic = dom.cicloDo(ctx, m.id, ctx.tri.chave);
+    const rhOuAdmin = E().visao === "rh" || E().eu.admin;
     const acoes = '<button class="btn" data-acao="novo-feedback" data-membro="' + esc(m.id) + '">' + icone("mais", 15) + " Feedback SCI</button>" +
-      (cic && !cic.data1a1 && m.estagio === "ATIVO" ? '<button class="btn sec" data-acao="agendar-1a1" data-id="' + esc(cic.id) + '">' + icone("calendario", 15) + " Agendar 1:1</button>" : "") +
+      (dom.temMensal(ctx) && ["SUCCESS", "FAIL"].indexOf(m.estagio) < 0 ? '<button class="btn sec" data-acao="novo-mensal" data-membro="' + esc(m.id) + '">' + icone("mais", 15) + " 1:1 do mês</button>" : "") +
+      (cic && !cic.data1a1 && m.estagio === "ATIVO" ? '<button class="btn sec" data-acao="agendar-1a1" data-id="' + esc(cic.id) + '">' + icone("calendario", 15) + " Agendar O2O</button>" : "") +
       '<a class="btn sec" href="#/membro/' + esc(m.id) + '/dossie">Dossiê em PDF</a>' +
-      (E().visao === "rh" || E().eu.admin ? '<button class="btn sec" data-acao="editar-membro" data-id="' + esc(m.id) + '">Editar cadastro</button>' : "");
+      (rhOuAdmin ? '<button class="btn sec" data-acao="editar-membro" data-id="' + esc(m.id) + '">Editar cadastro</button>' : "") +
+      (rhOuAdmin && m.estagio !== "FAIL" ? '<button class="btn link excluir" data-acao="tirar-do-app" data-id="' + esc(m.id) + '">' + icone("lixeira", 14) + " Tirar do app</button>" : "");
     let h = c.voltar("#/equipe", rotuloEquipe()) +
       '<div class="card"><div class="ficha-topo">' + c.avatar(m, 64) + '<div class="info"><div class="nome-grande">' + esc(m.nome) + "</div>" +
       '<div class="muted">' + esc(m.funcao || m.cargo || "") + "</div><div style=\"margin-top:6px;display:flex;gap:6px;flex-wrap:wrap\">" + c.tag(ROTULO_ESTAGIO_MEMBRO[m.estagio] || m.estagioNome, COR_ESTAGIO_MEMBRO[m.estagio]) +
@@ -117,19 +121,21 @@
     const abas = [
       { chave: "resumo", rotulo: "Histórico", rota: "#/membro/" + m.id },
       { chave: "feedbacks", rotulo: "Feedbacks SCI", rota: "#/membro/" + m.id + "/feedbacks", qt: fbs.length },
-      { chave: "ciclo", rotulo: "1:1 e evidências", rota: "#/membro/" + m.id + "/ciclo", qt: ciclos.length },
-      { chave: "desempenho", rotulo: "Desempenho anual", rota: "#/membro/" + m.id + "/desempenho" },
-      { chave: "carreira", rotulo: "Carreira", rota: "#/membro/" + m.id + "/carreira" },
-    ];
-    if (planos.length) abas.push({ chave: "planos", rotulo: "Planos", rota: "#/membro/" + m.id + "/planos", qt: planos.length });
+      { chave: "mensal", rotulo: "1:1 mensais", rota: "#/membro/" + m.id + "/mensal", qt: mensais.length },
+      { chave: "ciclo", rotulo: "O2O", rota: "#/membro/" + m.id + "/ciclo", qt: ciclos.length },
+    ].concat(dom.DESEMPENHO_ATIVO ? [{ chave: "desempenho", rotulo: "Desempenho anual", rota: "#/membro/" + m.id + "/desempenho" }] : [])
+      .concat([{ chave: "carreira", rotulo: "Carreira", rota: "#/membro/" + m.id + "/carreira" }]);
+    if (planos.length) abas.push({ chave: "planos", rotulo: "Planos de melhoria", rota: "#/membro/" + m.id + "/planos", qt: planos.length });
     if (obs.length) abas.push({ chave: "onboarding", rotulo: "Onboarding", rota: "#/membro/" + m.id + "/onboarding" });
     if (encs.length) abas.push({ chave: "encerramento", rotulo: "Encerramento", rota: "#/membro/" + m.id + "/encerramento" });
     h += '<div style="margin-top:18px">' + c.abas(abas, aba) + "</div>";
     if (aba === "feedbacks") h += '<div class="card">' + (fbs.length ? fbs.map((f) => GP.telas.rotinas.feedbackHtml(f, true)).join('<hr style="border:none;border-top:1px solid var(--divisor);margin:16px 0">') : c.vazio("Nenhum feedback SCI registrado.")) + "</div>";
-    else if (aba === "ciclo") h += ciclos.length ? ciclos.map((ci) => GP.telas.rotinas.cicloResumoHtml(ci)).join("") : '<div class="card">' + c.vazio("Nenhum item do Ciclo trimestral. Membros em onboarding entram no ciclo no trimestre seguinte ao Dia 90.") + "</div>";
-    else if (aba === "desempenho") h += GP.telas.desempenho.anualHtml(m, Number(ctx.hoje.slice(0, 4)));
+    else if (aba === "mensal") h += '<div class="card">' + (dom.temMensal(ctx) && ["SUCCESS", "FAIL"].indexOf(m.estagio) < 0 ? '<div style="margin-bottom:12px"><button class="btn peq" data-acao="novo-mensal" data-membro="' + esc(m.id) + '">' + icone("mais", 13) + " Registrar o 1:1 do mês</button></div>" : "") +
+      (mensais.length ? mensais.map((r) => GP.telas.rotinas.mensalHtml(r)).join('<hr style="border:none;border-top:1px solid var(--divisor);margin:16px 0">') : c.vazio("Nenhum 1:1 mensal registrado.")) + "</div>";
+    else if (aba === "ciclo") h += ciclos.length ? ciclos.map((ci) => GP.telas.rotinas.cicloResumoHtml(ci)).join("") : '<div class="card">' + c.vazio("Nenhum O2O ainda. Membros em onboarding entram no O2O no trimestre seguinte ao Dia 90.") + "</div>";
+    else if (aba === "desempenho" && dom.DESEMPENHO_ATIVO) h += GP.telas.desempenho.anualHtml(m, Number(ctx.hoje.slice(0, 4)));
     else if (aba === "carreira") h += carreiraHtml(m, ciclos);
-    else if (aba === "planos") h += planos.map((p) => GP.telas.offboarding.planoResumoHtml(p)).join("");
+    else if (aba === "planos") h += planos.map((p) => GP.telas.planos.planoResumoHtml(p)).join("");
     else if (aba === "onboarding") h += obs.map((o) => GP.telas.onboarding.resumoHtml(o)).join("");
     else if (aba === "encerramento") h += encs.map((e) => GP.telas.offboarding.encerramentoResumoHtml(e)).join("");
     else h += historicoHtml(m);
@@ -143,16 +149,18 @@
     const autor = (it) => dom.pessoa(ctx, it.autor || it.criadoPor).nome;
     dom.feedbacksDo(ctx, m.id).forEach((f) => ev.push({ data: f.data, cor: f.tipo === "Reconhecimento" ? "var(--verde)" : "var(--azul)", o: "Feedback de " + f.tipo.toLowerCase(), r: "por " + autor(f) + (f.retroativo ? " · registro retroativo" : ""), rota: "#/rotinas/feedback/" + f.id }));
     (ctx.idx.porMembro.ciclo[m.id] || []).forEach((ci) => {
-      if (ci.realizadoEm) ev.push({ data: ci.realizadoEm, cor: "var(--navy)", o: "1:1 do " + (calc.trimestrePorChave(ci.trimestre) || {}).curto, r: (ci.progresso ? "progresso no objetivo: " + ci.progresso.toLowerCase() + " · " : "") + "por " + autor(ci), rota: "#/rotinas/ciclo/" + ci.id });
-      if (ci.registroEvidEm) ev.push({ data: ci.registroEvidEm.slice(0, 10), cor: "var(--navy)", o: "Evidências do " + (calc.trimestrePorChave(ci.trimestre) || {}).curto, r: (ci.classificacao ? "classificação: " + ci.classificacao.toLowerCase() + " · " : "") + "por " + autor(ci), rota: "#/desempenho/ciclo/" + ci.id });
+      if (ci.realizadoEm) ev.push({ data: ci.realizadoEm, cor: "var(--navy)", o: "O2O do " + (calc.trimestrePorChave(ci.trimestre) || {}).curto, r: (ci.progresso ? "progresso no objetivo: " + ci.progresso.toLowerCase() + " · " : "") + "por " + autor(ci), rota: "#/rotinas/ciclo/" + ci.id });
+      if (ci.registroEvidEm && dom.DESEMPENHO_ATIVO) ev.push({ data: ci.registroEvidEm.slice(0, 10), cor: "var(--navy)", o: "Evidências do " + (calc.trimestrePorChave(ci.trimestre) || {}).curto, r: (ci.classificacao ? "classificação: " + ci.classificacao.toLowerCase() + " · " : "") + "por " + autor(ci), rota: "#/desempenho/ciclo/" + ci.id });
     });
+    dom.mensaisDo(ctx, m.id).forEach((r) => ev.push({ data: r.data, cor: "var(--azul)", o: "1:1 de " + calc.mesDe(r.data).curto, r: "por " + autor(r), rota: "#/rotinas/mensal/" + r.id }));
     (ctx.idx.porMembro.planos[m.id] || []).forEach((p) => {
-      ev.push({ data: p.inicio, cor: "var(--ambar)", o: "Plano de alinhamento de resultados aberto", r: "término " + calc.fmtData(p.termino), rota: "#/offboarding/plano/" + p.id });
-      if (p.checkinData) ev.push({ data: p.checkinData, cor: "var(--ambar)", o: "Check-in do plano (Dia 30)", r: [p.checkin1, p.checkin2].filter(Boolean).join(" · "), rota: "#/offboarding/plano/" + p.id });
+      ev.push({ data: p.inicio, cor: "var(--ambar)", o: "Plano de melhoria aberto", r: "término " + calc.fmtData(p.termino), rota: "#/rotinas/plano/" + p.id });
+      if (p.checkinData) ev.push({ data: p.checkinData, cor: "var(--ambar)", o: "Check-in do plano de melhoria (Dia 30)", r: [p.checkin1, p.checkin2].filter(Boolean).join(" · "), rota: "#/rotinas/plano/" + p.id });
     });
     (ctx.idx.porMembro.onboarding[m.id] || []).forEach((o) => {
       if (o.ingresso) ev.push({ data: o.ingresso, cor: "var(--azul)", o: "Dia 1 do onboarding", r: "Embarcação Amorim", rota: "#/onboarding/" + o.id });
-      [1, 2, 3].forEach((n) => { if (o["al" + n + "Data"]) ev.push({ data: o["al" + n + "Data"], cor: "var(--azul)", o: (n === 3 ? "Alinhamento final" : "Alinhamento " + n) + " do onboarding", r: o["al" + n + "Resultado"] || "", rota: "#/onboarding/" + o.id }); });
+      if (o.fichaEnviadaEm) ev.push({ data: String(o.fichaEnviadaEm).slice(0, 10), cor: "var(--azul)", o: "Ficha do onboarding enviada ao membro", r: "", rota: "#/onboarding/" + o.id });
+      [1, 2, 3].forEach((n) => { if (o["al" + n + "Data"]) ev.push({ data: o["al" + n + "Data"], cor: "var(--azul)", o: "Avaliação do " + n + "º mês do onboarding", r: o["al" + n + "Resultado"] || "", rota: "#/onboarding/" + o.id }); });
     });
     (ctx.idx.porMembro.encerramentos[m.id] || []).forEach((e) => ev.push({ data: String(e.criadoEm).slice(0, 10), cor: "var(--vermelho)", o: "Solicitação de encerramento de contrato", r: e.estagioNome, rota: "#/offboarding/encerramento/" + e.id }));
     (ctx.idx.porMembro.leituras[m.id] || []).filter((l) => l.lidaEm).forEach((l) => ev.push({ data: l.lidaEm, cor: "var(--suave)", o: "Leitura da entrega \"" + l.titulo + "\"", r: l.leitura, rota: "#/desempenho/leitura/" + l.id }));
@@ -183,8 +191,9 @@
       '<div class="card"><div class="nome-grande" style="font-size:20px;font-weight:800;color:var(--navy)">Dossiê · ' + esc(m.nome) + '</div><div class="muted">Gerado em ' + calc.fmtDataAno(ctx.hoje) + " por " + esc(E().eu.nome) + ". Uso restrito: liderança, coordenação e RH.</div>" +
       c.dados([["Função", m.funcao], ["Ingresso", calc.fmtDataAno(m.ingresso)], ["Contrato", m.contrato], ["Nível", m.nivel], ["Senioridade", m.senioridade]]) + "</div>" +
       '<div class="card"><h3>Feedbacks SCI</h3>' + (fbs.length ? fbs.map((f) => GP.telas.rotinas.feedbackHtml(f, false)).join("<hr>") : c.vazio("Nenhum.")) + "</div>" +
-      '<div class="card"><h3>1:1 e evidências</h3>' + (ciclos.length ? ciclos.map((ci) => GP.telas.rotinas.cicloResumoHtml(ci, true)).join("") : c.vazio("Nenhum.")) + "</div>" +
-      (planos.length ? '<div class="card"><h3>Planos de alinhamento</h3>' + planos.map((p) => GP.telas.offboarding.planoResumoHtml(p, true)).join("") + "</div>" : "") +
+      (dom.mensaisDo(ctx, m.id).length ? '<div class="card"><h3>1:1 mensais</h3>' + dom.mensaisDo(ctx, m.id).map((r) => GP.telas.rotinas.mensalHtml(r)).join("<hr>") + "</div>" : "") +
+      '<div class="card"><h3>O2O</h3>' + (ciclos.length ? ciclos.map((ci) => GP.telas.rotinas.cicloResumoHtml(ci, true)).join("") : c.vazio("Nenhum.")) + "</div>" +
+      (planos.length ? '<div class="card"><h3>Planos de melhoria</h3>' + planos.map((p) => GP.telas.planos.planoResumoHtml(p, true)).join("") + "</div>" : "") +
       (obs.length ? '<div class="card"><h3>Onboarding</h3>' + obs.map((o) => GP.telas.onboarding.resumoHtml(o, true)).join("") + "</div>" : "") +
       '<div class="card"><h3>Histórico</h3>' + historicoHtml(m).replace('<div class="card">', "<div>") + "</div>";
   }
@@ -244,6 +253,20 @@
         return novo;
       }, { mensagem: "Membro cadastrado." });
     }
+  };
+
+  /* ---------------- tirar do app (prestador pontual, conta genérica: reunião de 29/10/2026) ---------------- */
+  /** O item do Membros vai para Arquivado: a pessoa sai das equipes, das pendências e dos avisos, e a
+      sincronização diária deixa como está (55-sync.js). Os registros dela continuam guardados. */
+  ui.acoes["tirar-do-app"] = function (el) {
+    const ctx = E().ctx;
+    const m = dom.infoMembro(ctx, ctx.idx.membro[el.dataset.id]);
+    if (!window.confirm("Tirar " + m.nome + " do app?\n\nO item do Membros vai para Arquivado: a pessoa sai das equipes, das pendências e dos avisos, e a sincronização diária não a traz de volta. Os registros dela continuam guardados.\n\nPara trazer de volta: Editar cadastro → Estágio Ativo.")) return;
+    ui.salvar(el, async () => {
+      await ui.atualizar("membros", m.id, { estagio: "FAIL" });
+      try { await E().repo.comentar("membros", m.id, "Tirado do app por " + E().eu.nome + " em " + calc.fmtDataAno(ctx.hoje) + " (item em Arquivado)."); } catch (e) { /* o comentário não impede */ }
+      ui.navegar("#/equipe");
+    }, { mensagem: m.nome + " saiu do app." });
   };
 
   GP.telas = GP.telas || {};

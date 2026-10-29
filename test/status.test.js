@@ -27,10 +27,18 @@ test("nada configurado: tudo desligado, com o nome das variáveis que faltam", a
 });
 
 test("configurado: liga as rotinas e não devolve nenhum valor", async () => {
-  const env = { BITRIX_WEBHOOK_URL: "https://portal/rest/1/segredo123/", CRON_SECRET: "cron-xyz", GP_AVISAR_IDS: "6", BITRIX_EVENTO_TOKEN: "tok-abc", GP_CEO_IDS: "1", GP_LINK_APP: "https://portal/marketplace/app/9/" };
+  const env = { BITRIX_WEBHOOK_URL: "https://portal/rest/1/segredo123/", CRON_SECRET: "cron-xyz", GP_AVISAR_IDS: "6", BITRIX_EVENTO_TOKEN: "tok-abc", GP_CEO_IDS: "1", GP_LINK_APP: "https://portal/marketplace/app/9/",
+    SMTP_HOST: "mail.exemplo.com", SMTP_USUARIO: "rh@exemplo.com", SMTP_SENHA: "senha-smtp-789" };
   const r = await chamar(env);
   Object.values(r.corpo.rotinas).forEach((x) => assert.equal(x.ligada, true));
   assert.equal(r.corpo.opcionais.GP_LINK_APP, true);
   assert.equal(r.corpo.opcionais.GP_EXCECOES_IDS, false);
-  ["segredo123", "cron-xyz", "tok-abc", "marketplace"].forEach((v) => assert.ok(r.bruto.indexOf(v) < 0, "vazou " + v));
+  assert.equal(r.corpo.opcionais.SMTP_PORTA, false);
+  ["segredo123", "cron-xyz", "tok-abc", "marketplace", "senha-smtp-789", "rh@exemplo.com", "mail.exemplo.com"].forEach((v) => assert.ok(r.bruto.indexOf(v) < 0, "vazou " + v));
+});
+
+test("e-mail: sem as variáveis do SMTP, a ficha e os avisos dos funis ficam desligados", async () => {
+  const r = await chamar({ BITRIX_WEBHOOK_URL: "https://portal/rest/1/x/", BITRIX_EVENTO_TOKEN: "t", SMTP_HOST: "mail.exemplo.com" });
+  assert.deepEqual(r.corpo.rotinas.email, { ligada: false, falta: ["SMTP_USUARIO", "SMTP_SENHA"] });
+  assert.deepEqual(r.corpo.rotinas.avisosNegocios.falta, ["SMTP_USUARIO", "SMTP_SENHA"]);
 });

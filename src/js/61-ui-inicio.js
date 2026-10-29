@@ -49,10 +49,10 @@
     h += '<div class="card"><div class="destinos">' +
       destino("equipe", "equipe", "Minha equipe", "Card de cada membro, com o histórico") +
       destino("recrutamento", "recrutamento", "Recrutamento", "Solicitar vaga e acompanhar") +
-      destino("onboarding", "onboarding", "Onboarding", "Embarcação: os primeiros 90 dias") +
-      destino("rotinas", "rotinas", "Rotinas", "1:1 do trimestre e feedbacks SCI") +
-      destino("desempenho", "desempenho", "Desempenho", "Entregas, evidências e o ano") +
-      destino("offboarding", "offboarding", "Offboarding", "Planos e encerramentos de contrato") +
+      destino("onboarding", "onboarding", "Onboarding", "Ficha e avaliações dos 3 primeiros meses") +
+      destino("rotinas", "rotinas", "Feedbacks", "Feedbacks SCI, 1:1 do mês, O2O e plano de melhoria") +
+      (dom.DESEMPENHO_ATIVO ? destino("desempenho", "desempenho", "Desempenho", "Entregas, evidências e o ano") : "") +
+      destino("offboarding", "offboarding", "Offboarding", "Solicitações e histórico de desligamentos") +
       '<div class="sep">Para consultar</div>' +
       destino("agenda", "agenda", "Agenda", "Ausências, aniversários e feriados") +
       (links.manual ? '<a href="' + esc(links.manual) + '" target="_blank" rel="noopener"><span class="ic">' + icone("manual", 18) + '</span><span><span class="t">Manual</span><br><span class="d">Manual da liderança</span></span></a>'
@@ -90,16 +90,17 @@
       at(atencao.length, atencao.length === 1 ? "liderança em Atenção ou Precisa de apoio" : "lideranças em Atenção ou Precisa de apoio", "#/painel/setor", atencao.length > 0) + "</div>";
   }
   function atalhosRH() {
-    const fila = dom.filaRH(E().ctx);
-    if (!fila.length) return "";
-    return '<div class="card acao" style="margin-bottom:16px"><h3>' + icone("alerta", 16) + " " + plural(fila.length, "solicitação aguarda o RH", "solicitações aguardam o RH") +
+    const d = dom.demandasRH(E().ctx);
+    const n = d.offboarding + d.recrutamento + dom.filaRH(E().ctx).filter((f) => ["ENVIADA_RH", "AG_COORD"].indexOf(f.item.estagio) < 0).length;
+    if (!n) return "";
+    return '<div class="card acao vermelho" style="margin-bottom:16px"><h3>' + icone("alerta", 16) + " " + plural(n, "solicitação aguarda o RH", "solicitações aguardam o RH") +
       '<a class="extra" href="#/painel">Abrir a fila do RH →</a></h3></div>';
   }
   function inicioCEO() {
     const g = geral();
     if (!g) return faixa(saudacao(), "Visão geral", null, "") + semResumoCEO();
     return faixa(saudacao(), "Visão geral", [
-      { valor: g.ind.um1a1.curto, rotulo: "1:1 do trimestre agendados" },
+      { valor: g.ind.um1a1.curto, rotulo: "O2O do trimestre agendados" },
       { valor: g.areasEmDia.texto.split(" · ")[1] || g.areasEmDia.texto, rotulo: "áreas em dia" },
       { valor: g.ind.atrasadas, rotulo: "itens atrasados", alerta: g.ind.atrasadas > 0 },
     ], '<a href="#/painel">Abrir o painel geral →</a>') +
@@ -135,9 +136,10 @@
     const dicas = dom.dicas(ctx, equipe, { uid: E().eu.id, dispensadas: E().dispensadas });
     const nomesFaltam = (lista2) => lista2.map((m) => esc(primeiroNome(dom.infoMembro(ctx, m).nome))).join(", ");
     const fb = ind.feedback90;
-    const rotinas = '<div class="card"><h3>Rotinas do trimestre<span class="extra muted">' + esc(ctx.tri.rotulo) + "</span></h3>" +
-      c.barra({ rotulo: "1:1 do trimestre agendados", r: ind.um1a1, meta: 100, atraso: ind.um1a1.faltam.some((m) => dom.statusCiclo(ctx, dom.cicloDo(ctx, m.id, ctx.tri.chave)).cor === "vermelho"), nota: ind.um1a1.faltam.length ? "Falta: " + nomesFaltam(ind.um1a1.faltam) : (ind.um1a1.d ? "Todos agendados." : "") }) +
-      c.barra({ rotulo: "Evidências do " + ctx.triAnterior.curto + " registradas", r: ind.evidencias, nota: ind.evidencias.faltam.length ? "Falta: " + nomesFaltam(ind.evidencias.faltam) + " · prazo " + calc.fmtData(calc.prazoEvidencias(ctx.triAnterior)) : "" }) +
+    const rotinas = '<div class="card"><h3>Rotinas da equipe<span class="extra muted">' + esc(ctx.tri.rotulo) + "</span></h3>" +
+      (ind.mensal.ativo ? c.barra({ rotulo: "1:1 de " + ind.mensal.mes.curto + " registrados", r: ind.mensal, nota: ind.mensal.faltam.length ? "Falta: " + nomesFaltam(ind.mensal.faltam) + " · até " + calc.fmtData(ind.mensal.prazo) : (ind.mensal.d ? "Todos registrados." : "") }) : "") +
+      c.barra({ rotulo: "O2O do trimestre agendados", r: ind.um1a1, meta: 100, atraso: ind.um1a1.faltam.some((m) => dom.statusCiclo(ctx, dom.cicloDo(ctx, m.id, ctx.tri.chave)).cor === "vermelho"), nota: ind.um1a1.faltam.length ? "Falta: " + nomesFaltam(ind.um1a1.faltam) : (ind.um1a1.d ? "Todos agendados." : "") }) +
+      (dom.DESEMPENHO_ATIVO ? c.barra({ rotulo: "Evidências do " + ctx.triAnterior.curto + " registradas", r: ind.evidencias, nota: ind.evidencias.faltam.length ? "Falta: " + nomesFaltam(ind.evidencias.faltam) + " · prazo " + calc.fmtData(calc.prazoEvidencias(ctx.triAnterior)) : "" }) : "") +
       c.barra({ rotulo: "Membros com feedback nos últimos 90 dias", r: fb, meta: 90, nota: fb.faltam.length ? "Sem feedback: " + nomesFaltam(fb.faltam) : (fb.maisAntigo ? "O mais antigo é de " + esc(primeiroNome(dom.infoMembro(ctx, fb.maisAntigo.membro).nome)) + ", " + calc.fmtData(fb.maisAntigo.data) : "") }) +
       c.barra({ rotulo: "Etapas do onboarding no prazo", r: ind.onboarding }) +
       '<div class="barra-nota" style="margin-top:14px">Equilíbrio dos feedbacks em 90 dias (reconhecimento : desenvolvimento): ' + c.tag(ind.equilibrio.texto, ind.equilibrio.cor) + "</div></div>";
@@ -173,22 +175,26 @@
     const ano = Number(ctx.hoje.slice(0, 4));
     [ano, ano + 1].forEach((a) => [1, 2, 3, 4].forEach((t) => {
       const tri = calc.trimestre(a, t);
-      ev.push({ data: tri.inicio, texto: "Abertura do " + tri.curto, fixo: true });
-      ev.push({ data: calc.prazoEvidencias(tri), texto: "Prazo das evidências do " + tri.curto, fixo: true });
+      ev.push({ data: tri.inicio, texto: "Abertura do " + tri.curto + " (O2O no início do trimestre)", fixo: true });
+      if (dom.DESEMPENHO_ATIVO) ev.push({ data: calc.prazoEvidencias(tri), texto: "Prazo das evidências do " + tri.curto, fixo: true });
     }));
-    [ano, ano + 1].forEach((a) => {
+    if (dom.DESEMPENHO_ATIVO) [ano, ano + 1].forEach((a) => {
       ev.push({ data: a + "-11-01", texto: "Autoavaliação anual enviada aos membros", fixo: true });
       ev.push({ data: a + "-12-09", texto: "Calibração da avaliação anual", fixo: true });
       ev.push({ data: a + "-12-18", texto: "Devolutiva da avaliação anual (até)", fixo: true });
     });
+    if (dom.temMensal(ctx)) [0, 1, 2].forEach((k) => {
+      const mes = calc.mesDe(calc.addDias(calc.mesDe(ctx.hoje).inicio, k * 31));
+      ev.push({ data: dom.ultimoDiaUtil(ctx, mes.fim), texto: "Último dia para os 1:1 de " + mes.curto, fixo: true });
+    });
     equipe.forEach((m0) => {
       const m = dom.infoMembro(ctx, m0);
       const cic = dom.cicloDo(ctx, m.id, ctx.tri.chave);
-      if (cic && cic.data1a1 && !cic.realizadoEm) ev.push({ data: cic.data1a1, texto: "1:1 de " + primeiroNome(m.nome) });
+      if (cic && cic.data1a1 && !cic.realizadoEm) ev.push({ data: cic.data1a1, texto: "O2O de " + primeiroNome(m.nome) });
       const ob = dom.onboardingDo(ctx, m.id);
       if (ob && ["SUCCESS", "FAIL"].indexOf(ob.estagio) < 0) dom.statusOnboarding(ctx, ob).alinhamentos.filter((a) => !a.registrado).forEach((a) => ev.push({ data: a.data, texto: a.rotulo + " de " + primeiroNome(m.nome) }));
       const p = dom.planoAtivoDo(ctx, m.id);
-      if (p) ev.push({ data: dom.statusPlano(ctx, p).termino, texto: "Fim do plano de " + primeiroNome(m.nome) });
+      if (p) ev.push({ data: dom.statusPlano(ctx, p).termino, texto: "Fim do plano de melhoria de " + primeiroNome(m.nome) });
     });
     const lista = ev.filter((e) => e.data >= ctx.hoje && e.data <= fim).sort((a, b) => (a.data < b.data ? -1 : 1));
     return '<div class="card"><h3>' + icone("calendario", 16) + " Próximas datas do ciclo</h3>" + (lista.length ? '<div class="lista">' + lista.slice(0, 10).map((e) =>
@@ -216,14 +222,14 @@
       '<div class="grade c3" style="margin-bottom:16px">' +
       cartao("Suas aprovações", aprov.length, aprov.length ? "a mais antiga há " + Math.max.apply(null, aprov.map((a) => a.dias)) + " dias (prazo de 3)" : "nenhuma aguardando", aprov.some((a) => a.dias > 3), "#/offboarding") +
       cartao("Perto do aviso de 14 dias", perto.length, perto.length ? "aviso a partir de " + calc.fmtData(perto.map((p) => p.avisoCoordenacao).sort()[0]) : "nenhum item com 7 a 13 dias de atraso", perto.length > 0, "#/painel/setor") +
-      cartao("Planos de alinhamento", planos.length, planos.length ? "em andamento no setor" : "nenhum em andamento", false, "#/offboarding") + "</div>";
+      cartao("Planos de melhoria", planos.length, planos.length ? "em andamento no setor" : "nenhum em andamento", false, "#/rotinas") + "</div>";
     h += '<div class="card"><h3>Lideranças do setor<span class="extra muted">ordem alfabética, sem ranking</span></h3><div class="tabela-wrap"><table class="tabela"><thead><tr>' +
-      "<th>Liderança</th><th class='n'>Equipe</th><th>1:1 do tri</th><th>Evidências</th><th>Feedback 90 dias</th><th>Onboarding</th><th class='n'>Atrasadas</th><th>Reconhec. : desenv.</th><th>Situação</th></tr></thead><tbody>" +
+      "<th>Liderança</th><th class='n'>Equipe</th><th>1:1 do mês</th><th>O2O do tri</th><th>Feedback 90 dias</th><th>Onboarding</th><th class='n'>Atrasadas</th><th>Reconhec. : desenv.</th><th>Situação</th></tr></thead><tbody>" +
       mapa.map((l) => {
         const i = l.ind;
         const cel = (r, meta) => '<span class="calor ' + corDe(r, meta) + '" title="' + esc(r.texto) + '">' + esc(r.valor === null ? "sem dado" : r.curto + " · " + r.n + "/" + r.d) + "</span>";
         return '<tr class="clicavel" data-rota="#/equipe/lideranca/' + esc(l.lideranca.id) + '"><td>' + c.pessoa(l.lideranca, "", 28) + '</td><td class="n">' + l.tamanho + "</td>" +
-          "<td>" + cel(i.um1a1, 100) + "</td><td>" + cel(i.evidencias) + "</td><td>" + cel(i.feedback90, 90) + "</td><td>" + cel(i.onboarding) + '</td><td class="n">' +
+          "<td>" + cel(i.mensal) + "</td><td>" + cel(i.um1a1, 100) + "</td><td>" + cel(i.feedback90, 90) + "</td><td>" + cel(i.onboarding) + '</td><td class="n">' +
           (i.atrasadas ? '<b style="color:var(--vermelho)">' + i.atrasadas + "</b>" : "0") + "</td><td>" + c.tag(i.equilibrio.texto, i.equilibrio.cor) + "</td><td>" + c.tag(i.situacao.rotulo, i.situacao.cor) + "</td></tr>";
       }).join("") + '</tbody></table></div><div class="legenda"><span><i style="background:var(--verde-bg)"></i>em dia</span><span><i style="background:var(--ambar-bg)"></i>atenção</span><span><i style="background:var(--vermelho-bg)"></i>precisa de apoio</span>' +
       "<span>O equilíbrio dos feedbacks não entra no cálculo da situação: é um sinal para a conversa de apoio.</span></div></div>";
@@ -253,11 +259,12 @@
     const aba = aba0 || (rh ? "hoje" : "indicadores");
     const lista = (rh ? [{ chave: "hoje", rotulo: "Hoje", rota: "#/painel/hoje" }] : [])
       .concat([{ chave: "indicadores", rotulo: "Indicadores", rota: "#/painel/indicadores" }, { chave: "setores", rotulo: "Setores e retenção", rota: "#/painel/setores" }])
-      .concat(rh ? [{ chave: "processos", rotulo: "Processos e cadastros", rota: "#/painel/processos" }] : []);
+      .concat(rh ? [{ chave: "processos", rotulo: "Processos e cadastros", rota: "#/painel/processos" }, { chave: "exportar", rotulo: "Exportar", rota: "#/painel/exportar" }] : []);
     let h = faixa(rh ? "Painel do RH" : "Painel geral", g.nMembros + " membros · " + ctx.tri.rotulo, null, atencaoHoje(g)) + c.abas(lista, aba);
     if (aba === "hoje" && rh) h += abaHoje(g);
     else if (aba === "setores") h += abaSetores(g, rh);
     else if (aba === "processos" && rh) h += abaProcessos(g);
+    else if (aba === "exportar" && rh) h += GP.telas.exportar.abaExportar();
     else h += abaIndicadores(g, rh);
     return h;
   }
@@ -267,9 +274,11 @@
     const apoio = g.areas.filter((a) => a.ind.situacao.chave === "apoio").sort((a, b) => b.ind.atrasadas - a.ind.atrasadas)[0];
     if (apoio) frases.push('<a href="#/painel/setores">' + esc(apoio.depto.nome) + " precisa de apoio: " + plural(apoio.ind.atrasadas, "item atrasado", "itens atrasados") + " →</a>");
     const sem1a1 = g.ind.um1a1.d - g.ind.um1a1.n;
-    if (sem1a1 > 0) frases.push('<a href="#/painel/indicadores">' + plural(sem1a1, "membro ainda sem 1:1 agendado", "membros ainda sem 1:1 agendado") + " no " + E().ctx.tri.curto + " →</a>");
+    if (sem1a1 > 0) frases.push('<a href="#/painel/indicadores">' + plural(sem1a1, "membro ainda sem O2O agendado", "membros ainda sem O2O agendado") + " no " + E().ctx.tri.curto + " →</a>");
+    const semMensal = g.ind.mensal && g.ind.mensal.ativo ? g.ind.mensal.d - g.ind.mensal.n : 0;
+    if (semMensal > 0) frases.push('<a href="#/painel/indicadores">' + plural(semMensal, "membro ainda sem o 1:1 de ", "membros ainda sem o 1:1 de ") + esc(g.ind.mensal.mes.curto) + " →</a>");
     const prazoEvid = calc.prazoEvidencias(E().ctx.triAnterior);
-    if (prazoEvid >= E().ctx.hoje) frases.push('<a href="#/painel/indicadores">Próximo prazo do ciclo: evidências do ' + E().ctx.triAnterior.curto + " até " + calc.fmtData(prazoEvid) + " →</a>");
+    if (dom.DESEMPENHO_ATIVO && prazoEvid >= E().ctx.hoje) frases.push('<a href="#/painel/indicadores">Próximo prazo do ciclo: evidências do ' + E().ctx.triAnterior.curto + " até " + calc.fmtData(prazoEvid) + " →</a>");
     return frases.slice(0, 3).join("");
   }
   function cartaoIndicador(rotulo, valor, contexto, meta) {
@@ -280,12 +289,12 @@
   function abaIndicadores(g, rh) {
     const i = g.ind;
     const cartoes = rh ? [
-      cartaoIndicador("1:1 do trimestre agendados", i.um1a1.curto, esc(i.um1a1.texto), "100%"),
+      i.mensal && i.mensal.ativo ? cartaoIndicador("1:1 de " + i.mensal.mes.curto + " registrados", i.mensal.curto, esc(i.mensal.texto) + " · até " + calc.fmtData(i.mensal.prazo)) : cartaoIndicador("Pendências atrasadas", String(i.atrasadas), "tarefas, não pessoas"),
+      cartaoIndicador("O2O do trimestre agendados", i.um1a1.curto, esc(i.um1a1.texto), "100%"),
       cartaoIndicador("Feedback nos últimos 90 dias", i.feedback90.curto, esc(i.feedback90.texto), "90%"),
-      cartaoIndicador("Pendências atrasadas", String(i.atrasadas), "tarefas, não pessoas"),
       cartaoIndicador("Áreas em dia", g.areasEmDia.curto, esc(g.areasEmDia.texto)),
     ] : [
-      cartaoIndicador("1:1 do trimestre agendados", i.um1a1.curto, esc(i.um1a1.texto), "100%"),
+      cartaoIndicador("O2O do trimestre agendados", i.um1a1.curto, esc(i.um1a1.texto), "100%"),
       cartaoIndicador("Áreas em dia", g.areasEmDia.curto, esc(g.areasEmDia.texto)),
       cartaoIndicador("Rotatividade (12 meses)", g.rotatividade.curto, g.saidas + " saídas · " + g.aPedido + " a pedido do membro, " + g.decisao + " por decisão da empresa"),
       cartaoIndicador("Tempo para preencher vaga", g.tempoVaga === null ? "sem dado" : Math.round(g.tempoVaga) + " dias", "mediana das vagas fechadas nos últimos 6 meses"),
@@ -307,7 +316,13 @@
   function abaHoje(g) {
     const ctx = E().ctx;
     const fila = dom.filaRH(ctx);
-    let h = '<div class="card"><h3>Fila do RH<span class="extra muted">' + plural(fila.length, "item", "itens") + "</span></h3>" + (fila.length ? '<div class="lista">' + fila.map((f) =>
+    const esteira = dom.solicitacoesOffboarding(ctx).filter((s) => s.nova);
+    const vagas = dom.vagasDe(ctx, null).filter((v) => v.nova);
+    const total = fila.length + esteira.length + vagas.length;
+    let h = '<div class="card' + (esteira.length || vagas.length ? " acao vermelho" : "") + '"><h3>Fila do RH<span class="extra muted">' + plural(total, "item", "itens") + "</span></h3>" + (total ? '<div class="lista">' +
+      esteira.map((s) => '<div class="item clicavel" data-rota="#/offboarding"><div class="principal-item"><div class="t">Encerramento de contrato · ' + esc(s.membro || s.titulo) + '</div><div class="d">' + esc([s.setor, s.motivo, s.solicitante ? "pedida por " + s.solicitante : ""].filter(Boolean).join(" · ")) + '</div></div><div class="lado">' + c.tag("Nova · esteira", "vermelho") + "</div></div>").join("") +
+      vagas.map((v) => '<div class="item clicavel" data-rota="#/recrutamento"><div class="principal-item"><div class="t">Vaga · ' + esc(v.titulo) + '</div><div class="d">' + esc(v.solicitante ? "pedida por " + v.solicitante : "") + '</div></div><div class="lado">' + c.tag("Nova solicitação", "vermelho") + "</div></div>").join("") +
+      fila.map((f) =>
       '<div class="item clicavel" data-rota="#/offboarding/encerramento/' + esc(f.item.id) + '">' + (f.membro ? c.avatar(f.membro, 30) : "") + '<div class="principal-item"><div class="t">Encerramento de contrato · ' + esc(f.membro ? f.membro.nome : "") + '</div><div class="d">' + esc(f.item.motivo || "") + "</div></div>" +
       '<div class="lado">' + c.tag(f.item.estagioNome, f.item.estagio === "BLOQUEADA" ? "vermelho" : "azul") + "</div></div>").join("") + "</div>" : c.vazio("Nada aguardando o RH.")) + "</div>";
     h += '<div class="card"><h3>Pendências atrasadas por liderança</h3>' + (g.areas.filter((a) => a.ind.atrasadas).length ? '<div class="lista">' + g.areas.filter((a) => a.ind.atrasadas).map((a) =>
@@ -345,7 +360,7 @@
     const aceitas = enc.filter((x) => x.primeiraVerificacao === "Aceita na 1ª verificação" && x.motivo !== dom.MOTIVO_GRAVE).length;
     const total1 = enc.filter((x) => x.primeiraVerificacao && x.motivo !== dom.MOTIVO_GRAVE).length;
     const semCiclo = dom.membrosAtivos(ctx.registros.membros || []).filter((m) => m.estagio === "ATIVO" && !dom.cicloDo(ctx, m.id, ctx.tri.chave));
-    return '<div class="card acao"><h3>Ciclo trimestral do ' + esc(ctx.tri.rotulo) + '</h3><p class="muted" style="margin-top:0">No primeiro dia útil de cada trimestre, o RH cria um item do Ciclo para cada membro no estágio Ativo (3.3). A criação do item é o aviso de início do trimestre. Membros em onboarding entram no trimestre seguinte ao Dia 90.</p>' +
+    return '<div class="card acao"><h3>Ciclo trimestral do ' + esc(ctx.tri.rotulo) + '</h3><p class="muted" style="margin-top:0">No primeiro dia útil de cada trimestre, o RH cria um item do Ciclo para cada membro no estágio Ativo (3.3): é nele que a liderança agenda e registra o O2O. A criação do item é o aviso de início do trimestre. Membros em onboarding entram no trimestre seguinte ao Dia 90.</p>' +
       (semCiclo.length ? '<p><b>' + plural(semCiclo.length, "membro ativo ainda sem item", "membros ativos ainda sem item") + "</b>: " + esc(semCiclo.map((m) => dom.infoMembro(ctx, m).nome).join(", ")) + '.</p><button class="btn" data-acao="abrir-trimestre">Abrir o ' + esc(ctx.tri.curto) + " para " + plural(semCiclo.length, "membro", "membros") + "</button>"
         : '<p class="muted">✓ Todos os membros ativos já têm o item do ' + esc(ctx.tri.curto) + ".</p>") + "</div>" +
       '<div class="card"><h3>Encerramentos de contrato por etapa</h3><div class="grade c4">' + porEstagio.map((p) =>
@@ -392,7 +407,7 @@
   const PASSOS = [
     { t: "O Início mostra o seu dia", d: "Os números do dia, a faixa dos próximos 14 dias e um caminho para cada módulo.", ic: "inicio" },
     { t: "O Painel mostra o que fazer", d: "O que depende de você, com os atrasados primeiro, e as rotinas do trimestre da equipe.", ic: "painel" },
-    { t: "O card do membro guarda o histórico", d: "Feedbacks, 1:1, evidências, planos e onboarding de cada pessoa, com data e autor.", ic: "equipe" },
+    { t: "O card do membro guarda o histórico", d: "Feedbacks, 1:1 do mês, O2O, planos de melhoria e onboarding de cada pessoa, com data e autor.", ic: "equipe" },
   ];
   ui.renderTour = function () {
     const n = E().tourPasso;

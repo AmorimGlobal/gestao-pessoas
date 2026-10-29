@@ -9,8 +9,12 @@ const ROTINAS = {
   avisos: ["BITRIX_WEBHOOK_URL", "CRON_SECRET", "GP_AVISAR_IDS", "GP_CEO_IDS"],
   trava: ["BITRIX_WEBHOOK_URL", "BITRIX_EVENTO_TOKEN", "GP_CEO_IDS"],
   painelCEO: ["BITRIX_WEBHOOK_URL", "GP_CEO_IDS"],
+  // envio de e-mail (lib/email.js): a ficha do onboarding (api/ficha.js)
+  email: ["BITRIX_WEBHOOK_URL", "SMTP_HOST", "SMTP_USUARIO", "SMTP_SENHA"],
+  // e-mail a quem pediu nos funis de vagas e de offboarding (api/eventos.js, eventos ONCRMDEAL*)
+  avisosNegocios: ["BITRIX_WEBHOOK_URL", "BITRIX_EVENTO_TOKEN", "SMTP_HOST", "SMTP_USUARIO", "SMTP_SENHA"],
 };
-const OPCIONAIS = ["GP_EXCECOES_IDS", "GP_LINK_APP", "GP_CATEGORIA_VAGAS"];
+const OPCIONAIS = ["GP_EXCECOES_IDS", "GP_LINK_APP", "GP_CATEGORIA_VAGAS", "GP_CATEGORIA_OFFBOARDING", "SMTP_PORTA", "EMAIL_REMETENTE"];
 
 function responder(res, status, corpo) {
   res.statusCode = status;

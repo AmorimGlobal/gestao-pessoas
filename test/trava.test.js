@@ -7,6 +7,7 @@ const schema = require("../src/js/20-schema.js");
 const { provisionar } = require("../src/js/30-provision.js");
 const { abrirPortal } = require("../lib/bitrix-servidor.js");
 const handler = require("../api/eventos.js");
+const dom = require("../src/js/50-dominio.js");
 const { criarBitrixFalso } = require("./fake-bitrix.js");
 
 const HOJE = "2026-10-20";
@@ -71,7 +72,7 @@ test("formulário sem os registros: bloqueia com o motivo, liga ao membro e avis
   assert.equal(r.acao, "bloquear");
   const enc = await c.portal.obter("encerramentos", id);
   assert.equal(enc.estagio, "BLOQUEADA");
-  assert.equal(enc.bloqueio, "Este motivo exige 2 feedbacks SCI e um plano de alinhamento de 60 dias encerrado.");
+  assert.equal(enc.bloqueio, dom.MSG_TRAVA);
   assert.equal(enc.membroId, c.ana.id);
   assert.equal(enc.coordenacao, "2");
   assert.equal(enc.origem, "Formulário da coordenação");
@@ -214,8 +215,14 @@ test("segurança: token errado 401, sem configuração 503, GET 405, outros proc
   await handler(requisicao(corpoEvento("ONCRMDYNAMICITEMUPDATE", membrosEti, c.ana.id)), r4, { env: ENV, chamar: c.bx.chamar, semCache: true });
   assert.equal(r4.corpo.ignorado, "outro processo");
   const r5 = resposta();
-  await handler(requisicao(corpoEvento("ONCRMDEALUPDATE", 2, 10)), r5, { env: ENV, chamar: c.bx.chamar });
-  assert.match(r5.corpo.ignorado, /ONCRMDEALUPDATE/);
+  await handler(requisicao(corpoEvento("ONCRMCONTACTUPDATE", 3, 10)), r5, { env: ENV, chamar: c.bx.chamar });
+  assert.match(r5.corpo.ignorado, /ONCRMCONTACTUPDATE/);
+  // negócio (e-mails dos funis, test/avisos-negocios.test.js) sem o SMTP configurado: ignorado sem chamar o Bitrix
+  const r6 = resposta();
+  const chamadasAntes = c.bx.estado.chamadas.length;
+  await handler(requisicao(corpoEvento("ONCRMDEALUPDATE", 2, 10)), r6, { env: ENV, chamar: c.bx.chamar });
+  assert.match(r6.corpo.ignorado, /e-mail não configurado/);
+  assert.equal(c.bx.estado.chamadas.length, chamadasAntes);
   assert.equal(c.bx.estado.avisos.length, 0);
   assert.ok(schema.processo("encerramentos"));
 });

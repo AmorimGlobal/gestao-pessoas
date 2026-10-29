@@ -31,6 +31,11 @@
     h += '<div class="aviso-info" style="margin-bottom:16px">' + (E().visao === "rh" ? "Pedidos do RH entram direto no funil de vagas." : formal ? "Como coordenação, a sua solicitação vai direto ao RH." : "A solicitação de uma liderança direta vai primeiro para a coordenação, que aprova e envia ao RH.") +
       " O formulário abre dentro do Bitrix, com você identificada pelo login.</div>";
     if (erroVagas) h += '<div class="aviso-atencao" style="margin-bottom:16px">Não foi possível ler o funil de vagas: ' + esc(erroVagas) + ". O TI precisa dar à função Liderança acesso de leitura ao funil \"HR | Requisição de Vagas\".</div>";
+    // Alerta vermelho do RH: solicitações que ainda estão em "Nova solicitação" (reunião de 29/10/2026)
+    const novas = E().visao === "rh" ? vagas.filter((v) => v.nova) : [];
+    if (novas.length) h += '<div class="card acao vermelho"><h3>' + icone("alerta", 16) + " " + plural(novas.length, "solicitação de vaga nova aguarda o RH", "solicitações de vaga novas aguardam o RH") + '</h3><div class="lista">' +
+      novas.map((v) => '<div class="item"><div class="principal-item"><div class="t">' + esc(v.titulo) + '</div><div class="d">' + (v.solicitante ? "pedida por " + esc(v.solicitante) : "") + (v.atualizadoEm ? " · em " + calc.fmtData(v.atualizadoEm) : "") + '</div></div><div class="lado">' + c.tag("Nova solicitação", "vermelho") + "</div></div>").join("") +
+      '</div><p class="muted" style="font-size:12px;margin:10px 0 0">O alerta some quando o card sai de "Nova solicitação" no funil HR | Requisição de Vagas.</p></div>';
     if (finPend.length) {
       h += '<div class="card acao"><h3>Avaliar os finalistas<span class="extra muted">prazo de 5 dias úteis</span></h3><div class="lista">' + finPend.map((f) =>
         '<div class="item clicavel" data-rota="#/recrutamento/finalista/' + esc(f.id) + '"><div class="principal-item"><div class="t">' + esc(f.candidato || f.titulo) + '</div><div class="d">' + esc(f.titulo) + "</div></div><div class=\"lado\">" + c.prazo(f.prazo) + "</div></div>").join("") + "</div></div>";

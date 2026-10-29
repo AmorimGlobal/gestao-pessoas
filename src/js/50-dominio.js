@@ -20,8 +20,13 @@
   const MOTIVOS_COM_TRAVA = ["Resultados abaixo do acordado", "Desalinhamento de perfil"];
   const MOTIVOS_ABREVIADOS = ["Reestruturação da área", "Fim do prazo previsto no contrato"];
   const MOTIVO_GRAVE = "Situação grave ou urgente";
-  const MSG_TRAVA = "Este motivo exige 2 feedbacks SCI e um plano de alinhamento de 60 dias encerrado.";
+  const MSG_TRAVA = "Este motivo exige 2 feedbacks SCI de desenvolvimento e um plano de melhoria de 60 dias encerrado sem os resultados.";
   const MSG_JUSTIFICATIVA = "Registre a justificativa do fluxo abreviado.";
+  // Reunião de 29/10/2026: a avaliação de desempenho (evidências do trimestre, leituras marcadas como
+  // relevantes e o ano) sai do app e volta em 2027. Com false, nada disso gera pendência nem indicador.
+  const DESEMPENHO_ATIVO = false;
+  // Tipos que a liderança registra: abertura e encerramento de plano saíram do formulário (29/10/2026)
+  const TIPOS_FEEDBACK_REGISTRO = ["Reconhecimento", "Desenvolvimento"];
 
   /* ================================================================ índices */
   function indexar(ctx) {
@@ -219,21 +224,23 @@
     const t = calc.trimestrePorChave(c.trimestre);
     const abertura = dataDe(c.criadoEm) || (t && t.inicio);
     const r = { item: c, trimestre: t };
-    if (c.estagio === "SUCCESS") return Object.assign(r, { chave: "concluido", texto: "Evidências registradas", cor: "verde" });
+    // O "1:1 do trimestre" da especificação passou a se chamar O2O (sessão de desenvolvimento) em 29/10/2026
+    if (c.estagio === "SUCCESS") return Object.assign(r, DESEMPENHO_ATIVO || !c.realizadoEm ? { chave: "concluido", texto: "Evidências registradas", cor: "verde" } : { chave: "realizado", texto: "O2O realizado em " + calc.fmtData(c.realizadoEm), cor: "verde" });
     if (c.estagio === "FAIL") return Object.assign(r, { chave: "cancelado", texto: "Cancelado", cor: "cinza" });
     const carencia = (ctx.config && ctx.config.parametros && ctx.config.parametros.carencia1a1) || 7;
     if (!c.realizadoEm) {
       if (!c.data1a1) {
         const p = prazo(ctx, m, calc.dataDoDia(abertura, carencia));
         const atr = calc.atrasado(p, ctx.hoje);
-        return Object.assign(r, { chave: atr ? "sem-agenda" : "agendar", texto: atr ? "1:1 sem agendamento" : "1:1 a agendar", cor: atr ? "vermelho" : "amarelo", prazo: p, acao: "agendar" });
+        return Object.assign(r, { chave: atr ? "sem-agenda" : "agendar", texto: atr ? "O2O sem agendamento" : "O2O a agendar", cor: atr ? "vermelho" : "amarelo", prazo: p, acao: "agendar" });
       }
-      if (ctx.hoje <= c.data1a1) return Object.assign(r, { chave: "agendado", texto: "1:1 agendado para " + calc.fmtData(c.data1a1), cor: "azul", data: c.data1a1 });
+      if (ctx.hoje <= c.data1a1) return Object.assign(r, { chave: "agendado", texto: "O2O agendado para " + calc.fmtData(c.data1a1), cor: "azul", data: c.data1a1 });
       const p = calc.addDias(c.data1a1, 1);
       const atr = calc.atrasado(p, ctx.hoje);
-      return Object.assign(r, { chave: "registrar-1a1", texto: "Registrar o 1:1 de " + calc.fmtData(c.data1a1), cor: atr ? "vermelho" : "amarelo", prazo: p, acao: "registrar-1a1" });
+      return Object.assign(r, { chave: "registrar-1a1", texto: "Registrar o O2O de " + calc.fmtData(c.data1a1), cor: atr ? "vermelho" : "amarelo", prazo: p, acao: "registrar-1a1" });
     }
-    if (t && ctx.hoje <= t.fim) return Object.assign(r, { chave: "realizado", texto: "1:1 realizado em " + calc.fmtData(c.realizadoEm), cor: "azul" });
+    if (!DESEMPENHO_ATIVO) return Object.assign(r, { chave: "realizado", texto: "O2O realizado em " + calc.fmtData(c.realizadoEm), cor: "verde" });
+    if (t && ctx.hoje <= t.fim) return Object.assign(r, { chave: "realizado", texto: "O2O realizado em " + calc.fmtData(c.realizadoEm), cor: "azul" });
     const p = prazo(ctx, m, c.prazoEvidencias || (t && calc.prazoEvidencias(t)));
     const atr = calc.atrasado(p, ctx.hoje);
     return Object.assign(r, { chave: atr ? "evid-atrasadas" : "evidencias", texto: atr ? "Evidências atrasadas" : "Registrar evidências até " + calc.fmtData(p), cor: atr ? "vermelho" : "amarelo", prazo: p, acao: "evidencias" });
@@ -270,6 +277,7 @@
     return {
       item: ob, membro: m, ingresso, dia, fase, senioridade, alinhamentos, proximo, leituras,
       prazoFicha, fichaOk: !!ob.fichaEm, fichaAtrasada: !ob.fichaEm && prazoFicha && calc.atrasado(prazoFicha, ctx.hoje),
+      fichaEnviada: !!ob.fichaEnviadaEm,
       prazoEntregas, entregasOk: !!ob.entregasPlanejadasEm,
       entregasAtrasadas: !ob.entregasPlanejadasEm && prazoEntregas && calc.atrasado(prazoEntregas, ctx.hoje),
       revisaoEsperada: calc.REVISAO_ESPERADA[senioridade] || "",
@@ -278,6 +286,29 @@
   }
   function onboardingDo(ctx, membroId) {
     return doMembro(ctx, "onboarding", membroId).filter((o) => o.estagio !== "FAIL").sort((a, b) => (a.ingresso < b.ingresso ? 1 : -1))[0] || null;
+  }
+
+  /* ================================================================ 1:1 mensal (reunião de 29/10/2026) */
+  /** Sem o processo "1:1 mensais" no portal (falta rodar a configuração), o 1:1 mensal não cobra ninguém */
+  function temMensal(ctx) { return !(ctx.recursos && ctx.recursos.mensal === false); }
+  function mensaisDo(ctx, membroId) {
+    return doMembro(ctx, "mensal", membroId).filter((x) => x.estagio !== "FAIL").sort((a, b) => (a.data < b.data ? 1 : -1));
+  }
+  function mensalNoMes(ctx, membroId, mesChave) { return mensaisDo(ctx, membroId).find((x) => String(x.data || "").slice(0, 7) === mesChave) || null; }
+  /** Último dia útil até a data (o prazo do 1:1 do mês) */
+  function ultimoDiaUtil(ctx, iso) {
+    const fer = feriadosDe(ctx, "SP");
+    let d = iso;
+    for (let i = 0; i < 10 && !calc.ehDiaUtil(d, fer); i++) d = calc.addDias(d, -1);
+    return d;
+  }
+  /** 1:1 do mês de cada membro ativo: quem já teve e quem falta */
+  function situacaoMensal(ctx, membros, mesIso) {
+    const mes = calc.mesDe(mesIso || ctx.hoje);
+    const ativos = membros.filter((m) => m.estagio === "ATIVO");
+    const feitos = [], faltam = [];
+    ativos.forEach((m) => { const r = mensalNoMes(ctx, m.id, mes.chave); if (r) feitos.push({ membro: m, registro: r }); else faltam.push(m); });
+    return { mes, ativos, feitos, faltam, pct: calc.percentual(feitos.length, ativos.length), prazo: ultimoDiaUtil(ctx, mes.fim) };
   }
 
   /* ================================================================ planos de alinhamento (3.5.2) */
@@ -311,20 +342,21 @@
     const bloqueios = [];
     let plano = null, feedbacks = [];
     if (MOTIVOS_COM_TRAVA.indexOf(motivo) >= 0) {
-      const fbs = {};
-      doMembro(ctx, "feedbacks", membroId).forEach((f) => { fbs[f.id] = f; });
-      const valido = (id) => id && fbs[id] && feedbackValido(fbs[id]);
-      const planos = doMembro(ctx, "planos", membroId);
-      plano = planos.find((p) => p.estagio === "FAIL" && valido(p.feedbackAberturaId) && valido(p.feedbackEncerramentoId))
-        || planos.find((p) => p.estagio === "FAIL") || null;
-      const okPlano = !!(plano && plano.estagio === "FAIL");
-      const okAbertura = !!(plano && valido(plano.feedbackAberturaId));
-      const okEncerramento = !!(plano && valido(plano.feedbackEncerramentoId));
-      itens.push({ ok: okPlano, texto: "Plano de alinhamento de 60 dias encerrado em \"Resultados não atingidos\"" });
-      itens.push({ ok: okAbertura, texto: "Feedback SCI de abertura vinculado ao plano" });
-      itens.push({ ok: okEncerramento, texto: "Feedback SCI de encerramento vinculado ao plano" });
-      if (!(okPlano && okAbertura && okEncerramento)) bloqueios.push(MSG_TRAVA);
-      if (plano) feedbacks = [plano.feedbackAberturaId, plano.feedbackEncerramentoId].filter(valido);
+      // Desde 29/10/2026 o plano de melhoria não nasce de um feedback "de abertura": valem os feedbacks
+      // de desenvolvimento registrados desde 30 dias antes do início do plano. Os vinculados ao plano
+      // (registros antigos) entram primeiro.
+      const planos = doMembro(ctx, "planos", membroId).filter((p) => p.estagio === "FAIL")
+        .sort((a, b) => (String(a.termino || a.inicio || "") < String(b.termino || b.inicio || "") ? 1 : -1));
+      plano = planos[0] || null;
+      const desde = plano && plano.inicio ? calc.addDias(plano.inicio, -30) : "";
+      const dev = feedbacksDo(ctx, membroId).filter((f) => calc.ehFeedbackDesenvolvimento(f.tipo) && (!desde || !f.data || f.data >= desde));
+      const ligados = plano ? [plano.feedbackAberturaId, plano.feedbackEncerramentoId].filter((id) => id && dev.some((f) => f.id === id)) : [];
+      feedbacks = ligados.concat(dev.map((f) => f.id).filter((id) => ligados.indexOf(id) < 0)).slice(0, 2);
+      const okPlano = !!plano;
+      const okFeedbacks = feedbacks.length >= 2;
+      itens.push({ ok: okPlano, texto: "Plano de melhoria de 60 dias encerrado em \"Resultados não atingidos\"" });
+      itens.push({ ok: okFeedbacks, texto: "2 feedbacks SCI de desenvolvimento registrados" + (desde ? " desde " + calc.fmtData(desde) : "") + (feedbacks.length === 1 ? " (há 1)" : "") });
+      if (!(okPlano && okFeedbacks)) bloqueios.push(MSG_TRAVA);
     } else if (MOTIVOS_ABREVIADOS.indexOf(motivo) >= 0) {
       const ok = !!String(justificativa || "").trim();
       itens.push({ ok, texto: "Justificativa do fluxo abreviado registrada" });
@@ -358,37 +390,50 @@
     const o = opcoes || {};
     const lista = [];
     const tri = ctx.tri;
+    const mes = calc.mesDe(ctx.hoje);
+    const prazoMensal = ultimoDiaUtil(ctx, mes.fim);
     membros.forEach((m0) => {
       const m = infoMembro(ctx, m0);
       const nome = m.nome.split(" ")[0];
-      // Ciclo: trimestre atual e o anterior (evidências ainda em prazo)
-      [tri.chave, ctx.triAnterior.chave].forEach((chaveTri) => {
+      // O2O (Ciclo trimestral): trimestre atual e, com a avaliação de desempenho ligada, o anterior (evidências)
+      (DESEMPENHO_ATIVO ? [tri.chave, ctx.triAnterior.chave] : [tri.chave]).forEach((chaveTri) => {
         const c = cicloDo(ctx, m.id, chaveTri);
         if (!c || m.estagio !== "ATIVO") return;
         const s = statusCiclo(ctx, c);
-        if (s.acao === "agendar") lista.push(pend(ctx, { id: "1a1-" + c.id, tipo: "1:1", titulo: "Agendar o 1:1 de " + nome, membro: m, prazo: s.prazo, rota: "#/rotinas/ciclo/" + c.id, registro: { chave: "ciclo", id: c.id } }));
-        if (s.acao === "registrar-1a1") lista.push(pend(ctx, { id: "reg1a1-" + c.id, tipo: "1:1", titulo: "Registrar o 1:1 de " + nome, membro: m, prazo: s.prazo, rota: "#/rotinas/ciclo/" + c.id, registro: { chave: "ciclo", id: c.id } }));
+        if (s.acao === "agendar") lista.push(pend(ctx, { id: "1a1-" + c.id, tipo: "O2O", titulo: "Agendar o O2O de " + nome, membro: m, prazo: s.prazo, rota: "#/rotinas/ciclo/" + c.id, registro: { chave: "ciclo", id: c.id } }));
+        if (s.acao === "registrar-1a1") lista.push(pend(ctx, { id: "reg1a1-" + c.id, tipo: "O2O", titulo: "Registrar o O2O de " + nome, membro: m, prazo: s.prazo, rota: "#/rotinas/ciclo/" + c.id, registro: { chave: "ciclo", id: c.id } }));
         if (s.acao === "evidencias") lista.push(pend(ctx, { id: "evid-" + c.id, tipo: "Evidências", titulo: "Registrar as evidências do " + s.trimestre.curto + " de " + nome, membro: m, prazo: s.prazo, rota: "#/desempenho/ciclo/" + c.id, registro: { chave: "ciclo", id: c.id } }));
       });
-      // Onboarding
+      // 1:1 do mês (conversa breve): um por membro ativo, até o último dia útil do mês
+      if (m.estagio === "ATIVO" && temMensal(ctx) && !mensalNoMes(ctx, m.id, mes.chave)) {
+        lista.push(pend(ctx, { id: "mensal-" + mes.chave + "-" + m.id, tipo: "1:1", titulo: "Registrar o 1:1 de " + mes.curto + " de " + nome, membro: m, prazo: prazoMensal, rota: "#/rotinas/mensal/novo/" + m.id }));
+      }
+      // Onboarding: a Ficha, o envio dela ao membro e as avaliações de cada mês
       const ob = onboardingDo(ctx, m.id);
       if (ob && ["SUCCESS", "FAIL"].indexOf(ob.estagio) < 0) {
         const s = statusOnboarding(ctx, ob);
         if (!s.fichaOk) lista.push(pend(ctx, { id: "ficha-" + ob.id, tipo: "Onboarding", titulo: "Completar a Ficha de " + nome, membro: m, prazo: s.prazoFicha, rota: "#/onboarding/" + ob.id }));
-        if (s.fichaOk && !s.entregasOk && s.dia >= 1) lista.push(pend(ctx, { id: "entregas-" + ob.id, tipo: "Onboarding", titulo: "Planejar as 2 entregas das semanas 3 e 4 de " + nome, membro: m, prazo: s.prazoEntregas, rota: "#/onboarding/" + ob.id }));
+        else if (!s.fichaEnviada) {
+          // a Ficha chega ao membro até o Dia 1; se foi preenchida depois, 2 dias depois do preenchimento
+          const depois = ob.fichaEm ? calc.addDias(ob.fichaEm, 2) : "";
+          const prazoEnvio = !s.ingresso ? depois : depois > s.ingresso ? depois : s.ingresso;
+          lista.push(pend(ctx, { id: "fichaenv-" + ob.id, tipo: "Onboarding", titulo: "Enviar a Ficha para " + nome + " por e-mail", membro: m, prazo: prazoEnvio, rota: "#/onboarding/" + ob.id }));
+        }
         const prox = s.proximo;
-        if (prox && calc.diffDias(ctx.hoje, prox.data) <= 7) lista.push(pend(ctx, { id: "al" + prox.numero + "-" + ob.id, tipo: "Onboarding", titulo: prox.rotulo + " de " + nome + " (Dia " + prox.dia + ")", membro: m, prazo: prox.data, rota: "#/onboarding/" + ob.id }));
+        if (prox && calc.diffDias(ctx.hoje, prox.data) <= 7) lista.push(pend(ctx, { id: "al" + prox.numero + "-" + ob.id, tipo: "Onboarding", titulo: prox.rotulo + " de " + nome + " (" + prox.fase + ", Dia " + prox.dia + ")", membro: m, prazo: prox.data, rota: "#/onboarding/" + ob.id }));
       }
-      // Plano de alinhamento
+      // Plano de melhoria (plano de alinhamento de resultados)
       doMembro(ctx, "planos", m.id).forEach((p) => {
         const s = statusPlano(ctx, p);
         if (!s.ativo) return;
-        if (s.acao === "checkin" && calc.diffDias(ctx.hoje, s.prazo) <= 5) lista.push(pend(ctx, { id: "checkin-" + p.id, tipo: "Plano", titulo: "Check-in do plano de " + nome + " (Dia 30)", membro: m, prazo: s.prazo, rota: "#/offboarding/plano/" + p.id }));
-        if (s.acao === "encerrar") lista.push(pend(ctx, { id: "encplano-" + p.id, tipo: "Plano", titulo: "Encerrar o plano de " + nome + " (Dia 60)", membro: m, prazo: s.prazo, rota: "#/offboarding/plano/" + p.id }));
+        if (s.acao === "checkin" && calc.diffDias(ctx.hoje, s.prazo) <= 5) lista.push(pend(ctx, { id: "checkin-" + p.id, tipo: "Plano", titulo: "Check-in do plano de melhoria de " + nome + " (Dia 30)", membro: m, prazo: s.prazo, rota: "#/rotinas/plano/" + p.id }));
+        if (s.acao === "encerrar") lista.push(pend(ctx, { id: "encplano-" + p.id, tipo: "Plano", titulo: "Encerrar o plano de melhoria de " + nome + " (Dia 60)", membro: m, prazo: s.prazo, rota: "#/rotinas/plano/" + p.id }));
       });
-      // Leituras de entrega (só onboarding, plano e marcadas como relevantes: 4.8)
+      // Leituras de entrega pendentes (registros anteriores a 29/10/2026: hoje as entregas do onboarding
+      // são avaliadas direto na avaliação do mês). As "marcadas como relevantes" eram do desempenho.
       doMembro(ctx, "leituras", m.id).forEach((l) => {
         if (l.leitura || ["SUCCESS", "FAIL"].indexOf(l.estagio) >= 0) return;
+        if (!DESEMPENHO_ATIVO && l.origem !== "Plano de alinhamento" && l.origem !== "Onboarding") return;
         const comPrazo = l.origem === "Plano de alinhamento" || l.origem === "Onboarding" || l.origem === "Prazo vencido sem conclusão";
         lista.push(pend(ctx, { id: "leit-" + l.id, tipo: "Leitura", titulo: "Ler a entrega \"" + (l.titulo || "sem título") + "\" de " + nome, membro: m, prazo: comPrazo ? l.prazoLeitura : "", rota: "#/desempenho/leitura/" + l.id, destaque: l.origem === "Plano de alinhamento" }));
       });
@@ -456,7 +501,8 @@
       const ob = onboardingDo(ctx, m.id);
       if (!ob || ob.estagio === "FAIL") return;
       const s = statusOnboarding(ctx, ob);
-      const etapas = [{ prazo: s.prazoFicha, feito: ob.fichaEm }, { prazo: s.prazoEntregas, feito: ob.entregasPlanejadasEm }]
+      // o planejamento das entregas em tarefas saiu do onboarding em 29/10/2026: contam a Ficha e as avaliações
+      const etapas = [{ prazo: s.prazoFicha, feito: ob.fichaEm }]
         .concat(s.alinhamentos.map((a) => ({ prazo: a.data, feito: a.dataRegistro })));
       etapas.forEach((e) => {
         if (!e.prazo || ctx.hoje <= e.prazo && !e.feito) return; // ainda não venceu
@@ -470,8 +516,12 @@
     const rEvid = calc.percentual(evidOk.length, itensAnt.length);
     const rFb = calc.percentual(comFb.length, ativos.length);
     const rOb = calc.percentual(obN, obD);
-    const somaN = com1a1.length + evidOk.length + comFb.length + obN;
-    const somaD = eleg1a1.length + itensAnt.length + ativos.length + obD;
+    // 1:1 mensal: o mês corrente é só acompanhamento; a nota das rotinas usa o mês que já fechou
+    const comMensal = temMensal(ctx);
+    const mesAtual = situacaoMensal(ctx, membros, ctx.hoje);
+    const mesAnterior = situacaoMensal(ctx, membros, calc.addDias(calc.mesDe(ctx.hoje).inicio, -1));
+    const somaN = com1a1.length + (DESEMPENHO_ATIVO ? evidOk.length : 0) + comFb.length + obN + (comMensal ? mesAnterior.feitos.length : 0);
+    const somaD = eleg1a1.length + (DESEMPENHO_ATIVO ? itensAnt.length : 0) + ativos.length + obD + (comMensal ? mesAnterior.ativos.length : 0);
     const rotinas = calc.percentual(somaN, somaD);
     // Equilíbrio e feedbacks do período
     const fbs90 = [], fbsTri = [];
@@ -485,6 +535,8 @@
       um1a1: Object.assign(r1a1, { faltam: sem1a1 }),
       evidencias: Object.assign(rEvid, { faltam: itensAnt.filter((c) => c.estagio !== "SUCCESS").map((c) => ctx.idx.membro[c.membroId]).filter(Boolean) }),
       feedback90: Object.assign(rFb, { faltam: semFb, maisAntigo, meta: 90 }),
+      mensal: Object.assign(mesAtual.pct, { faltam: mesAtual.faltam, mes: mesAtual.mes, prazo: mesAtual.prazo, ativo: comMensal }),
+      mensalAnterior: Object.assign(mesAnterior.pct, { faltam: mesAnterior.faltam, mes: mesAnterior.mes }),
       onboarding: rOb,
       rotinas, atrasadas: atrasadas.length, pendencias,
       situacao: calc.situacaoLideranca(rotinas.valor, atrasadas.length),
@@ -551,12 +603,98 @@
       const fechadaEm = fechada ? dataDe((won && won.CREATED_TIME) || n.CLOSEDATE || n.DATE_MODIFY) : "";
       return {
         id: String(n.ID), titulo: n.UF_CRM_RV_VAGA || n.TITLE, etapa: etapa.nome, semantica: etapa.semantica,
+        // na primeira etapa ("Nova solicitação"): demanda nova do RH, com o alerta vermelho
+        nova: pos === 0 && !etapa.semantica,
         posicao: pos >= 0 ? pos + 1 : null, totalEtapas: sequencia.length, aprovadaEm, fechada, fechadaEm,
         diasEmAberto: aprovadaEm && !fechada && !etapa.semantica ? calc.diffDias(aprovadaEm, ctx.hoje) : null,
         tempoParaFechar: aprovadaEm && fechadaEm ? calc.diffDias(aprovadaEm, fechadaEm) : null,
         solicitante: n.UF_CRM_RV_LIDER || "", entradaDesejada: dataDe(n.UF_CRM_RV_DATA_ENT), atualizadoEm: dataDe(n.DATE_MODIFY),
       };
     });
+  }
+
+  /* ================================================================ offboarding pelo funil de negócios (29/10/2026) */
+  /** Solicitações do funil "HR | Offboarding", que nascem do formulário CRM. ctx.offboarding vem no
+      mesmo formato das vagas ({etapas, negocios}); as listas já chegam com o texto da opção. */
+  function solicitacoesOffboarding(ctx) {
+    const v = ctx.offboarding || { etapas: [], negocios: [] };
+    const abertas = (v.etapas || []).filter((e) => !e.semantica);
+    return (v.negocios || []).map((n) => {
+      const etapa = (v.etapas || []).find((e) => e.id === n.STAGE_ID) || { id: n.STAGE_ID, nome: n.STAGE_ID, semantica: "" };
+      const pos = abertas.findIndex((e) => e.id === n.STAGE_ID);
+      const concluida = etapa.semantica === "S";
+      return {
+        id: String(n.ID), titulo: n.TITLE || "", membro: n.UF_CRM_OFF_MEMBRO || n.TITLE || "", solicitante: n.UF_CRM_OFF_SOLICIT || "",
+        email: String(n.UF_CRM_OFF_EMAIL || "").toLowerCase(), papel: n.UF_CRM_OFF_PAPEL || "", setor: n.UF_CRM_OFF_SETOR || "",
+        contrato: n.UF_CRM_OFF_CONTRATO || "", motivo: n.UF_CRM_OFF_MOTIVO || "",
+        etapa: etapa.nome, etapaId: etapa.id, semantica: etapa.semantica || "", posicao: pos >= 0 ? pos + 1 : null, totalEtapas: abertas.length,
+        nova: pos === 0, concluida, cancelada: etapa.semantica === "F",
+        criadaEm: dataDe(n.DATE_CREATE), atualizadaEm: dataDe(n.DATE_MODIFY), dataDesejada: dataDe(n.UF_CRM_OFF_DATA_DES),
+        dataEfetiva: dataDe(n.UF_CRM_OFF_DATA_EFET) || (concluida ? dataDe(n.CLOSEDATE || n.DATE_MODIFY) : ""),
+      };
+    }).sort((a, b) => (a.criadaEm < b.criadaEm ? 1 : -1));
+  }
+  /** Demandas novas que aguardam o RH, por módulo: o alerta vermelho do menu (reunião de 29/10/2026) */
+  function demandasRH(ctx) {
+    const doFunil = solicitacoesOffboarding(ctx).filter((s) => s.nova).length;
+    const doApp = (ctx.registros.encerramentos || []).filter((e) => e.estagio === "ENVIADA_RH" || (e.estagio === "AG_COORD" && aprovadorDe(ctx, e).rh)).length;
+    return { offboarding: doFunil + doApp, recrutamento: vagasDe(ctx, null).filter((v) => v.nova).length };
+  }
+  /** Histórico do offboarding por trimestre, semestre ou ano (reunião de 29/10/2026).
+      - desligamentos: itens do Membros que passaram para Encerrado, pela data da mudança de estágio
+        (vale para toda saída: pela esteira, pelo app ou pela desativação do usuário no Bitrix);
+      - solicitações: o que entrou pelo formulário (funil) e pelo app, pela data de criação;
+      - motivos: das solicitações concluídas, quando se sabe.
+      filtro(m): quais membros entram (RH: todos; coordenação e liderança: os seus). */
+  function historicoDesligamentos(ctx, granularidade, filtro) {
+    const g = granularidade || "trimestre";
+    const linhas = {};
+    const linha = (iso) => {
+      if (!calc.dataValida(iso)) return null;
+      const p = calc.periodoDe(iso, g);
+      return (linhas[p.chave] = linhas[p.chave] || { periodo: p, desligamentos: [], solicitacoes: 0, motivos: {} });
+    };
+    const motivo = (l, txt) => { if (l && txt) l.motivos[txt] = (l.motivos[txt] || 0) + 1; };
+    (ctx.registros.membros || []).filter((m) => m.estagio === "SUCCESS" && (!filtro || filtro(m))).forEach((m) => {
+      const data = dataDe(m.movidoEm || m.atualizadoEm);
+      const l = linha(data);
+      // quem saiu costuma estar com o usuário desativado (fora da lista): vale o nome gravado no item
+      const u = ctx.idx.usuario[m.responsavel];
+      if (l) l.desligamentos.push({ membro: m, nome: (u && u.nome) || m.titulo || "Usuário " + m.responsavel, data });
+    });
+    if (!filtro) {
+      solicitacoesOffboarding(ctx).forEach((s) => {
+        const l = linha(s.criadaEm);
+        if (l) l.solicitacoes++;
+        if (s.concluida) motivo(linha(s.dataEfetiva), s.motivo);
+      });
+    }
+    (ctx.registros.encerramentos || []).filter((e) => e.estagio !== "NEW" && (!filtro || (ctx.idx.membro[e.membroId] && filtro(ctx.idx.membro[e.membroId])))).forEach((e) => {
+      const l = linha(dataDe(e.criadoEm));
+      if (l) l.solicitacoes++;
+      if (e.estagio === "SUCCESS") motivo(linha(e.concluidaEm || dataDe(e.atualizadoEm)), e.motivo);
+    });
+    return Object.keys(linhas).sort().reverse().map((k) => linhas[k]);
+  }
+
+  /* ================================================================ excluir registros (pedido de 29/10/2026) */
+  /** Quem pode excluir um registro do app:
+      - RH e administrador: qualquer um (o item vai para a lixeira do CRM, que o administrador restaura);
+      - quem registrou: nas primeiras 48 horas, como na edição (4.1);
+      - a solicitação de encerramento ainda em rascunho ou bloqueada: quem pediu;
+      - o planejamento da função: quem criou.
+      O item do Membros não se exclui (os registros da pessoa dependem dele): o RH tira do app (Arquivado). */
+  function podeExcluir(ctx, chave, item, uid, agoraIso) {
+    if (!item || chave === "membros") return false;
+    const p = papeis(ctx, uid);
+    if (p.rh || p.admin) return true;
+    const id = String(uid);
+    const meu = [item.autor, item.criadoPor, item.solicitante].some((x) => x && String(x) === id);
+    if (!meu) return false;
+    if (chave === "encerramentos") return ["NEW", "BLOQUEADA"].indexOf(item.estagio) >= 0;
+    if (chave === "planejamento") return true;
+    if (["onboarding", "ciclo", "finalistas"].indexOf(chave) >= 0) return false;
+    return editavel(item.criadoEm, agoraIso);
   }
 
   /* ================================================================ agenda da equipe (3.6) */
@@ -629,17 +767,17 @@
           porque: "Plano ativo desde " + calc.fmtData(p.inicio) + "; resultado \"Atingido\" no check-in; nenhum feedback de reconhecimento depois de " + calc.fmtData(p.checkinData) + ".",
         });
       });
-      // 2. Agendar o 1:1 fora da ausência
+      // 2. Agendar o O2O fora da ausência
       const c = cicloDo(ctx, m.id, ctx.tri.chave);
       if (c && m.estagio === "ATIVO") {
         const s = statusCiclo(ctx, c);
         const lim = calc.addDias(ctx.hoje, 14);
         const aus = (ctx.ausencias || []).find((a) => a.pessoa === m.userId && a.inicio <= lim && a.fim >= ctx.hoje);
         if (s.chave === "sem-agenda" && aus) lista.push({
-          id: "1a1-aus-" + c.id, titulo: "Agende o 1:1 de " + nome + " fora da ausência",
-          texto: nome + " estará fora de " + calc.fmtData(aus.inicio) + " a " + calc.fmtData(aus.fim) + ". Vale marcar o 1:1 antes ou a partir de " + calc.fmtData(calc.voltaEm(aus.fim, feriadosDoMembro(ctx, m))) + ".",
-          referencia: "Regra do app · Ciclo trimestral (3.3)", acao: { rotulo: "Agendar o 1:1", rota: "#/rotinas/ciclo/" + c.id },
-          porque: "1:1 do " + ctx.tri.curto + " sem data; ausência confirmada nas próximas 2 semanas.",
+          id: "1a1-aus-" + c.id, titulo: "Agende o O2O de " + nome + " fora da ausência",
+          texto: nome + " estará fora de " + calc.fmtData(aus.inicio) + " a " + calc.fmtData(aus.fim) + ". Vale marcar o O2O antes ou a partir de " + calc.fmtData(calc.voltaEm(aus.fim, feriadosDoMembro(ctx, m))) + ".",
+          referencia: "Regra do app · Ciclo trimestral (3.3)", acao: { rotulo: "Agendar o O2O", rota: "#/rotinas/ciclo/" + c.id },
+          porque: "O2O do " + ctx.tri.curto + " sem data; ausência confirmada nas próximas 2 semanas.",
         });
       }
       // 3. A Ficha trava o onboarding
@@ -648,15 +786,15 @@
         const s = statusOnboarding(ctx, ob);
         if (s.fichaAtrasada) lista.push({
           id: "ficha-" + ob.id, titulo: "A Ficha de " + nome + " trava o onboarding",
-          texto: "Sem a Ficha, as entregas das semanas 3 e 4 não têm referência. Comece pelos resultados esperados" + (ob.planejamentoId ? ": o planejamento da função já tem um modelo." : "."),
+          texto: "Sem a Ficha, a avaliação do 1º mês não tem referência, e o membro chega sem saber o que se espera dele. Comece pelos resultados esperados" + (ob.planejamentoId ? ": o planejamento da função já tem um modelo." : "."),
           referencia: "Guia do onboarding · Preparação", acao: { rotulo: "Completar a Ficha", rota: "#/onboarding/" + ob.id },
-          porque: "Ficha com prazo em " + calc.fmtData(s.prazoFicha) + " e ainda não preenchida; planejamento das semanas 3 e 4 vence em " + calc.fmtData(s.prazoEntregas) + ".",
+          porque: "Ficha com prazo em " + calc.fmtData(s.prazoFicha) + " e ainda não preenchida.",
         });
       }
     });
-    // 4. Ordem de leitura das entregas
+    // 4. Ordem de leitura das entregas (fazia parte da avaliação de desempenho, que volta em 2027)
     const pendLeit = [];
-    membros.forEach((m) => doMembro(ctx, "leituras", m.id).forEach((l) => { if (!l.leitura && ["NEW", "ATRASADA"].indexOf(l.estagio) >= 0) pendLeit.push(l); }));
+    if (DESEMPENHO_ATIVO) membros.forEach((m) => doMembro(ctx, "leituras", m.id).forEach((l) => { if (!l.leitura && ["NEW", "ATRASADA"].indexOf(l.estagio) >= 0) pendLeit.push(l); }));
     if (pendLeit.length >= 2) {
       const ord = pendLeit.slice().sort((a, b) => {
         const pa = a.origem === "Plano de alinhamento" ? 0 : 1, pb = b.origem === "Plano de alinhamento" ? 0 : 1;
@@ -823,8 +961,13 @@
     const emDia = areas.filter((a) => a.ind.situacao.chave === "em-dia").length;
     // Rotatividade: saídas (encerramentos concluídos) nos últimos 12 meses ÷ membros ativos (aproximação até existir a foto mensal)
     const ini12 = calc.addDias(ctx.hoje, -365);
-    const saidas = (ctx.registros.encerramentos || []).filter((e) => e.estagio === "SUCCESS" && (e.concluidaEm || "") >= ini12);
-    const aPedido = saidas.filter((e) => /pedido/i.test(e.motivoSaida || "")).length;
+    // saídas: as solicitações concluídas (app e esteira de offboarding) ou, se forem mais, os itens do
+    // Membros que passaram para Encerrado (toda saída passa por lá, inclusive a pedido do membro)
+    const encs = (ctx.registros.encerramentos || []).filter((e) => e.estagio === "SUCCESS" && (e.concluidaEm || "") >= ini12);
+    const doFunil = solicitacoesOffboarding(ctx).filter((s) => s.concluida && s.dataEfetiva >= ini12);
+    const encerrados = (ctx.registros.membros || []).filter((m) => m.estagio === "SUCCESS" && dataDe(m.movidoEm || m.atualizadoEm) >= ini12).length;
+    const saidas = { length: Math.max(encs.length + doFunil.length, encerrados) };
+    const aPedido = encs.filter((e) => /pedido/i.test(e.motivoSaida || "")).length + doFunil.filter((s) => /pedido/i.test(s.motivo)).length;
     const vagas = vagasDe(ctx, null);
     const ini6 = calc.addDias(ctx.hoje, -182);
     const tempos = vagas.filter((v) => v.fechada && v.fechadaEm >= ini6 && v.tempoParaFechar !== null).map((v) => v.tempoParaFechar);
@@ -833,7 +976,8 @@
       rotatividade: calc.percentual(saidas.length, todos.length + saidas.length), saidas: saidas.length, aPedido, decisao: saidas.length - aPedido,
       tempoVaga: calc.mediana(tempos), vagasAbertas: vagas.filter((v) => !v.semantica).length,
       emOnboarding: todos.filter((m) => m.estagio === "NEW").length,
-      encerramentosAndamento: (ctx.registros.encerramentos || []).filter((e) => ["SUCCESS", "FAIL"].indexOf(e.estagio) < 0).length,
+      encerramentosAndamento: (ctx.registros.encerramentos || []).filter((e) => ["SUCCESS", "FAIL"].indexOf(e.estagio) < 0).length +
+        solicitacoesOffboarding(ctx).filter((s) => !s.semantica).length,
     };
   }
   /** Só números, prazos e nomes de áreas e lideranças: é o que a CEO recebe (4.4: sem o conteúdo
@@ -850,12 +994,14 @@
   }
 
   return {
-    MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE,
+    MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE, DESEMPENHO_ATIVO, TIPOS_FEEDBACK_REGISTRO,
     indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, deptoPrincipal, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancaNaEstrutura, coordenacaoNaEstrutura, liderancaEfetiva, coordenacaoEfetiva, liderancasDoSetor, membrosVisiveis,
     feriadosDe, feriadosDoMembro, feedbackValido, feedbacksDo, editavel, ultimoFeedback,
     cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
+    temMensal, mensaisDo, mensalNoMes, situacaoMensal, ultimoDiaUtil,
     verificarRegistros, destinoEncerramento, aprovadorDe,
     pendenciasDe, ordenarPendencias, aprovacoesPendentes, filaRH,
-    indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, agendaEquipe, dicas, anoDoMembro, painelGeral, resumoPainel, checagemImplantacao, setoresSemChefe, mudancasSetorSemChefe,
+    indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, solicitacoesOffboarding, demandasRH, historicoDesligamentos, podeExcluir,
+    agendaEquipe, dicas, anoDoMembro, painelGeral, resumoPainel, checagemImplantacao, setoresSemChefe, mudancasSetorSemChefe,
   };
 });

@@ -129,3 +129,11 @@ test("equipe pela estrutura: a liderança de área entra na equipe da coordenaç
   assert.deepEqual(dom.equipeDe(ctx, "2").map((m) => m.titulo), ["Carla Mendes"]);
   assert.equal(dom.equipeDe(ctx, "3").length, 6); // a equipe da Carla continua a mesma
 });
+
+test("Arquivado (tirado do app pelo RH): a sincronização deixa como está, sem pedir conferência", () => {
+  const p = sync.planejar(entrada((e) => { e.membros.find((m) => m.responsavel === "101").estagio = "FAIL"; }));
+  assert.ok(!p.criar.some((c) => c.usuario.id === "101"), "não recria");
+  assert.ok(!p.conferir.some((x) => x.usuario.id === "101"), "não manda conferir");
+  const p2 = sync.planejar(entrada((e) => { e.membros.find((m) => m.responsavel === "101").estagio = "SUCCESS"; }));
+  assert.ok(p2.conferir.some((x) => x.usuario.id === "101"), "Encerrado com usuário ativo continua indo para conferir");
+});

@@ -8,5 +8,8 @@
     "test": "node --test test/*.test.js",
     "provisionar": "node tools/provisionar.js"
   },
+  "dependencies": {
+    "nodemailer": "^6.10.1"
+  },
   "engines": { "node": "22.x" }
 }

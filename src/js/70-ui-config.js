@@ -14,7 +14,7 @@
   const LINKS = [
     ["manual", "Manual da liderança", "Faixa no topo do Início e item do menu."],
     ["formVaga", "Formulário de solicitação de vaga", "Solicitação de Contratação (formulário CRM 259, funil HR | Requisição de Vagas)."],
-    ["formEncerramento", "Formulário de solicitação de encerramento", "Opcional: o app já tem a solicitação com verificação."],
+    ["formOffboarding", "Formulário de solicitação de encerramento (offboarding)", "Formulário CRM do funil HR | Offboarding. Com o link, o botão da aba Offboarding abre o formulário; sem ele, a solicitação continua pelo app, com a verificação."],
     ["baseConhecimento", "Base de Conhecimento", "Guias de apoio às lideranças."],
     ["guiaOnboarding", "Guia do onboarding", "Link na aba Onboarding."],
     ["guiaOffboarding", "Guia de offboarding (versão 2)", "Card fechado no topo da aba Offboarding."],
@@ -22,6 +22,14 @@
   ];
   const PAPEIS = [["coordenacao", "Coordenação e acima", "Enviam solicitações formais direto ao RH e aprovam as da equipe (1.2)."], ["rh", "RH", "Veem todas as equipes, a fila do RH e recebem os avisos."], ["ceo", "CEO", "Painel geral, só números (sem o conteúdo dos registros)."], ["excecoes", "Fora do app", "Não ganham item no processo Membros nem entram nas equipes. A CEO já fica de fora sozinha."]];
 
+  /** "Nome: descrição" por linha (o RH cola o glossário dele) */
+  function lerCompetencias(txt) {
+    const vistos = {};
+    return String(txt || "").split(/\r?\n/).map((l) => l.replace(/^[•\-*]\s*/, "").trim()).filter(Boolean).map((l) => {
+      const i = l.search(/[:–—]/);
+      return i > 0 ? { nome: l.slice(0, i).trim(), descricao: l.slice(i + 1).trim() } : { nome: l, descricao: "" };
+    }).filter((x) => x.nome && !vistos[x.nome.toLowerCase()] && (vistos[x.nome.toLowerCase()] = true));
+  }
   function linhasFeriados(lista) { return (lista || []).map((f) => f.data + " " + f.nome).join("\n"); }
   function lerFeriados(txt) {
     return String(txt || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => {
@@ -66,14 +74,18 @@
     // Listas e textos
     const fl = cfg.feriadosLocais || {};
     h += '<div class="card"><h3>Cadastros</h3><div id="form-config">' +
-      c.campo({ nome: "niveis", rotulo: "Níveis da Arquitetura de Cargos", tipo: "textoLongo", valor: (cfg.niveis || []).join("\n"), linhas: 5, ajuda: "Um nível por linha, do primeiro ao último. Usados no 1:1 (próximo nível) e no card do membro." }) +
+      c.campo({ nome: "niveis", rotulo: "Níveis da Arquitetura de Cargos", tipo: "textoLongo", valor: (cfg.niveis || []).join("\n"), linhas: 5, ajuda: "Um nível por linha, do primeiro ao último. Usados no O2O (próximo nível) e no card do membro." }) +
       '<div class="linha-campos">' + c.campo({ nome: "feriadosSP", rotulo: "Feriados de São Paulo (estado e cidade)", tipo: "textoLongo", valor: linhasFeriados(fl.SP), linhas: 6, ajuda: "Um por linha: AAAA-MM-DD Nome. O RH atualiza todo dezembro." }) +
       c.campo({ nome: "feriadosBA", rotulo: "Feriados de Salvador (estado e cidade)", tipo: "textoLongo", valor: linhasFeriados(fl.BA), linhas: 6, ajuda: "Os nacionais vêm do Bitrix e não entram aqui." }) + "</div>" +
       '<div class="grupo-form"><div class="rotulo-grupo">Links</div>' + LINKS.map((l) => c.campo({ nome: "link_" + l[0], rotulo: l[1], valor: (cfg.links || {})[l[0]], ajuda: l[2], opcional: true, placeholder: "https://" })).join("") + "</div>" +
       '<div class="grupo-form"><div class="rotulo-grupo">Parâmetros</div><div class="linha-campos">' +
-      c.campo({ nome: "carencia1a1", rotulo: "Dias para agendar o 1:1 antes do vermelho", tipo: "numero", valor: (cfg.parametros || {}).carencia1a1 || 7 }) +
+      c.campo({ nome: "carencia1a1", rotulo: "Dias para agendar o O2O antes do vermelho", tipo: "numero", valor: (cfg.parametros || {}).carencia1a1 || 7 }) +
       c.campo({ nome: "prazoLeitura", rotulo: "Prazo da leitura de entrega (dias)", tipo: "numero", valor: (cfg.parametros || {}).prazoLeitura || 7 }) + "</div>" +
-      c.campo({ nome: "categoriaVagas", rotulo: "Funil de vagas (CATEGORY_ID dos negócios)", tipo: "numero", valor: (cfg.recrutamento || {}).categoria || 77, ajuda: "Hoje: HR | Requisição de Vagas (77). Troque quando o funil de R&S existir." }) + "</div>" +
+      '<div class="linha-campos">' + c.campo({ nome: "categoriaVagas", rotulo: "Funil de vagas (CATEGORY_ID dos negócios)", tipo: "numero", valor: (cfg.recrutamento || {}).categoria || 77, ajuda: "Hoje: HR | Requisição de Vagas (77). Troque quando o funil de R&S existir." }) +
+      c.campo({ nome: "categoriaOffboarding", rotulo: "Funil de offboarding (CATEGORY_ID dos negócios)", tipo: "numero", valor: (cfg.offboarding || {}).categoria || 79, ajuda: "HR | Offboarding (79), criado em 29/10/2026. É a esteira das solicitações de encerramento." }) + "</div></div>" +
+      '<div class="grupo-form"><div class="rotulo-grupo">Glossário de competências comportamentais</div>' +
+      c.campo({ nome: "competencias", rotulo: "Competências (uma por linha: Nome: descrição)", tipo: "textoLongo", valor: (cfg.competencias || []).map((x) => x.nome + (x.descricao ? ": " + x.descricao : "")).join("\n"), linhas: 8, opcional: true,
+        ajuda: "Aparecem como caixas de marcar no planejamento da função e na Ficha do onboarding. A liderança ainda pode acrescentar outras." }) + "</div>" +
       '<button class="btn" data-acao="salvar-config">Salvar os cadastros</button></div></div>';
     return h;
   };
@@ -138,6 +150,8 @@
     ["avisos", "Avisos da 4.4", "Resumo semanal, dia do atraso, 7 e 14 dias. Todo dia às 8h."],
     ["trava", "Trava do encerramento no servidor", "Precisa também do webhook de saída no Bitrix, com o endereço abaixo."],
     ["painelCEO", "Painel da CEO", "Números calculados no servidor; a CEO não precisa de leitura nos processos."],
+    ["email", "E-mail: Ficha do onboarding", "Manda a Ficha ao novo membro. Precisa de uma caixa de e-mail (SMTP_HOST, SMTP_USUARIO, SMTP_SENHA)."],
+    ["avisosNegocios", "E-mails das solicitações de vaga e de offboarding", "Avisa quem pediu quando a solicitação chega e quando muda de etapa. Precisa do e-mail e do webhook de saída com ONCRMDEALADD e ONCRMDEALUPDATE."],
   ];
   const idsDoPapel = (cfg, papel) => ((cfg.papeis || {})[papel] || []).map((p) => p.id).filter(Boolean);
   function carregarStatus() {
@@ -166,6 +180,8 @@
       ["GP_CEO_IDS", ceo.join(","), "a CEO, de Papéis no app (obrigatória: ela nunca ganha item nem aviso)"],
       ["GP_EXCECOES_IDS", fora.join(","), "CEO e Fora do app: nunca recebem aviso"],
       ["GP_LINK_APP", ref, "endereço deste app no Bitrix, no fim de cada aviso"],
+      ["GP_CATEGORIA_VAGAS", String((cfg.recrutamento || {}).categoria || 77), "funil HR | Requisição de Vagas"],
+      ["GP_CATEGORIA_OFFBOARDING", String((cfg.offboarding || {}).categoria || 79), "funil HR | Offboarding (os e-mails a quem pediu)"],
     ];
     return '<div class="card"><h3>Rotinas no servidor (Vercel)</h3>' +
       '<p class="muted" style="margin-top:0">O que precisa rodar fora da tela. Cada rotina liga quando as variáveis dela estão gravadas na Vercel (Settings → Environment Variables, seguido de Redeploy). O webhook de entrada (BITRIX_WEBHOOK_URL), o CRON_SECRET e o BITRIX_EVENTO_TOKEN são segredos: grave direto na Vercel e não mande para ninguém.</p>' +
@@ -173,7 +189,7 @@
       '<div class="grupo-form"><div class="rotulo-grupo">Valores para copiar na Vercel</div><div class="tabela-wrap"><table class="tabela"><tbody>' +
       valores.map((v) => '<tr><td class="num"><b>' + esc(v[0]) + '</b></td><td class="num">' + (v[1] ? esc(v[1]) : '<span class="muted">—</span>') + '</td><td class="muted" style="font-size:12px">' + esc(v[2]) + "</td></tr>").join("") +
       "</tbody></table></div>" +
-      '<p class="muted" style="font-size:12px">Webhook de saída (Bitrix → Desenvolvedores → Outros → Webhook de saída), com os eventos ONCRMDYNAMICITEMADD e ONCRMDYNAMICITEMUPDATE: <b class="num">' + esc((/^https?:/.test(location.origin) ? location.origin : "https://gestao-pessoas-bice.vercel.app") + "/api/eventos") + "</b></p></div></div>";
+      '<p class="muted" style="font-size:12px">Webhook de saída (Bitrix → Desenvolvedores → Outros → Webhook de saída), com os eventos ONCRMDYNAMICITEMADD, ONCRMDYNAMICITEMUPDATE, ONCRMDEALADD e ONCRMDEALUPDATE: <b class="num">' + esc((/^https?:/.test(location.origin) ? location.origin : "https://gestao-pessoas-bice.vercel.app") + "/api/eventos") + "</b></p></div></div>";
   }
 
   async function gravarConfig(novo, botao, mensagem) {
@@ -192,7 +208,9 @@
     LINKS.forEach((l) => { cfg.links[l[0]] = String(d["link_" + l[0]] || "").trim(); });
     cfg.parametros = { carencia1a1: Number(d.carencia1a1) || 7, prazoLeitura: Number(d.prazoLeitura) || 7 };
     cfg.recrutamento = { categoria: Number(d.categoriaVagas) || 77 };
-    gravarConfig(cfg, el, "Cadastros salvos. Recarregue o app para aplicar o funil de vagas.");
+    cfg.offboarding = { categoria: Number(d.categoriaOffboarding) || 79 };
+    cfg.competencias = lerCompetencias(d.competencias);
+    gravarConfig(cfg, el, "Cadastros salvos. Recarregue o app para aplicar os funis.");
   };
   ui.acoes["adicionar-papel"] = async function (el) {
     const escolhidos = await E().repo.selecionarUsuarios(true);
@@ -302,9 +320,10 @@
     const cfg = Object.assign({}, atual);
     if (novo.processos) Object.assign(cfg, { processos: novo.processos, solucaoId: novo.solucaoId, provisionadoEm: novo.provisionadoEm });
     // papéis, feriados, links e parâmetros: entra só o que veio no arquivo
-    ["papeis", "feriadosLocais", "links", "parametros", "recrutamento"].forEach((k) => { if (novo[k] && typeof novo[k] === "object") cfg[k] = Object.assign({}, atual[k] || {}, novo[k]); });
+    ["papeis", "feriadosLocais", "links", "parametros", "recrutamento", "offboarding"].forEach((k) => { if (novo[k] && typeof novo[k] === "object") cfg[k] = Object.assign({}, atual[k] || {}, novo[k]); });
     if (Array.isArray(novo.niveis)) cfg.niveis = novo.niveis;
-    if (!novo.processos && !["papeis", "feriadosLocais", "links", "parametros", "recrutamento", "niveis"].some((k) => novo[k])) { ui.erroNoPainel("Nada para importar: o JSON não tem processos, papéis, feriados, níveis, links nem parâmetros."); return; }
+    if (Array.isArray(novo.competencias)) cfg.competencias = novo.competencias.filter((x) => x && x.nome);
+    if (!novo.processos && !["papeis", "feriadosLocais", "links", "parametros", "recrutamento", "offboarding", "niveis", "competencias"].some((k) => novo[k])) { ui.erroNoPainel("Nada para importar: o JSON não tem processos, papéis, feriados, níveis, links nem parâmetros."); return; }
     gravarConfig(cfg, el, "Configuração importada. Recarregue o app.");
   };
 })(window);

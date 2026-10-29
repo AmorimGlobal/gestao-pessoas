@@ -93,7 +93,7 @@
     },
     /* ---------------- 3.3.2 Feedbacks SCI ---------------- */
     {
-      chave: "feedbacks", nome: "Feedbacks SCI", modulo: "Rotinas", pai: "membros",
+      chave: "feedbacks", nome: "Feedbacks SCI", modulo: "Feedbacks", pai: "membros",
       descricao: "Responsável = o membro. Autor do registro = a liderança. Editável nas primeiras 48 horas.",
       estagios: [
         { codigo: "NEW", nome: "Editável", cor: COR.azul },
@@ -113,10 +113,28 @@
         autor(), adendos(),
       ],
     },
-    /* ---------------- 3.3 Ciclo trimestral (1:1 e evidências) ---------------- */
+    /* ---------------- 1:1 mensal (reunião de 29/10/2026) ---------------- */
     {
-      chave: "ciclo", nome: "Ciclo trimestral", modulo: "Rotinas e Desempenho", pai: "membros",
-      descricao: "Um item por membro ativo por trimestre, importado pelo RH no primeiro dia útil do trimestre.",
+      chave: "mensal", nome: "1:1 mensais", modulo: "Feedbacks", pai: "membros",
+      descricao: "Conversa breve do mês, de cerca de 20 minutos: como o membro está, se precisa de apoio e o que foi combinado. Registra o que aconteceu, sem agendamento.",
+      estagios: [
+        { codigo: "NEW", nome: "Registrado", cor: COR.azul },
+        { codigo: "SUCCESS", nome: "Concluído", cor: COR.verde },
+        { codigo: "FAIL", nome: "Anulado", cor: COR.cinza },
+      ],
+      campos: [
+        c("data", "DATA", "data", "Data em que aconteceu"),
+        c("comoEsta", "COMO_ESTA", "textoLongo", "Como o membro está"),
+        c("apoio", "APOIO", "textoLongo", "Precisa de apoio em algo?"),
+        c("pontos", "PONTOS", "textoLongo", "Principais pontos da conversa"),
+        c("combinados", "COMBINADOS", "textoLongo", "Combinados"),
+        autor(), adendos(),
+      ],
+    },
+    /* ---------------- 3.3 Ciclo trimestral (O2O; as evidências ficaram para 2027) ---------------- */
+    {
+      chave: "ciclo", nome: "Ciclo trimestral", modulo: "Feedbacks (O2O)", pai: "membros",
+      descricao: "Um item por membro ativo por trimestre, criado pelo RH no primeiro dia útil do trimestre. Guarda o O2O, a sessão de desenvolvimento do início do trimestre.",
       estagios: [
         { codigo: "NEW", nome: "1:1 a agendar", cor: COR.amarelo },
         { codigo: "SEM_AGENDA", nome: "1:1 sem agendamento", cor: COR.vermelho },
@@ -164,8 +182,8 @@
     },
     /* ---------------- 3.5.2 Planos de alinhamento de resultados ---------------- */
     {
-      chave: "planos", nome: "Planos de alinhamento de resultados", modulo: "Offboarding", pai: "membros",
-      descricao: "Criado pela liderança a partir do card do membro, logo depois do feedback de abertura. Termina no Dia 60.",
+      chave: "planos", nome: "Planos de alinhamento de resultados", modulo: "Feedbacks (plano de melhoria)", pai: "membros",
+      descricao: "O plano de melhoria: aberto pela liderança no módulo Feedbacks, com 2 resultados esperados. Check-in no Dia 30 e término no Dia 60.",
       estagios: [
         { codigo: "NEW", nome: "Em andamento", cor: COR.azul },
         { codigo: "CHECKIN_ATRASO", nome: "Check-in atrasado", cor: COR.vermelho },
@@ -251,20 +269,24 @@
         c("colega", "COLEGA", "pessoa", "Colega de trabalho (o Mapa)"),
         c("planejamentoId", "PLANEJAMENTO_ID", "texto", "Planejamento da função (ID)"),
         c("fichaEscopo", "FICHA_ESCOPO", "textoLongo", "Ficha · escopo da função"),
-        c("fichaPadroes", "FICHA_PADROES", "textoLongo", "Ficha · padrões"),
+        // o sufixo continua PADROES: desde 29/10/2026 o conteúdo são as competências comportamentais
+        c("fichaPadroes", "FICHA_PADROES", "textoLongo", "Ficha · competências comportamentais"),
         c("fichaIndicadores", "FICHA_INDICADORES", "textoLongo", "Ficha · indicadores"),
         c("entregasAncoragem", "ENTREGAS_ANC", "textoLongo", "Entregas da Ancoragem (semanas 3 e 4)"),
         c("entregasImersao", "ENTREGAS_IME", "textoLongo", "Entregas da Imersão"),
         c("entregasMarAberto", "ENTREGAS_MAR", "textoLongo", "Entregas do Mar Aberto"),
         c("fichaEm", "FICHA_EM", "data", "Ficha preenchida em"),
+        c("fichaEnviadaEm", "FICHA_ENVIADA_EM", "dataHora", "Ficha enviada ao membro em", { ajuda: "O membro recebe a Ficha por e-mail. As notas e as justificativas das avaliações nunca vão para ele." }),
         c("entregasPlanejadasEm", "ENTREGAS_PLAN_EM", "data", "Entregas das semanas 3 e 4 planejadas em"),
+        // Avaliações do 1º, 2º e 3º mês (Ancoragem, Imersão e Mar Aberto). Desde 29/10/2026 o "retorno"
+        // guarda a justificativa da nota: fica com a liderança e o RH, nunca vai para o membro.
         ...[1, 2, 3].flatMap((n) => {
           const nome = n === 3 ? "Alinhamento final" : "Alinhamento " + n;
           return [
             c("al" + n + "Data", "AL" + n + "_DATA", "data", nome + " · data"),
             c("al" + n + "Nota", "AL" + n + "_NOTA", "numero", nome + " · nota da fase"),
             c("al" + n + "Resultado", "AL" + n + "_RESULTADO", "lista", nome + " · resultado da fase", { opcoes: OPCOES.resultadoFase }),
-            c("al" + n + "Retorno", "AL" + n + "_RETORNO", "textoLongo", nome + " · retorno em SCI"),
+            c("al" + n + "Retorno", "AL" + n + "_RETORNO", "textoLongo", nome + " · justificativa da nota"),
             c("al" + n + "Combinados", "AL" + n + "_COMBINADOS", "textoLongo", nome + " · combinados"),
           ];
         }),
@@ -274,8 +296,8 @@
     },
     /* ---------------- 3.4 Leituras de entrega ---------------- */
     {
-      chave: "leituras", nome: "Leituras de entrega", modulo: "Desempenho e Onboarding", pai: "membros",
-      descricao: "Leitura interna da entrega. Fica fora do alcance do membro: nunca vai para o comentário da tarefa.",
+      chave: "leituras", nome: "Leituras de entrega", modulo: "Onboarding", pai: "membros",
+      descricao: "Entregas avaliadas na régua (Conforme 100, Com ajuste 70, Fora do padrão 30, Não entregue 0). Leitura interna: o membro não vê.",
       estagios: [
         { codigo: "NEW", nome: "Aguardando leitura", cor: COR.amarelo },
         { codigo: "ATRASADA", nome: "Leitura atrasada", cor: COR.vermelho },
@@ -316,7 +338,7 @@
         c("funcao", "FUNCAO", "texto", "Função"),
         c("area", "AREA", "texto", "Setor e área"),
         c("escopo", "ESCOPO", "textoLongo", "Escopo"),
-        c("padroes", "PADROES", "textoLongo", "Padrões"),
+        c("padroes", "PADROES", "textoLongo", "Competências comportamentais", { ajuda: "Uma por linha, escolhidas no glossário do RH ou acrescentadas pela liderança." }),
         c("indicadores", "INDICADORES", "textoLongo", "Indicadores"),
         c("entregasAncoragem", "ENTREGAS_ANC", "textoLongo", "Entregas da Ancoragem"),
         c("entregasImersao", "ENTREGAS_IME", "textoLongo", "Entregas da Imersão"),

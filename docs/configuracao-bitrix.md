@@ -108,7 +108,7 @@ A rotina `api/avisos.js` roda todo dia às 8h (horário de Brasília, com a marg
 - **Destinatários:** o membro e quem está em `GP_EXCECOES_IDS` (a CEO) nunca recebem. Os avisos não levam conteúdo de feedback, leitura ou plano, só o nome da pendência e as datas.
 - **Uma vez só, sem guardar estado:** cada marco sai no dia útil em que é cruzado. O que cruzar no fim de semana ou num feriado sai no dia útil seguinte. Se a rotina falhar num dia, os marcos daquele dia não são reenviados (o resumo da semana seguinte mostra tudo de novo).
 - **Link:** grave `GP_LINK_APP` com o endereço do app no Bitrix (abra o app e copie o endereço, algo como `https://amorimglobal.bitrix24.com.br/marketplace/app/<número>/`). Sem a variável, o aviso diz "Abra o app Gestão de Pessoas no Bitrix".
-- **E-mail:** os avisos saem como notificação do Bitrix (`im.notify.system.add`). O Bitrix manda por e-mail as notificações não lidas conforme a configuração de notificações de cada pessoa. Confirme no portal se isso atende ao "e-mail de lembrete" da 4.4. Um e-mail próprio precisaria de um serviço de envio (SMTP), que o app ainda não tem.
+- **E-mail:** os avisos saem como notificação do Bitrix (`im.notify.system.add`). O Bitrix manda por e-mail as notificações não lidas conforme a configuração de notificações de cada pessoa. Confirme no portal se isso atende ao "e-mail de lembrete" da 4.4. Desde 29/10/2026 o servidor tem envio por SMTP (seção 9), usado na ficha do onboarding e nos funis de vagas e de offboarding; os avisos da 4.4 continuam como notificação.
 - **Rodar de novo no mesmo dia reenvia:** um "Run" manual no painel da Vercel manda de novo os avisos do dia (a rotina não guarda o que já enviou). Para testar, use o `?simular=1` abaixo.
 - **Parâmetros:** o servidor usa os padrões (7 dias para agendar o 1:1, 7 dias para a leitura), porque a Configuração do app fica no Bitrix e só o navegador lê. Se o RH mudar esses números na Configuração, os avisos e o painel da CEO podem divergir da tela em um ou dois dias.
 - **Feriados:** o servidor conhece os feriados nacionais. Os de SP e Salvador ficam na Configuração do app, que só o navegador lê. Por isso, um prazo que cai num feriado local pode gerar o aviso um dia antes da tela.
@@ -122,7 +122,7 @@ A rotina `api/avisos.js` roda todo dia às 8h (horário de Brasília, com a marg
 
 ## 4. Funções de acesso (2.4) — à mão
 
-Configure em CRM → Configurações → Permissões. Para cada um dos 9 processos:
+Configure em CRM → Configurações → Permissões. Para cada um dos 10 processos (o "1:1 mensais" entrou em 29/10/2026):
 
 | Função | Ler | Criar e editar | Observação |
 |---|---|---|---|
@@ -131,9 +131,12 @@ Configure em CRM → Configurações → Permissões. Para cada um dos 9 process
 | RH | Todos | Todos | Administra estágios |
 | Membros e demais usuários | Nenhum | Nenhum | O membro não vê os próprios registros |
 
-Mais duas permissões:
+**O RH precisa de "Todos" mesmo.** O app lê os registros com o login de quem usa. Com "Do departamento", a pessoa do RH só enxerga o próprio setor, e em "Ver como outra pessoa" a equipe da liderança escolhida aparece vazia. Foi o que aconteceu em 28/10/2026. Desde 29/10/2026 o app avisa o RH e o administrador no topo da tela quando a permissão esconde registros: ele compara o que o login leu com o total do processo, contado no servidor por `api/contagem.js`, com o mesmo `BITRIX_WEBHOOK_URL` e `GP_AVISAR_IDS`.
+
+Mais três permissões:
 
 - **Funil 77 (HR \| Requisição de Vagas):** a Liderança precisa de **leitura** para a aba Recrutamento mostrar as vagas que ela pediu. O app filtra pelo e-mail do solicitante (`UF_CRM_RV_EMAIL`).
+- **Funil 79 (HR \| Offboarding):** o RH precisa de leitura e edição. A Liderança e a Coordenação **não** recebem acesso: as solicitações são sensíveis, e quem pede usa só o formulário.
 - **CEO:** **nenhuma** permissão nos 9 processos. O painel dela é calculado no servidor (`api/painel.js`), que devolve só números. Para ligar, grave na Vercel:
   - `GP_CEO_IDS` com o ID de usuário da CEO;
   - `GP_CATEGORIA_VAGAS`, opcional (padrão 77), para o tempo de preenchimento de vaga.
@@ -233,3 +236,80 @@ A aprovação da coordenação pode ser feita de duas formas:
 - **Feriados:** os nacionais vêm de `calendar.settings.get` ("year_holidays"). Se o portal não tiver essa lista, o app usa os feriados federais calculados. Os de SP e Salvador ficam em Configuração.
 - **Painéis do BI Builder (RH e CEO):** o app já tem uma versão própria. O BI Builder entra se o RH quiser os gráficos nativos.
 - **Base de Conhecimento:** guias, modelos SCI e o guia de offboarding. Cadastre os links em Configuração.
+
+## 9. E-mails: ficha do onboarding e funis de vagas e de offboarding
+
+Decisões da reunião de 29/10/2026: o novo membro recebe por e-mail a Ficha da função, e quem pede uma vaga ou um encerramento de contrato recebe um e-mail quando a solicitação chega e a cada mudança de etapa. O Bitrix não tem um método REST para mandar e-mail a um endereço qualquer, então o servidor envia pelo SMTP de uma caixa da Amorim (`lib/email.js`).
+
+- **Ficha do onboarding** (`api/ficha.js`): botão no onboarding do membro. Só envia quem o próprio Bitrix deixa ler aquele onboarding (o servidor pergunta ao portal com o login de quem clicou), e nunca o próprio membro.
+  - O e-mail leva o escopo, as competências comportamentais, os indicadores, as entregas de cada fase com as datas das conversas dos Dias 30, 60 e 90 e quem acompanha o membro.
+  - Nunca leva notas, leituras, resultados ou justificativas.
+  - A resposta ao e-mail vai para quem enviou.
+  - O item ganha "Ficha enviada ao membro em" e um comentário no histórico.
+  - As datas usam os feriados nacionais. Os de SP e Salvador ficam na Configuração do app, que só o navegador lê.
+- **Funis de negócios** (`lib/avisos-negocios.js`, pelo `api/eventos.js`):
+  - Quem pediu recebe um e-mail na chegada ("Recebemos a sua solicitação…") e a cada mudança de etapa.
+  - Na chegada, o RH (`GP_AVISAR_IDS`) recebe uma notificação do Bitrix com o link do negócio.
+  - O e-mail do offboarding leva só o nome do membro digitado no formulário e a etapa, nunca o motivo ou a descrição.
+  - **Uma vez por etapa:** o servidor grava a etapa avisada num campo do negócio. Sem esse campo, nada é enviado, porque cada atualização repetiria o mesmo e-mail.
+  - **Negócios que já existiam:** a primeira atualização depois de ligar só grava a etapa, sem e-mail, a não ser que a etapa tenha acabado de mudar.
+
+| Variável (Vercel) | Valor |
+|---|---|
+| `SMTP_HOST` | Servidor SMTP da caixa. Na HostGator, `mail.<domínio>`. No Google Workspace, `smtp.gmail.com` |
+| `SMTP_PORTA` | Opcional, padrão 465 (SSL). Use 587 se o provedor pedir STARTTLS |
+| `SMTP_USUARIO` | O e-mail completo da caixa que envia |
+| `SMTP_SENHA` | A senha da caixa. No Google, uma senha de app, que exige a verificação em duas etapas. É segredo: grave direto na Vercel |
+| `EMAIL_REMETENTE` | Opcional: outro endereço de remetente. Muitos servidores só aceitam o próprio login |
+| `GP_CATEGORIA_VAGAS` | Opcional, padrão 77 (HR \| Requisição de Vagas). É a mesma variável do painel da CEO |
+| `GP_CATEGORIA_OFFBOARDING` | `CATEGORY_ID` do funil de offboarding. Sem ela, esse funil não manda e-mail |
+
+Campos de controle nos negócios. São tipo string, ficam fora dos formulários e o RH não precisa ver:
+
+| Campo | Funil |
+|---|---|
+| `UF_CRM_RV_ULT_AVISO` | Vagas |
+| `UF_CRM_OFF_ULT_AVISO` | Offboarding |
+
+Quem pediu vem destes campos:
+
+| Funil | E-mail | Nome, só para o "Olá, …" |
+|---|---|---|
+| Vagas | `UF_CRM_RV_EMAIL` | `UF_CRM_RV_LIDER` |
+| Offboarding | `UF_CRM_OFF_EMAIL` | `UF_CRM_OFF_SOLICIT` |
+
+No offboarding, o nome do membro vem de `UF_CRM_OFF_MEMBRO`.
+
+Para ligar os e-mails dos funis:
+
+1. No mesmo webhook de saída da seção 7 (mesmo endereço `…/api/eventos` e mesmo `BITRIX_EVENTO_TOKEN`), marque também **ONCRMDEALADD** e **ONCRMDEALUPDATE**.
+2. Grave as variáveis do SMTP e faça um Redeploy.
+3. Em Configuração → Rotinas no servidor, confira as linhas "E-mail" e "Avisos dos funis".
+
+O Bitrix manda o evento de todos os funis de negócios. A função lê o negócio (`crm.deal.get`) e ignora os de outros funis.
+
+Para testar, envie uma solicitação pelo formulário de vagas com o seu e-mail. Em até um minuto chega "Recebemos a sua solicitação de vaga", e o RH recebe a notificação. Depois mova o card de etapa: chega o e-mail com a etapa nova.
+
+## 10. Reunião de 29/10/2026: o que muda no Bitrix
+
+O relatório da reunião (`Relatório.docx`) mudou o escopo do app. O que precisa de configuração no portal:
+
+1. **Processo novo "1:1 mensais"** (o 1:1 do mês, a conversa breve) e o campo "Ficha enviada ao membro em" no Onboarding. Um administrador abre o app → Configuração → **Criar ou completar a estrutura**. O webhook de entrada não tem o escopo `userfieldconfig`, então isso não roda pelo servidor. Depois dê as permissões da seção 4 ao processo novo. Até lá, o app avisa e não cobra o 1:1 de ninguém.
+2. **Esteira "HR \| Offboarding" (funil de negócios 79)**, já criada em 29/10/2026 por `amorim-api/offboarding-bitrix/criar-funil.js`:
+   - etapas: Nova solicitação, Aguardando coordenação, Em análise (RH), Aprovada, Conversa realizada, Pós-encerramento, Concluída (ganho) e Cancelada (perda);
+   - 18 campos `UF_CRM_OFF_*`, uma primeira versão tirada da solicitação que o app já tinha;
+   - os negócios novos ficam com o RH como responsável.
+3. **Formulário de offboarding:** o RH (Luciele) vai mandar o formulário dela. Quando chegar:
+   - ajuste os campos com o `criar-funil.js`;
+   - gere o script com `gerar-form-console.js`;
+   - rode o script no console do Bitrix e ative o formulário;
+   - cole o link em Configuração → Links → "Formulário de solicitação de encerramento".
+
+   Sem o link, a aba Offboarding continua com a solicitação pelo app.
+4. **Alerta vermelho do RH:** o menu mostra quantas solicitações novas aguardam o RH no Recrutamento (vagas em "Nova solicitação" no funil 77) e no Offboarding (cards em "Nova solicitação" no funil 79 e solicitações do app em "Enviada ao RH"). O alerta some quando o card sai da primeira etapa.
+5. **Robôs da seção 6 que deixaram de valer:**
+   - "Planejar as 2 entregas" (Dia 15 do onboarding): o onboarding não cria mais tarefas;
+   - os de "Evidências" do Ciclo: a avaliação de desempenho saiu do app até 2027;
+   - "Leituras · Aguardando leitura": as entregas do onboarding são avaliadas direto na avaliação do mês.
+
+   O Ciclo trimestral continua: é nele que fica o O2O (o antigo "1:1 do trimestre").

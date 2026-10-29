@@ -54,7 +54,7 @@ test("Pendências atrasadas: 2 (1:1 de Bruno e Ficha de Gustavo)", () => {
   const ind = dom.indicadoresEquipe(ctx, dom.equipeDe(ctx, "3"), { uid: "3" });
   assert.equal(ind.atrasadas, 2);
   const atrasadas = ind.pendencias.filter((p) => p.atrasado).map((p) => p.titulo);
-  assert.deepEqual(atrasadas.sort(), ["Agendar o 1:1 de Bruno", "Completar a Ficha de Gustavo"]);
+  assert.deepEqual(atrasadas.sort(), ["Agendar o O2O de Bruno", "Completar a Ficha de Gustavo"]);
   // atrasadas vêm primeiro na lista
   assert.ok(ind.pendencias[0].atrasado && ind.pendencias[1].atrasado && !ind.pendencias[2].atrasado);
   assert.equal(ind.situacao.rotulo, "Atenção"); // 2 atrasadas
@@ -140,10 +140,10 @@ test("Status do ciclo: Bruno sem agendamento desde 08/10 (Dia 7 = 07/10)", () =>
   assert.equal(s.prazo, "2026-10-07");
   const ctx2 = contexto("3", "2026-10-07");
   assert.equal(dom.statusCiclo(ctx2, dom.cicloDo(ctx2, "2", "2026-T4")).chave, "agendar");
-  // Ana: Q3 com 1:1 realizado e evidências pendentes até 15/10
+  // Ana: Q3 com o O2O realizado. As evidências do trimestre saíram com a avaliação de desempenho (29/10/2026)
   const ana = dom.statusCiclo(ctx, dom.cicloDo(ctx, "1", "2026-T3"));
-  assert.equal(ana.chave, "evidencias");
-  assert.equal(ana.prazo, "2026-10-15");
+  assert.equal(ana.chave, "realizado");
+  assert.equal(ana.cor, "verde");
 });
 
 test("Agenda: Bruno volta em 19/10; 3 de 7 fora entre 26/12 e 02/01, com a liderança", () => {
@@ -184,12 +184,12 @@ test("Recrutamento: etapa, dias em aberto e tempo para fechar (28 dias)", () => 
   assert.equal(dom.vagasDe(ctx, "2").length, 3); // coordenação vê o setor
 });
 
-test("Dicas-modelo: reconhecer o progresso do Eduardo, Ficha do Gustavo, ordem das leituras, substituto", () => {
+test("Dicas-modelo: reconhecer o progresso do Eduardo, Ficha do Gustavo e substituto (a ordem das leituras saiu com o desempenho)", () => {
   const ctx = contexto("3");
   const ids = dom.dicas(ctx, dom.equipeDe(ctx, "3"), { uid: "3" }).map((d) => d.id);
   assert.ok(ids.indexOf("rec-plano-80") >= 0);
   assert.ok(ids.indexOf("ficha-61") >= 0);
-  assert.ok(ids.indexOf("ordem-leituras") >= 0);
+  assert.ok(ids.indexOf("ordem-leituras") < 0, "a ordem das leituras era do desempenho, que saiu do app");
   assert.ok(ids.some((i) => i.indexOf("substituto-") === 0));
 });
 
@@ -230,4 +230,84 @@ test("checagem antes de ligar o app (5.3)", () => {
   assert.deepEqual(r2.email.problemas, ["Ana Ribeiro: e-mail pessoal no cadastro"]);
   assert.match(r2.estrutura.problemas[0], /Bruno Teixeira: a liderança direta no Membros é Marcos Lima, e pela estrutura é Carla Mendes/);
   assert.ok(r2.feriados.problemas.some((p) => /sem cidade de referência/.test(p)));
+});
+
+/* ---------------- reunião de 29/10/2026 ---------------- */
+function comFunil(ctx) {
+  ctx.offboarding = dadosDemo().offboarding;
+  return ctx;
+}
+
+test("1:1 mensal: quem falta no mês, prazo no último dia útil e pendência de cada membro ativo", () => {
+  const ctx = contexto("3");
+  const s = dom.situacaoMensal(ctx, dom.equipeDe(ctx, "3"), ctx.hoje);
+  assert.equal(s.mes.chave, "2026-10");
+  assert.equal(s.prazo, "2026-10-30"); // 31/10/2026 é sábado
+  assert.deepEqual(nomes(ctx, s.faltam), ["Bruno", "Eduardo"]); // Ana já teve em 06/10; Fernanda está em encerramento
+  const pend = dom.pendenciasDe(ctx, dom.equipeDe(ctx, "3"), { uid: "3" }).filter((p) => p.tipo === "1:1").map((p) => p.titulo).sort();
+  assert.deepEqual(pend, ["Registrar o 1:1 de outubro de Bruno", "Registrar o 1:1 de outubro de Eduardo"]);
+  // sem o processo no portal, ninguém é cobrado
+  ctx.recursos = { mensal: false };
+  assert.equal(dom.pendenciasDe(ctx, dom.equipeDe(ctx, "3"), { uid: "3" }).filter((p) => p.tipo === "1:1").length, 0);
+});
+
+test("1:1 mensal nas rotinas: conta o mês que fechou, não o mês corrente", () => {
+  const ctx = contexto("5");
+  const ind = dom.indicadoresEquipe(ctx, dom.equipeDe(ctx, "5"), { uid: "5" });
+  assert.equal(ind.mensalAnterior.texto, "100% · 4 de 4"); // setembro
+  assert.equal(ind.mensal.texto, "50% · 2 de 4");          // outubro, ainda em andamento
+  assert.equal(ind.situacao.rotulo, "Em dia");
+});
+
+test("excluir: RH sempre; quem registrou só nas 48 horas; o Membros nunca", () => {
+  const ctx = contexto("3");
+  const novo = ctx.registros.feedbacks.find((f) => f.estagio === "NEW"); // registrado em 07/10 às 18h10
+  assert.ok(dom.podeExcluir(ctx, "feedbacks", novo, "3", "2026-10-08T10:00:00-03:00"));
+  assert.ok(!dom.podeExcluir(ctx, "feedbacks", novo, "3", "2026-10-10T10:00:00-03:00"), "passou de 48 horas");
+  assert.ok(!dom.podeExcluir(ctx, "feedbacks", novo, "4", "2026-10-08T10:00:00-03:00"), "outra liderança");
+  assert.ok(dom.podeExcluir(ctx, "feedbacks", ctx.registros.feedbacks[0], "6", "2026-10-08T10:00:00-03:00"), "RH");
+  assert.ok(!dom.podeExcluir(ctx, "membros", ctx.registros.membros[0], "6", "2026-10-08T10:00:00-03:00"), "Membros: o RH tira do app");
+  assert.ok(!dom.podeExcluir(ctx, "onboarding", ctx.registros.onboarding[0], "3", "2026-08-21T10:00:00-03:00"), "onboarding: só o RH");
+  const enc = ctx.registros.encerramentos[0];
+  assert.ok(!dom.podeExcluir(ctx, "encerramentos", enc, "2", "2026-10-05T12:00:00-03:00"), "já enviada ao RH");
+  assert.ok(dom.podeExcluir(ctx, "encerramentos", Object.assign({}, enc, { estagio: "NEW" }), "2", "2026-12-01T12:00:00-03:00"), "rascunho de quem pediu");
+});
+
+test("trava do encerramento: plano de melhoria encerrado sem os resultados e 2 feedbacks de desenvolvimento", () => {
+  const ctx = contexto("3");
+  const plano = ctx.registros.planos.find((p) => p.membroId === "4");
+  plano.estagio = "FAIL";
+  plano.feedbackAberturaId = ""; // plano novo: não nasce mais de um feedback de abertura
+  dom.indexar(ctx);
+  // só o feedback de 31/08 (o de 20/07 da Ana é de outra pessoa): falta um
+  let r = dom.verificarRegistros(ctx, "4", "Resultados abaixo do acordado", "");
+  assert.equal(r.ok, false);
+  ctx.registros.feedbacks.push({ id: "72", membroId: "4", data: "2026-10-20", tipo: "Desenvolvimento", estagio: "SUCCESS", retroativo: false, evidencia: [] });
+  dom.indexar(ctx);
+  r = dom.verificarRegistros(ctx, "4", "Resultados abaixo do acordado", "");
+  assert.ok(r.ok);
+  assert.deepEqual(r.feedbacks.sort(), ["70", "72"]);
+});
+
+test("offboarding: solicitações da esteira, alerta do RH e histórico por período", () => {
+  const ctx = comFunil(contexto("6"));
+  const sol = dom.solicitacoesOffboarding(ctx);
+  assert.equal(sol.length, 4);
+  assert.deepEqual(sol.filter((s) => s.nova).map((s) => s.membro), ["Igor Santos"]);
+  const d = dom.demandasRH(ctx);
+  assert.equal(d.offboarding, 2); // Igor (esteira, nova) + Fernanda (app, enviada ao RH)
+  assert.equal(d.recrutamento, 0); // nenhuma vaga em "Nova solicitação" na demonstração
+  const tri = dom.historicoDesligamentos(ctx, "trimestre");
+  assert.deepEqual(tri.map((l) => l.periodo.chave), ["2026-T4", "2026-T3", "2026-T1", "2025-T4"]);
+  const t3 = tri.find((l) => l.periodo.chave === "2026-T3");
+  assert.deepEqual(t3.desligamentos.map((x) => x.nome), ["Paulo Viana"]);
+  assert.deepEqual(t3.motivos, { "Pedido do membro": 1 });
+  const ano = dom.historicoDesligamentos(ctx, "ano");
+  assert.deepEqual(ano.map((l) => [l.periodo.chave, l.desligamentos.length]), [["2026", 2], ["2025", 1]]);
+  const sem = dom.historicoDesligamentos(ctx, "semestre");
+  assert.equal(sem[0].periodo.rotulo, "2º semestre de 2026");
+  // liderança: só a própria equipe, e sem a esteira (que só o RH lê)
+  const carla = dom.historicoDesligamentos(ctx, "ano", (m) => m.lideranca === "3");
+  assert.deepEqual(carla.map((l) => l.desligamentos.map((x) => x.nome)), [["Clara Neves"]]);
+  assert.equal(carla[0].solicitacoes, 1); // a da Fernanda, feita pelo app; as da esteira só o RH vê
 });

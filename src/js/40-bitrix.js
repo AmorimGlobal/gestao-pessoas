@@ -96,6 +96,9 @@
 
   const reg = GP.registros;
   const dataBitrix = reg.dataBitrix;
+  // Campos do funil "HR | Offboarding" que o app lê (amorim-api/offboarding-bitrix cria todos)
+  const CAMPOS_OFFBOARDING = ["UF_CRM_OFF_SOLICIT", "UF_CRM_OFF_EMAIL", "UF_CRM_OFF_PAPEL", "UF_CRM_OFF_MEMBRO", "UF_CRM_OFF_SETOR",
+    "UF_CRM_OFF_CONTRATO", "UF_CRM_OFF_MOTIVO", "UF_CRM_OFF_DATA_DES", "UF_CRM_OFF_DATA_EFET", "UF_CRM_OFF_REPOSICAO"];
 
   function semPermissao(e) {
     return !!e && (e.codigo === "ACCESS_DENIED" || /access denied|not allowed|permission|acesso negado/i.test(String(e.descricao || e.message || "")));
@@ -159,10 +162,20 @@
           const descoberta = await descobrirEstrutura();
           config = Object.assign({}, config || {}, { processos: descoberta.processos });
           origem = Object.keys(descoberta.processos).length ? "descoberta" : "ausente";
+        } else {
+          // Processo novo do app (ex.: "1:1 mensais", 29/10/2026) criado depois da configuração gravada: acha pelo título
+          const faltam = schema.PROCESSOS.map((p) => p.chave).filter((k) => !config.processos[k]);
+          if (faltam.length) {
+            try {
+              const d = await reg.descobrirEstrutura(bxTudo, faltam);
+              config = Object.assign({}, config, { processos: Object.assign({}, d.processos, config.processos) });
+            } catch (e) { console.warn("Processos novos não encontrados:", e); }
+          }
         }
         montarEstrutura(config);
         const ausentes = Object.keys(estrutura).length ? await carregarMetadados() : [];
-        return { config, origem, ausentes };
+        const processosFaltando = schema.PROCESSOS.filter((p) => !estrutura[p.chave]).map((p) => p.chave);
+        return { config, origem, ausentes, processosFaltando };
       },
       salvarConfig: function (cfg) {
         return new Promise(function (ok) {
@@ -221,14 +234,18 @@
         return itens.map(function (it) { return normalizar(chave, it); });
       },
       /** Um processo sem permissão de leitura (ex.: a CEO, ou a liderança em Finalistas) vem vazio
-          em vez de derrubar o app inteiro */
+          em vez de derrubar o app inteiro. Quais vieram negados fica em repo.acessoNegado (aviso ao RH). */
+      acessoNegado: [],
       listarTodos: async function () {
         const r = {};
+        repo.acessoNegado = [];
         for (const p of schema.PROCESSOS) {
-          try { r[p.chave] = await repo.listar(p.chave); } catch (e) { if (!semPermissao(e)) throw e; r[p.chave] = []; }
+          try { r[p.chave] = await repo.listar(p.chave); } catch (e) { if (!semPermissao(e)) throw e; r[p.chave] = []; repo.acessoNegado.push(p.chave); }
         }
         return r;
       },
+      /** O processo existe no portal (os novos só existem depois de rodar a configuração) */
+      temProcesso: function (chave) { return !!estrutura[chave]; },
       criar: async function (chave, dados) {
         const e = estrutura[chave];
         const d = await bx("crm.item.add", { entityTypeId: e.eti, fields: montarCampos(chave, dados) });
@@ -243,6 +260,12 @@
         const e = estrutura[chave];
         const d = await bx("crm.item.get", { entityTypeId: e.eti, id: Number(id) });
         return normalizar(chave, d.item);
+      },
+      /** Exclui o item (vai para a lixeira do CRM, de onde o administrador pode restaurar) */
+      excluir: async function (chave, id) {
+        const e = estrutura[chave];
+        if (!e) throw { codigo: "", descricao: "o processo deste registro não está ligado ao app" };
+        await bx("crm.item.delete", { entityTypeId: e.eti, id: Number(id) });
       },
       /** Abre o card nativo do item (para o RH, o histórico de alterações e os anexos) */
       abrirCard: function (chave, id) {
@@ -321,6 +344,25 @@
         if (!r.ok) throw new Error("o servidor respondeu " + r.status);
         return r.json();
       },
+      /** Quantos itens cada processo tem de fato (api/contagem.js, pelo webhook), para o RH saber se a
+          permissão do CRM esconde registros dele. Só números. */
+      contagemServidor: async function () {
+        const auth = BX24.getAuth ? BX24.getAuth() : null;
+        const r = await fetch("/api/contagem", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auth: (auth && auth.access_token) || "" }) });
+        const j = await r.json().catch(function () { return {}; });
+        if (!r.ok || !j.ok) throw new Error(j.erro || "o servidor respondeu " + r.status);
+        return j.total;
+      },
+      /** Envia a Ficha do onboarding ao membro por e-mail (api/ficha.js). O servidor confere, com o login
+          desta sessão, se a pessoa tem acesso ao onboarding no Bitrix. */
+      enviarFicha: async function (onboardingId, reenviar) {
+        const auth = BX24.getAuth ? BX24.getAuth() : null;
+        if (!auth || !auth.access_token) throw new Error("o Bitrix não entregou o token de acesso desta sessão");
+        const r = await fetch("/api/ficha", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auth: auth.access_token, onboardingId: String(onboardingId), reenviar: !!reenviar }) });
+        const j = await r.json().catch(function () { return {}; });
+        if (!r.ok || !j.ok) { const e = new Error(j.erro || "o servidor respondeu " + r.status); e.status = r.status; throw e; }
+        return j;
+      },
       /** O download do dossiê fica registrado: comentário na timeline do item Membros (4.4) */
       registrarDossie: async function (membroId, eu) {
         const e = estrutura.membros;
@@ -355,6 +397,30 @@
         ]);
         return { etapas: reg.etapasDoFunil(etapas), negocios, historico };
       },
+
+      /* ---------- offboarding: funil "HR | Offboarding" (formulário CRM, 29/10/2026) ---------- */
+      /** Só o RH costuma ter leitura neste funil. As listas chegam com o texto da opção, e a descrição
+          do motivo não é lida (fica só no card do Bitrix). */
+      offboarding: async function (categoria) {
+        const cat = Number(categoria);
+        if (!cat) return { etapas: [], negocios: [] };
+        const [etapas, negocios, campos] = await Promise.all([
+          bx("crm.dealcategory.stage.list", { id: cat }),
+          bxTudo("crm.deal.list", {
+            filter: { CATEGORY_ID: cat }, order: { ID: "DESC" },
+            select: ["ID", "TITLE", "STAGE_ID", "DATE_CREATE", "DATE_MODIFY", "CLOSEDATE", "CLOSED", "ASSIGNED_BY_ID"].concat(CAMPOS_OFFBOARDING),
+          }),
+          bx("crm.deal.fields", {}).catch(function () { return {}; }),
+        ]);
+        const textos = {};
+        CAMPOS_OFFBOARDING.forEach(function (k) {
+          const f = campos && campos[k];
+          if (f && Array.isArray(f.items)) { textos[k] = {}; f.items.forEach(function (i) { textos[k][String(i.ID)] = i.VALUE; }); }
+        });
+        negocios.forEach(function (n) { Object.keys(textos).forEach(function (k) { if (n[k] !== undefined && n[k] !== null && n[k] !== "") n[k] = textos[k][String(n[k])] || n[k]; }); });
+        return { etapas: reg.etapasDoFunil(etapas), negocios };
+      },
+      abrirNegocio: function (id) { if (BX24.openPath) BX24.openPath("/crm/deal/details/" + id + "/"); },
     };
     return repo;
   }

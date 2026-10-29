@@ -22,7 +22,7 @@ test("dia em que atrasa: uma mensagem por liderança, com tudo o que venceu", ()
   const p = planoDo("2026-10-08"); // quinta: os 1:1 com prazo 07/10 venceram ontem
   assert.equal(p.semanal, false);
   assert.deepEqual(de(p, "venceu").map((m) => m.para), ["3", "4"]);
-  assert.match(de(p, "venceu")[1].texto, /Venceu o prazo de 2 pendências:\n• Agendar o 1:1 de Júlia/);
+  assert.match(de(p, "venceu")[1].texto, /Venceu o prazo de 2 pendências:\n• Agendar o O2O de Júlia/);
   assert.match(de(p, "venceu")[1].texto, /Abra o app Gestão de Pessoas: https:\/\/portal\/app\/$/);
 });
 
@@ -33,8 +33,10 @@ test("fim de semana e feriado não avisam; o resumo sai no primeiro dia útil da
   assert.equal(p.semanal, true);
   const semanais = de(p, "semanal");
   // uma mensagem por pessoa, nunca uma por pendência
-  assert.deepEqual(semanais.map((m) => m.para).sort(), ["3", "4", "6"]);
-  assert.match(semanais.find((m) => m.para === "3").texto, /^Resumo da semana: 6 pendências, 3 atrasadas\./);
+  // Rafael (5) entra pelo 1:1 de outubro que falta na equipe dele (1:1 mensal, 29/10/2026)
+  assert.deepEqual(semanais.map((m) => m.para).sort(), ["3", "4", "5", "6"]);
+  // 7: entram os 1:1 de outubro de Bruno e Eduardo, sai o planejamento das entregas em tarefas (29/10/2026)
+  assert.match(semanais.find((m) => m.para === "3").texto, /^Resumo da semana: 7 pendências, 3 atrasadas\./);
   assert.match(semanais.find((m) => m.para === "6").texto, /Para o RH: 1 solicitação de encerramento aguardando o RH/);
   assert.equal(planoDo("2026-10-14").semanal, false);
 });

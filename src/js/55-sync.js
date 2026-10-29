@@ -90,7 +90,8 @@
         return;
       }
       if (FINAIS.indexOf(m.estagio) >= 0) {
-        plano.conferir.push({ usuario: u, membro: m, motivo: "usuário ativo no Bitrix com o item Membros em \"" + (m.estagioNome || m.estagio) + "\"" });
+        // "Arquivado" é o RH tirando a pessoa do app (prestador pontual, conta genérica): fica de fora em silêncio
+        if (m.estagio !== "FAIL") plano.conferir.push({ usuario: u, membro: m, motivo: "usuário ativo no Bitrix com o item Membros em \"" + (m.estagioNome || m.estagio) + "\"" });
         return;
       }
       // incerto (setor sem chefe): nunca troca o que está gravado; só preenche o vazio herdado

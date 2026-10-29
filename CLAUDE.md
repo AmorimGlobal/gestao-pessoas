@@ -4,17 +4,28 @@ Guia para o Claude Code (e para quem mantiver) o app **Gestão de Pessoas** da A
 
 ## O que é
 
-App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança executa as rotinas de gestão da equipe: Minha equipe, Agenda, Recrutamento, Onboarding, Rotinas (1:1 e feedbacks SCI), Desempenho e Offboarding, além do Painel. A especificação do RH está em `../Gestão de Pessoas · Especificação para TI.docx` (08/10/2026, revisão de arquitetura de 13/10). Telas, campos e textos seguem o glossário da seção 1.4: "membro", "liderança", "encerramento de contrato", "feedback de reconhecimento/desenvolvimento". Nunca "colaborador", "líder", "desligamento", "faltas" ou linguagem impositiva.
+App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança executa as rotinas de gestão da equipe: Minha equipe, Agenda, Recrutamento, Onboarding, Feedbacks (feedbacks SCI, 1:1 mensal, O2O trimestral e plano de melhoria) e Offboarding, além do Painel. A aba Desempenho saiu em 29/10/2026 e volta em 2027 (`dom.DESEMPENHO_ATIVO = false`; o código continua no app). A especificação do RH está em `../Gestão de Pessoas · Especificação para TI.docx` (08/10/2026, revisão de arquitetura de 13/10). Telas, campos e textos seguem o glossário da seção 1.4: "membro", "liderança", "encerramento de contrato", "feedback de reconhecimento/desenvolvimento". Nunca "colaborador", "líder", "desligamento", "faltas" ou linguagem impositiva.
 
 ## Arquitetura: o servidor só entrega a página
 
-- **Dados:** 9 processos inteligentes nativos ("Gestão de Pessoas · Membros", "· Feedbacks SCI", "· Ciclo trimestral", "· Planos de alinhamento de resultados", "· Encerramentos de contrato", "· Onboarding", "· Leituras de entrega", "· Planejamento da função", "· Avaliações de finalistas"), agrupados na solução automatizada "Gestão de Pessoas". As vagas vêm do funil de negócios **HR | Requisição de Vagas (categoria 77)**.
+- **Dados:** 10 processos inteligentes nativos ("Gestão de Pessoas · Membros", "· Feedbacks SCI", "· 1:1 mensais", "· Ciclo trimestral", "· Planos de alinhamento de resultados", "· Encerramentos de contrato", "· Onboarding", "· Leituras de entrega", "· Planejamento da função", "· Avaliações de finalistas"), agrupados na solução automatizada "Gestão de Pessoas". Dois funis de negócios são lidos:
+  - **HR | Requisição de Vagas (categoria 77):** as vagas.
+  - **HR | Offboarding (categoria 79, 29/10/2026):** a esteira das solicitações de encerramento, criada por `amorim-api/offboarding-bitrix`. Só o RH lê.
+- **Nomes que mudaram na tela (29/10/2026), sem mudar os nomes dos processos:**
+  - "1:1 do trimestre" virou **O2O**, e continua no "Ciclo trimestral".
+  - O plano de alinhamento virou **plano de melhoria**, e foi para o módulo Feedbacks.
+  - "Padrões" virou **competências comportamentais**, e o sufixo continua `PADROES`.
+  - Os alinhamentos do onboarding viraram **avaliações do 1º, 2º e 3º mês**.
+  - O título do processo é a chave da descoberta (`descobrirEstrutura`): renomear um processo quebra o app.
 - **Interface:** uma página única (HTML, CSS e JS sem framework), servida por uma função da Vercel. Toda chamada ao Bitrix sai do **navegador** por `BX24.callMethod`, com o login de quem abriu o app. Por isso as funções de acesso do CRM (2.4) valem sozinhas: a liderança só recebe os itens do departamento que chefia. É o mesmo padrão do `widget-rotina-contabil`.
 - **Servidor (só o que o navegador não pode fazer), em `api/` + `lib/`, pelo webhook de entrada:**
   - `api/sincronizar.js` (cron 6h): Membros acompanha a estrutura da empresa.
   - `api/avisos.js` (cron 8h): avisos da 4.4.
   - `api/eventos.js`: webhook de saída do Bitrix, para a trava do encerramento (4.1).
   - `api/painel.js`: números da CEO, que não tem leitura nos processos.
+  - `api/contagem.js`: total de itens de cada processo, para o aviso do RH quando a permissão do CRM esconde registros.
+  - `api/ficha.js`: manda a Ficha do onboarding ao membro por e-mail (SMTP, `lib/email.js`).
+  - `api/eventos.js`, com ONCRMDEALADD e ONCRMDEALUPDATE: e-mail a quem pediu nos funis 77 e 79 (`lib/avisos-negocios.js`).
   
   Todos calculam com as mesmas regras do navegador (`src/js/50-dominio.js`, `35-registros.js`). Variáveis e passo a passo: `docs/configuracao-bitrix.md`.
 - **Acesso:** a versão publicada (`api/app.js`) só sai para um POST do Bitrix com sessão confirmada no portal (`lib/acesso.js`). Ela é marcada com `window.GP_SO_BITRIX` pelo `build.js` e nunca cai na demonstração.
@@ -43,7 +54,7 @@ lib/avisos.js         avisos da 4.4: planejar() puro (marcos cruzados desde o di
 api/sincronizar.js, api/avisos.js, api/eventos.js, api/painel.js  funções da Vercel (escritas à mão; crons em vercel.json)
 src/js/50-dominio.js  regras de negócio puras: papéis, equipe, pendências, indicadores, verificação do encerramento, agenda, dicas  [Node + navegador]
 src/js/60-ui-base.js  estado, rotas (hash), layout, componentes, painel lateral, eventos
-src/js/61..70-ui-*.js telas: início/painel, equipe/card do membro, rotinas, desempenho, onboarding, offboarding, recrutamento, agenda, configuração
+src/js/61..70-ui-*.js telas: início/painel, equipe/card do membro, feedbacks (63-ui-rotinas: SCI, 1:1 mensal, O2O), plano de melhoria (63-ui-planos), desempenho (fora até 2027), onboarding, offboarding, recrutamento, agenda, exportar CSV do RH (69), configuração
 src/js/90-app.js      inicialização (Bitrix ou demonstração)
 build.js              junta tudo em dist/index.html e gera api/app.js
 tools/provisionar.js  CLI de provisionamento por webhook (crm + userfieldconfig)
@@ -56,7 +67,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 101 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 132 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -83,23 +94,41 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - **Os "supervisores adjuntos" do organograma** aparecem na API lotados direto no setor, e na prática chefiam as áreas.
   - **Sem chefe nenhum no caminho:** vale o item do Membros, a sincronização não troca e manda para o RH conferir (Configuração → Setores sem chefe no Bitrix, que só aparece nesse caso).
 - **Ver como outra pessoa** (`GP.app.verComo`, para administrador do Bitrix ou papel RH, `ui.podeVerComo`): troca `E.eu` e as visões pela pessoa escolhida. Desde 27/10/2026 **grava normalmente** (pedido do RH): o registro sai em nome da pessoa, o histórico do Bitrix mostra quem gravou de fato (o login é de quem usa), e o adendo diz "registrado por". O original fica em `E.euReal` e `E.repoReal`. A CEO, nesse modo, tem o resumo calculado no navegador.
+- **Excluir** (pedido de 29/10/2026), pelo `c.botaoExcluir` e pela regra `dom.podeExcluir`:
+  - **Quem exclui:** o RH e o administrador excluem qualquer registro. Quem registrou exclui nas primeiras 48 horas. Um encerramento em rascunho ou bloqueado, quem pediu. Um planejamento da função, quem criou.
+  - **Para onde vai:** o item vai para a lixeira do CRM, e o card do membro ganha um comentário dizendo quem excluiu.
+  - **O Membros não se exclui:** o RH "tira do app", que manda o item para "Arquivado". A sincronização deixa os itens arquivados como estão, sem mandar conferir.
+- **Onboarding (29/10/2026):**
+  - **Ficha:** o envio ao membro é um passo separado do salvar. Sem a caixa de e-mail na Vercel, o app mostra a Ficha em texto para mandar à mão e o botão "Marcar como enviada".
+  - **Avaliações do mês:** as entregas viram itens de "Leituras de entrega" (origem Onboarding), avaliados na régua 100, 70, 30 e 0. Uma entrega tirada da lista vai para "Cancelada".
+  - **Classificação:** o resultado usa a regra do patamar por senioridade da 3.2 até o RH mandar a fórmula final.
+  - **Privacidade:** notas e justificativas nunca vão para o membro.
 - **`build.js` compila o JS (`new Function`) antes de gravar**: um erro de sintaxe derruba o build, e a Vercel mantém a versão anterior no ar.
 - **Mudou o esquema?** Altere `20-schema.js`, rode os testes, rode o provisionamento (simulação primeiro) e reconstrua.
 
-## Estado (21/10/2026)
+## Estado (29/10/2026)
 
+- **Reunião de RH e TI em 29/10/2026** (`Relatório.docx`, fora do Git):
+  - Feito no app:
+    - "Rotinas" virou "Feedbacks", com o 1:1 mensal, o O2O e o plano de melhoria;
+    - a aba Desempenho saiu até 2027;
+    - o onboarding foi simplificado (Ficha com competências e envio por e-mail, avaliações do 1º, 2º e 3º mês na régua, painel da evolução);
+    - o offboarding passa a ter esteira, alerta vermelho e histórico por trimestre, semestre e ano;
+    - entraram o exportar CSV do RH, os botões de excluir e o "tirar do app";
+    - o app avisa quando a permissão do CRM esconde registros.
+  - Esperando o RH:
+    - o glossário de competências (Configuração → Cadastros);
+    - os campos e a fórmula das avaliações do onboarding;
+    - a estrutura do plano de melhoria;
+    - as especificações do 1:1 e do O2O;
+    - o formulário de offboarding (o script em `amorim-api/offboarding-bitrix` está pronto, mas não foi rodado: o usuário pediu para esperar o da Luciele);
+    - a referência visual.
 - **Portal:**
-  - A estrutura está completa: 9 processos, todos os estágios e todos os campos. A cidade de referência é `UF_CRM_57_CIDADE_FER`, porque o código `CIDADE_REF` ficou preso no Bitrix depois de uma tentativa que falhou.
-  - A primeira carga do Membros foi feita por script com webhook, sem notificações: 59 itens (55 Ativos e 4 em Onboarding) e 4 onboardings.
-  - Ficaram de fora a CEO (13) e as contas 1363, 90881, 545 e 96647.
-- **Falta o administrador:**
-  - Importar `config-importar.json` em Configuração → Importar configuração (papéis e feriados). O arquivo está fora do Git.
-  - Gravar `.env` na Vercel: preencher `BITRIX_WEBHOOK_URL` e `BITRIX_EVENTO_TOKEN` e fazer um Redeploy. O arquivo está fora do Git.
-- **Feito e testado em demonstração e no Bitrix falso:**
-  - sincronização com a estrutura;
-  - trava do encerramento no servidor;
-  - avisos da 4.4;
-  - painel da CEO pelo servidor.
-- **Falta ligar na Vercel:** as variáveis da seção 3 de `docs/configuracao-bitrix.md` (`BITRIX_WEBHOOK_URL`, `CRON_SECRET`, `GP_AVISAR_IDS`, `GP_CEO_IDS` (obrigatória), `GP_EXCECOES_IDS`, `BITRIX_EVENTO_TOKEN`, `GP_LINK_APP`) e o webhook de saída. Sem elas, `/api/*` responde 503.
-- **Aguardando o RH (Luciele):** a confirmação da arquitetura, as decisões da 6.1 (níveis, feriados locais, links, modelos SCI, critérios de situação) e a pergunta da 6.3 para Operações.
+  - A estrutura de 21/10 está completa: 9 processos e a primeira carga do Membros (59 itens).
+  - Em 29/10 foi criado o funil de negócios **HR | Offboarding (79)**, com 18 campos `UF_CRM_OFF_*` e `UF_CRM_RV_ULT_AVISO`.
+  - **Falta o administrador:**
+    - criar no app o processo "1:1 mensais" e o campo "Ficha enviada ao membro em" (Configuração → Criar ou completar a estrutura; o webhook não tem `userfieldconfig`);
+    - dar as permissões de CRM (docs, seção 4), com o RH em "Todos";
+    - escolher a caixa de e-mail do SMTP.
+- **Vercel:** as variáveis da seção 3 de `docs/configuracao-bitrix.md`, mais as da seção 9 (SMTP, `GP_CATEGORIA_OFFBOARDING` = 79). O webhook de saída (`BITRIX_EVENTO_TOKEN`) ainda não existe.
 - **Pendências e riscos:** `docs/tabela-2.7-e-validacoes.md`.

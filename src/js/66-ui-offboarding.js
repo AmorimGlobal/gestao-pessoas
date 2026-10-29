@@ -1,10 +1,10 @@
 /* =====================================================================================
-   TELAS — Offboarding: planos de alinhamento de resultados (3.5.2) e encerramentos de
-   contrato (3.5.3), com a verificação de registros (4.1) e o guia da liderança (3.5.4)
+   TELAS — Offboarding: esteira "HR | Offboarding", histórico de desligamentos e os
+   encerramentos de contrato feitos pelo app (3.5.3), com a verificação de registros (4.1)
+   e o guia da liderança (3.5.4). O plano de melhoria foi para Feedbacks (63-ui-planos.js).
    -------------------------------------------------------------------------------------
-   A verificação roda aqui antes de criar a solicitação e de novo a cada envio. A trava
-   "no servidor" (4.1) é o processo de negócio do Bitrix descrito em
-   docs/configuracao-bitrix.md: a tela sozinha não basta.
+   Na solicitação pelo app, a verificação roda antes de criar e de novo a cada envio. A
+   trava "no servidor" (4.1) está em lib/trava-encerramento.js: a tela sozinha não basta.
    ===================================================================================== */
 (function (raiz) {
   "use strict";
@@ -26,39 +26,40 @@
   };
 
   /* ================================================================ TELA OFFBOARDING */
+  /* Reunião de 29/10/2026: a solicitação vai por um formulário do Bitrix e vira um card na esteira
+     "HR | Offboarding" (funil de negócios), onde o RH gerencia. O app mostra o alerta das solicitações
+     novas, a esteira e o histórico de desligamentos por período. Enquanto o formulário não existir
+     (link vazio em Configuração), a solicitação continua pelo próprio app, com a verificação. */
   ui.rotas.offboarding = function (partes) {
-    if (partes[0] === "plano" && partes[1]) return telaPlano(partes[1]);
+    if (partes[0] === "plano" && partes[1]) return GP.telas.planos.telaPlano(partes[1]); // links antigos: o plano foi para Feedbacks
     if (partes[0] === "encerramento" && partes[1]) return telaEncerramento(partes[1]);
     const ctx = E().ctx;
+    const rh = E().visao === "rh";
     const membros = ui.membrosDaVisao();
     const ids = {};
     membros.forEach((m) => { ids[m.id] = true; });
-    const planos = (ctx.registros.planos || []).filter((p) => ids[p.membroId] || E().visao === "rh");
-    const ativos = planos.filter((p) => dom.statusPlano(ctx, p).ativo);
-    const encs = (ctx.registros.encerramentos || []).filter((e) => ids[e.membroId] || E().visao === "rh");
-    const andamento = encs.filter((e) => ["SUCCESS", "FAIL"].indexOf(e.estagio) < 0);
+    const encs = (ctx.registros.encerramentos || []).filter((e) => ids[e.membroId] || rh);
+    const andamentoApp = encs.filter((e) => ["SUCCESS", "FAIL"].indexOf(e.estagio) < 0);
+    const funil = rh ? dom.solicitacoesOffboarding(ctx) : [];
+    const abertas = funil.filter((s) => !s.semantica);
     const aprov = dom.aprovacoesPendentes(ctx, E().eu.id);
-    const filaRH = E().visao === "rh" ? dom.filaRH(ctx) : [];
     const links = (E().config && E().config.links) || {};
-    let h = c.cabecalho("offboarding", "Offboarding", "<span><b>" + ativos.length + "</b> plano(s) de alinhamento em andamento</span><span><b>" + andamento.length + "</b> encerramento(s) em andamento</span>",
-      '<button class="btn sec" data-acao="novo-plano">' + icone("mais", 15) + " Plano de alinhamento</button>");
-    // Cartão fixo do topo (3.5.3)
-    h += '<div class="card acao" style="margin-bottom:16px"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3 style="margin-bottom:4px">Solicitar encerramento de contrato</h3>' +
-      '<div class="muted">Primeiro o app confere se os registros do membro estão completos. ' + (E().visao === "rh" ? "Registrada pelo RH, a solicitação já entra na fila do RH." : dom.papeis(ctx, E().eu.id).enviaFormal ? "Como coordenação, a sua solicitação vai direto ao RH." : "A sua solicitação segue para a aprovação da coordenação responsável.") +
-      " Dúvidas sobre o contrato vão para o RH.</div></div><button class=\"btn\" data-acao=\"solicitar-encerramento\">Verificar registros e solicitar</button></div></div>";
+    const ano = ctx.hoje.slice(0, 4);
+    const doAno = (dom.historicoDesligamentos(ctx, "ano", filtroHistorico()).find((l) => l.periodo.chave === ano) || { desligamentos: [] }).desligamentos.length;
+    let h = c.cabecalho("offboarding", "Offboarding", "<span><b>" + (abertas.length + andamentoApp.length) + "</b> " + (abertas.length + andamentoApp.length === 1 ? "solicitação" : "solicitações") + " em andamento</span>" +
+      "<span><b>" + doAno + "</b> " + (doAno === 1 ? "desligamento" : "desligamentos") + " em " + ano + "</span>");
+    if (rh) h += alertaRH(funil.filter((s) => s.nova), dom.filaRH(ctx));
+    h += cartaoSolicitar(links);
     h += '<details class="card" style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700;color:var(--navy)">' + icone("manual", 15) + " Guia da liderança para o encerramento de contrato</summary>" +
       '<div style="margin-top:12px">' + Object.keys(GUIA).filter((k) => k !== "AG_COORD").map((k) => "<p><b>" + esc(GUIA[k].t) + ".</b> " + esc(GUIA[k].d) + "</p>").join("") +
       (links.guiaOffboarding ? '<a target="_blank" rel="noopener" href="' + esc(links.guiaOffboarding) + '">Abrir o guia completo na Base de Conhecimento →</a>' : '<span class="muted">O guia completo fica na Base de Conhecimento (link a cadastrar).</span>') + "</div></details>";
     if (aprov.length) h += '<div class="card acao"><h3>Aguardando a sua aprovação</h3><div class="lista">' + aprov.map((a) =>
       '<div class="item clicavel" data-rota="#/offboarding/encerramento/' + esc(a.item.id) + '">' + (a.membro ? c.avatar(a.membro, 30) : "") + '<div class="principal-item"><div class="t">' + esc(a.membro ? a.membro.nome : "") + '</div><div class="d">' + esc(a.item.motivo) + " · aguardando há " + plural(a.dias, "dia", "dias") + " (prazo de 3)</div></div>" +
       '<div class="lado">' + c.prazo(a.prazo) + "</div></div>").join("") + "</div></div>";
-    if (filaRH.length) h += '<div class="card acao"><h3>Fila do RH</h3><div class="lista">' + filaRH.map((f) => linhaEnc(f.item)).join("") + "</div></div>";
-    h += '<div class="grade c2"><div class="card"><h3>Planos de alinhamento de resultados</h3>' + (planos.length ? '<div class="lista">' + planos.slice().sort((a, b) => (a.inicio < b.inicio ? 1 : -1)).map((p) => {
-      const s = dom.statusPlano(ctx, p);
-      const m = dom.infoMembro(ctx, ctx.idx.membro[p.membroId] || {});
-      return '<div class="item clicavel" data-rota="#/offboarding/plano/' + esc(p.id) + '">' + c.avatar(m, 30) + '<div class="principal-item"><div class="t">' + esc(m.nome) + '</div><div class="d">desde ' + calc.fmtData(p.inicio) + " · término " + calc.fmtData(s.termino) + "</div></div><div class=\"lado\">" + c.tag(s.texto, s.cor) + "</div></div>";
-    }).join("") + "</div>" : c.vazio("Nenhum plano de alinhamento.")) + "</div>" +
-      '<div class="card"><h3>Encerramentos de contrato</h3>' + (encs.length ? '<div class="lista">' + encs.slice().sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1)).map((e) => linhaEnc(e)).join("") + "</div>" : c.vazio("Nenhuma solicitação.")) + "</div></div>";
+    if (rh) h += esteiraHtml(funil);
+    h += historicoHtml();
+    if (encs.length) h += '<div class="card"><h3>Solicitações feitas pelo app<span class="extra muted">' + plural(encs.length, "solicitação", "solicitações") + "</span></h3>" +
+      '<div class="lista">' + encs.slice().sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1)).map((e) => linhaEnc(e)).join("") + "</div></div>";
     return h;
   };
   function linhaEnc(e) {
@@ -67,154 +68,82 @@
     return '<div class="item clicavel" data-rota="#/offboarding/encerramento/' + esc(e.id) + '">' + c.avatar(m, 30) + '<div class="principal-item"><div class="t">' + esc(m.nome) + '</div><div class="d">' + esc(e.motivo || "motivo a definir") + (e.dataDesejada ? " · data desejada " + calc.fmtData(e.dataDesejada) : "") + "</div></div>" +
       '<div class="lado">' + c.tag(e.estagioNome, COR_ENC[e.estagio]) + "</div></div>";
   }
-
-  /* ================================================================ PLANO */
-  function planoResumoHtml(p, compacto) {
-    const ctx = E().ctx;
-    const s = dom.statusPlano(ctx, p);
-    const fbA = p.feedbackAberturaId ? ctx.idx.porId.feedbacks[p.feedbackAberturaId] : null;
-    const fbE = p.feedbackEncerramentoId ? ctx.idx.porId.feedbacks[p.feedbackEncerramentoId] : null;
-    const res = (n) => '<div style="padding:10px 12px;background:var(--sutil);border-radius:10px"><div class="k" style="font-size:11px;text-transform:uppercase;color:var(--suave);font-weight:700">Resultado esperado ' + n + '</div><div class="texto-registro">' + esc(p["resultado" + n]) + "</div>" +
-      '<div class="muted" style="font-size:12.5px;margin-top:4px">Evidência: ' + esc(p["evidencia" + n] || "") + "</div>" +
-      '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">' + (p["checkin" + n] ? c.tag("Check-in: " + p["checkin" + n], p["checkin" + n] === "Atingido" ? "verde" : p["checkin" + n] === "Não atingido" ? "vermelho" : "ambar") : "") +
-      (p["final" + n] ? c.tag("Final: " + p["final" + n], p["final" + n] === "Atingido" ? "verde" : "vermelho") : "") + "</div></div>";
-    return '<div class="card"><h3>Plano de ' + calc.fmtData(p.inicio) + " a " + calc.fmtData(s.termino) + '<span class="extra">' + c.tag(s.texto, s.cor) + "</span></h3>" +
-      '<div class="grade c2" style="margin-bottom:12px">' + res(1) + res(2) + "</div>" +
-      '<div class="sci">' + c.textoRegistro("Apoio oferecido", p.apoio) + (p.checkinData ? c.textoRegistro("Check-in de " + calc.fmtData(p.checkinData), p.checkinComentario) : "") +
-      '<div><div class="k">Feedbacks SCI vinculados</div>' + (fbA ? '<div>• <a href="#/rotinas/feedback/' + esc(fbA.id) + '">Abertura de plano · ' + calc.fmtData(fbA.data) + "</a></div>" : '<div class="muted">sem feedback de abertura</div>') +
-      (fbE ? '<div>• <a href="#/rotinas/feedback/' + esc(fbE.id) + '">Encerramento de plano · ' + calc.fmtData(fbE.data) + "</a></div>" : "") + "</div>" +
-      (p.adendos ? '<div><div class="k">Adendos</div><div class="adendo">' + esc(p.adendos) + "</div></div>" : "") + "</div>" +
-      (compacto ? "" : '<div style="margin-top:12px"><a href="#/offboarding/plano/' + esc(p.id) + '">Abrir o plano →</a></div>') + "</div>";
-  }
-  function telaPlano(id) {
-    const ctx = E().ctx;
-    const p = ctx.idx.porId.planos[id];
-    if (!p) return c.voltar("#/offboarding", "Offboarding") + '<div class="card">' + c.vazio("Plano não encontrado.") + "</div>";
-    const s = dom.statusPlano(ctx, p);
-    const m = dom.infoMembro(ctx, ctx.idx.membro[p.membroId] || {});
-    let acoes = "";
-    if (s.ativo && !s.checkinFeito) acoes += '<button class="btn" data-acao="checkin-plano" data-id="' + esc(p.id) + '">Registrar o check-in</button>';
-    if (s.ativo && s.checkinFeito) acoes += '<button class="btn" data-acao="encerrar-plano" data-id="' + esc(p.id) + '">Encerrar o plano</button>';
-    if (E().visao === "rh" && s.ativo) acoes += '<button class="btn sec" data-acao="prorrogar-plano" data-id="' + esc(p.id) + '">Prorrogar</button>';
-    acoes += '<button class="btn sec" data-acao="adendo" data-chave="planos" data-id="' + esc(p.id) + '">Adendo</button>';
-    let h = c.voltar("#/offboarding", "Offboarding") + c.cabecalho("offboarding", "Plano de alinhamento de " + m.nome, "<span>" + (s.dia ? "Dia <b>" + s.dia + "</b> de 60" : "") + "</span><span>check-in no Dia 30 (" + calc.fmtData(s.prazoCheckin) + ")</span><span>término " + calc.fmtData(s.termino) + "</span>", acoes);
-    h += '<div class="card" style="padding:16px 22px"><div class="barra"><div class="preench ' + (s.cor === "vermelho" ? "vermelho" : "") + '" style="width:' + Math.round(((s.dia || 0) / 60) * 100) + '%"></div><div class="meta" style="left:50%" title="Check-in no Dia 30"></div></div><div class="barra-nota">Dia ' + (s.dia || 0) + " de 60 · " + esc(s.texto) + "</div></div>";
-    if (p.estagio === "FAIL") {
-      const jaTem = (ctx.idx.porMembro.encerramentos[p.membroId] || []).find((e) => e.estagio !== "FAIL");
-      h += '<div class="card acao vermelho"><h3>O plano terminou sem os resultados</h3><p class="muted" style="margin-top:0">O app sugere avaliar o encerramento de contrato. A decisão é da liderança direta: se seguir, a solicitação nasce em Rascunho, já com o plano e os 2 feedbacks vinculados, e depois passa pela coordenação.</p>' +
-        (jaTem ? '<a class="btn sec" href="#/offboarding/encerramento/' + esc(jaTem.id) + '">Abrir a solicitação existente</a>' : '<button class="btn" data-acao="encerramento-de-plano" data-id="' + esc(p.id) + '">Avaliar o encerramento</button>') + "</div>";
-    }
-    return h + planoResumoHtml(p, true);
+  /** O que o RH acompanha no histórico: tudo. A coordenação e a liderança: as próprias equipes. */
+  function filtroHistorico() {
+    const v = E().visao, uid = String(E().eu.id);
+    if (v === "rh") return null;
+    if (v === "coordenacao") return (m) => String(m.coordenacao || "") === uid || String(m.lideranca || "") === uid;
+    return (m) => String(m.lideranca || "") === uid;
   }
 
-  /** Formulário do plano. feedbackId: o feedback de abertura recém-registrado (vindo de Rotinas). */
-  function abrirFormPlano(membroId, feedbackId) {
-    const ctx = E().ctx;
-    const membros = ui.minhaEquipe().concat(E().visao !== "lideranca" ? ui.membrosDaVisao() : []).filter((m, i, a) => a.indexOf(m) === i && m.estagio === "ATIVO").map((m) => dom.infoMembro(ctx, m));
-    const usados = {};
-    (ctx.registros.planos || []).forEach((p) => { usados[p.feedbackAberturaId] = true; });
-    const opcoesFb = (mid) => dom.feedbacksDo(ctx, mid).filter((f) => f.tipo === "Abertura de plano" && !usados[f.id]).map((f) => ({ valor: f.id, rotulo: "Abertura de plano · " + calc.fmtDataAno(f.data) }));
-    const fbs = membroId ? opcoesFb(membroId) : [];
-    const corpo = '<div id="form-plano">' + c.campo({ nome: "membroId", rotulo: "Membro", tipo: "lista", opcoes: membros.map((m) => ({ valor: m.id, rotulo: m.nome })), valor: membroId, desabilitado: !!feedbackId }) +
-      (feedbackId ? '<input type="hidden" name="membroId" value="' + esc(membroId) + '">' : "") +
-      c.campo({ nome: "feedbackAberturaId", rotulo: "Feedback SCI de abertura", tipo: "lista", opcoes: fbs, valor: feedbackId, ajuda: "O plano nasce logo depois do feedback de abertura. Sem ele, registre primeiro o feedback em Rotinas, com o tipo \"Abertura de plano\"." }) +
-      '<div class="linha-campos">' + c.campo({ nome: "inicio", rotulo: "Data de início (Dia 1)", tipo: "data", valor: ctx.hoje }) + '<div class="campo"><div class="rotulo">Término (Dia 60)</div><div class="entrada" id="termino-plano" style="background:var(--sutil)">' + calc.fmtDataAno(calc.terminoPlano(ctx.hoje)) + "</div></div></div>" +
-      '<div class="grupo-form"><div class="rotulo-grupo">2 resultados esperados</div>' +
-      c.campo({ nome: "resultado1", rotulo: "Resultado esperado 1", tipo: "textoLongo", linhas: 2, ajuda: "Um resultado de trabalho, mensurável. Nada sobre horário ou forma de execução." }) + c.campo({ nome: "evidencia1", rotulo: "Evidência de atingimento 1", tipo: "textoLongo", linhas: 2 }) +
-      c.campo({ nome: "resultado2", rotulo: "Resultado esperado 2", tipo: "textoLongo", linhas: 2 }) + c.campo({ nome: "evidencia2", rotulo: "Evidência de atingimento 2", tipo: "textoLongo", linhas: 2 }) + "</div>" +
-      c.campo({ nome: "apoio", rotulo: "Apoio oferecido", tipo: "textoLongo", linhas: 2, ajuda: "O que a liderança e a supervisão vão fazer para apoiar." }) + "</div>";
-    ui.abrirPainel({
-      titulo: "Plano de alinhamento de resultados", sub: "60 dias, com check-in no Dia 30. Coordenação e RH são avisados na abertura.", corpo, largo: true,
-      rodape: '<button class="btn" data-acao="salvar-plano">Abrir o plano</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
-      aoAbrir: function (el) {
-        const sel = el.querySelector('select[name="membroId"]');
-        if (sel) sel.addEventListener("change", function () {
-          const fbSel = el.querySelector('select[name="feedbackAberturaId"]');
-          fbSel.innerHTML = '<option value="">Selecione</option>' + opcoesFb(sel.value).map((o) => '<option value="' + esc(o.valor) + '">' + esc(o.rotulo) + "</option>").join("");
-        });
-        const ini = el.querySelector('input[name="inicio"]');
-        ini.addEventListener("change", function () { if (calc.dataValida(ini.value)) document.getElementById("termino-plano").textContent = calc.fmtDataAno(calc.terminoPlano(ini.value)); });
-      },
-    });
+  /** Alerta vermelho do RH: solicitações que chegaram e ainda não foram tocadas (reunião de 29/10/2026) */
+  function alertaRH(novasFunil, filaApp) {
+    const doApp = filaApp.filter((f) => f.item.estagio === "ENVIADA_RH" || f.item.estagio === "AG_COORD");
+    const n = novasFunil.length + doApp.length;
+    if (!n) return "";
+    return '<div class="card acao vermelho"><h3>' + icone("alerta", 16) + " " + plural(n, "solicitação nova aguarda o RH", "solicitações novas aguardam o RH") + "</h3><div class=\"lista\">" +
+      novasFunil.map((s) => '<div class="item clicavel" data-acao="abrir-negocio" data-id="' + esc(s.id) + '"><div class="principal-item"><div class="t">' + esc(s.membro || s.titulo) + '</div><div class="d">' +
+        esc([s.setor, s.motivo, s.solicitante ? "pedida por " + s.solicitante : "", s.criadaEm ? "em " + calc.fmtData(s.criadaEm) : ""].filter(Boolean).join(" · ")) + '</div></div><div class="lado">' + c.tag("Nova · esteira", "vermelho") + "</div></div>").join("") +
+      doApp.map((f) => linhaEnc(f.item)).join("") + "</div>" +
+      '<p class="muted" style="font-size:12px;margin:10px 0 0">O alerta some quando a solicitação sai de "Nova solicitação" na esteira (ou de "Enviada ao RH", nas feitas pelo app).</p></div>';
   }
-  ui.acoes["novo-plano"] = function (el) { abrirFormPlano(el.dataset.membro || "", ""); };
-  ui.acoes["salvar-plano"] = function (el) {
-    const f = document.getElementById("form-plano");
-    if (!ui.validar(f, ["membroId", "feedbackAberturaId", "inicio", "resultado1", "evidencia1", "resultado2", "evidencia2", "apoio"])) return;
-    const d = ui.lerForm(f);
+
+  /** Quem envia a solicitação (3.6): com coordenação acima da liderança, é a coordenação que envia; sem
+      coordenação acima, segue direto para o RH. */
+  function cartaoSolicitar(links) {
+    const ctx = E().ctx, uid = String(E().eu.id);
+    const p = dom.papeis(ctx, uid);
+    const meu = ctx.idx.membroPorUsuario[uid];
+    const coord = meu ? String(dom.coordenacaoEfetiva(ctx, meu) || "") : "";
+    const coordAcima = !p.rh && !p.enviaFormal && coord && coord !== uid;
+    const texto = E().visao === "rh" ? "O RH registra direto na esteira." : p.enviaFormal ? "Como coordenação, você envia a solicitação direto ao RH." :
+      coordAcima ? "Na sua área, quem envia a solicitação é a coordenação (" + dom.pessoa(ctx, coord).nome + "). Converse com ela antes: ela envia, e o RH acompanha pela esteira." :
+      "Sem coordenação acima de você, a solicitação vai direto para o RH.";
+    const botao = links.formOffboarding
+      ? '<a class="btn' + (coordAcima ? " sec" : "") + '" target="_blank" rel="noopener" href="' + esc(links.formOffboarding) + '">' + icone("externo", 14) + " Abrir o formulário de solicitação</a>"
+      : '<button class="btn' + (coordAcima ? " sec" : "") + '" data-acao="solicitar-encerramento">Verificar registros e solicitar</button>';
+    return '<div class="card acao" style="margin-bottom:16px"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3 style="margin-bottom:4px">Solicitar encerramento de contrato</h3>' +
+      '<div class="muted">' + esc(texto) + (links.formOffboarding ? " O formulário cria o card na esteira HR | Offboarding, e o RH conduz a partir dali." : " Antes de enviar, o app confere se os registros do membro estão completos.") +
+      " Dúvidas sobre o contrato vão para o RH.</div></div>" + botao + "</div></div>";
+  }
+
+  /** Esteira "HR | Offboarding" (só o RH lê o funil): as solicitações em andamento, por etapa */
+  function esteiraHtml(funil) {
+    const off = E().ctx.offboarding || {};
+    const abertas = funil.filter((s) => !s.semantica);
+    let corpo;
+    if (off.erro) corpo = '<div class="aviso-atencao">Não foi possível ler a esteira: ' + esc(off.erro) + '. A função do RH precisa de leitura no funil "HR | Offboarding" (CRM → Configurações → Permissões de acesso).</div>';
+    else if (!off.categoria) corpo = c.vazio("A esteira de offboarding ainda não está ligada ao app (Configuração → funil de offboarding).");
+    else corpo = abertas.length ? '<div class="lista">' + abertas.map((s) =>
+      '<div class="item clicavel" data-acao="abrir-negocio" data-id="' + esc(s.id) + '"><div class="principal-item"><div class="t">' + esc(s.membro || s.titulo) + '</div><div class="d">' +
+      esc([s.setor, s.motivo, s.solicitante ? "pedida por " + s.solicitante : "", s.dataDesejada ? "data desejada " + calc.fmtData(s.dataDesejada) : ""].filter(Boolean).join(" · ")) + "</div>" +
+      '<div class="barra" style="margin-top:8px;max-width:360px"><div class="preench" style="width:' + (s.posicao ? Math.round((s.posicao / s.totalEtapas) * 100) : 0) + '%"></div></div></div>' +
+      '<div class="lado">' + c.tag(s.nova ? "Nova solicitação" : s.etapa, s.nova ? "vermelho" : "azul") + '<span class="prazo">desde ' + calc.fmtData(s.criadaEm) + "</span></div></div>").join("") + "</div>"
+      : c.vazio("Nenhuma solicitação em andamento na esteira.");
+    return '<div class="card"><h3>Esteira HR | Offboarding<span class="extra muted">' + plural(abertas.length, "em andamento", "em andamento") + " · o RH move os cards no Bitrix</span></h3>" + corpo + "</div>";
+  }
+  ui.acoes["abrir-negocio"] = function (el) {
+    if (E().repo.modo === "bitrix" && E().repo.abrirNegocio) E().repo.abrirNegocio(el.dataset.id);
+    else ui.avisar("Na demonstração, o card " + el.dataset.id + " abriria na esteira do Bitrix.");
+  };
+
+  /** Histórico de desligamentos por trimestre, semestre ou ano (reunião de 29/10/2026) */
+  const GRANULARIDADES = [["trimestre", "Trimestre"], ["semestre", "Semestre"], ["ano", "Ano"]];
+  function historicoHtml() {
     const ctx = E().ctx;
-    const m = dom.infoMembro(ctx, ctx.idx.membro[d.membroId]);
-    if (dom.planoAtivoDo(ctx, m.id)) { ui.erroNoPainel(m.nome + " já tem um plano em andamento."); return; }
-    ui.salvar(el, async () => {
-      const p = await ui.criar("planos", {
-        titulo: "Plano · " + m.nome, membroId: m.id, responsavel: m.responsavel, feedbackAberturaId: d.feedbackAberturaId, inicio: d.inicio, termino: calc.terminoPlano(d.inicio),
-        resultado1: d.resultado1, evidencia1: d.evidencia1, resultado2: d.resultado2, evidencia2: d.evidencia2, apoio: d.apoio, autor: E().eu.id, estagio: "NEW",
-      });
-      await ui.atualizar("feedbacks", d.feedbackAberturaId, { planoId: p.id });
-      await GP.app.avisarRH("Plano de alinhamento de resultados aberto para " + m.nome + ", com término em " + calc.fmtData(p.termino) + ".", [m.coordenacao]);
-      ui.navegar("#/offboarding/plano/" + p.id);
-      return p;
-    }, { mensagem: "Plano aberto. Check-in no Dia 30." });
-  };
-  ui.acoes["checkin-plano"] = function (el) {
-    const p = E().ctx.idx.porId.planos[el.dataset.id];
-    ui.abrirPainel({
-      titulo: "Check-in do plano (Dia 30)", largo: true,
-      corpo: '<div id="form-checkin"><p class="muted" style="margin-top:0">Situação de cada resultado esperado até aqui.</p>' +
-        "<p><b>1.</b> " + esc(p.resultado1) + "</p>" + c.campo({ nome: "checkin1", rotulo: "Resultado 1", tipo: "escolha", opcoes: op.checkin }) +
-        "<p><b>2.</b> " + esc(p.resultado2) + "</p>" + c.campo({ nome: "checkin2", rotulo: "Resultado 2", tipo: "escolha", opcoes: op.checkin }) +
-        c.campo({ nome: "checkinComentario", rotulo: "Comentário", tipo: "textoLongo", ajuda: "Fatos e resultados, com datas." }) + c.campo({ nome: "checkinData", rotulo: "Data do check-in", tipo: "data", valor: E().ctx.hoje, max: E().ctx.hoje }) + "</div>",
-      rodape: '<button class="btn" data-acao="salvar-checkin" data-id="' + esc(p.id) + '">Registrar o check-in</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
-    });
-  };
-  ui.acoes["salvar-checkin"] = function (el) {
-    const f = document.getElementById("form-checkin");
-    if (!ui.validar(f, ["checkin1", "checkin2", "checkinComentario", "checkinData"])) return;
-    const d = ui.lerForm(f);
-    ui.salvar(el, () => ui.atualizar("planos", el.dataset.id, { checkin1: d.checkin1, checkin2: d.checkin2, checkinComentario: d.checkinComentario, checkinData: d.checkinData, estagio: "CHECKIN_OK" }), { mensagem: "Check-in registrado." });
-  };
-  ui.acoes["encerrar-plano"] = function (el) {
-    const ctx = E().ctx;
-    const p = ctx.idx.porId.planos[el.dataset.id];
-    const fbs = dom.feedbacksDo(ctx, p.membroId).filter((f) => f.tipo === "Encerramento de plano" && f.data >= p.inicio).map((f) => ({ valor: f.id, rotulo: "Encerramento de plano · " + calc.fmtDataAno(f.data) }));
-    ui.abrirPainel({
-      titulo: "Encerrar o plano (Dia 60)", largo: true,
-      corpo: '<div id="form-enc-plano">' + (fbs.length ? "" : '<div class="aviso-atencao" style="margin-bottom:14px">Falta o feedback SCI de encerramento do plano. <a href="#" data-acao="novo-feedback" data-membro="' + esc(p.membroId) + '" data-tipo="Encerramento de plano">Registrar agora</a> e volte aqui.</div>') +
-        "<p><b>1.</b> " + esc(p.resultado1) + "</p>" + c.campo({ nome: "final1", rotulo: "Situação final do resultado 1", tipo: "escolha", opcoes: op.situacaoFinal }) +
-        "<p><b>2.</b> " + esc(p.resultado2) + "</p>" + c.campo({ nome: "final2", rotulo: "Situação final do resultado 2", tipo: "escolha", opcoes: op.situacaoFinal }) +
-        c.campo({ nome: "feedbackEncerramentoId", rotulo: "Feedback SCI de encerramento", tipo: "lista", opcoes: fbs }) + "</div>",
-      rodape: '<button class="btn" data-acao="salvar-enc-plano" data-id="' + esc(p.id) + '">Encerrar o plano</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
-    });
-  };
-  ui.acoes["salvar-enc-plano"] = function (el) {
-    const f = document.getElementById("form-enc-plano");
-    if (!ui.validar(f, ["final1", "final2", "feedbackEncerramentoId"])) return;
-    const d = ui.lerForm(f);
-    const atingiu = d.final1 === "Atingido" && d.final2 === "Atingido";
-    const ctx = E().ctx;
-    const p = ctx.idx.porId.planos[el.dataset.id];
-    const m = dom.infoMembro(ctx, ctx.idx.membro[p.membroId]);
-    ui.salvar(el, async () => {
-      await ui.atualizar("planos", p.id, { final1: d.final1, final2: d.final2, feedbackEncerramentoId: d.feedbackEncerramentoId, estagio: atingiu ? "SUCCESS" : "FAIL" });
-      await ui.atualizar("feedbacks", d.feedbackEncerramentoId, { planoId: p.id });
-      await GP.app.avisarRH("Plano de alinhamento de " + m.nome + " encerrado: " + (atingiu ? "resultados atingidos." : "resultados não atingidos."), [m.coordenacao]);
-    }, { mensagem: atingiu ? "Plano encerrado com os resultados atingidos." : "Plano encerrado sem os resultados." });
-  };
-  ui.acoes["prorrogar-plano"] = function (el) {
-    const p = E().ctx.idx.porId.planos[el.dataset.id];
-    ui.abrirPainel({
-      titulo: "Prorrogar o plano", sub: "O RH altera a data de término e devolve o plano para \"Check-in realizado\" (3.5.2).",
-      corpo: '<div id="form-prorrogar">' + c.campo({ nome: "termino", rotulo: "Nova data de término", tipo: "data", valor: p.termino, min: E().ctx.hoje }) + c.campo({ nome: "justificativa", rotulo: "Justificativa", tipo: "textoLongo" }) + "</div>",
-      rodape: '<button class="btn" data-acao="salvar-prorrogar" data-id="' + esc(p.id) + '">Prorrogar</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
-    });
-  };
-  ui.acoes["salvar-prorrogar"] = function (el) {
-    const f = document.getElementById("form-prorrogar");
-    if (!ui.validar(f, ["termino", "justificativa"])) return;
-    const d = ui.lerForm(f);
-    const p = E().ctx.idx.porId.planos[el.dataset.id];
-    ui.salvar(el, () => ui.atualizar("planos", p.id, { termino: d.termino, estagio: "CHECKIN_OK", adendos: ui.novoAdendo(p.adendos, d.justificativa, "Prorrogado de " + calc.fmtData(p.termino) + " para " + calc.fmtData(d.termino) + ".") }), { mensagem: "Plano prorrogado." });
-  };
+    const g = E().filtros.offPeriodo || "trimestre";
+    const linhas = dom.historicoDesligamentos(ctx, g, filtroHistorico());
+    const rh = E().visao === "rh";
+    const seletor = '<select class="entrada" style="width:auto;padding:4px 8px" data-mudar="off-periodo" aria-label="Agrupar por">' + GRANULARIDADES.map((x) => '<option value="' + x[0] + '"' + (x[0] === g ? " selected" : "") + ">" + x[1] + "</option>").join("") + "</select>";
+    const corpo = linhas.length ? '<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Período</th><th class="n">Desligamentos</th><th class="n">Solicitações</th><th>Motivos (solicitações concluídas)</th></tr></thead><tbody>' +
+      linhas.map((l) => "<tr><td><b>" + esc(l.periodo.rotulo) + "</b>" + (l.desligamentos.length ? '<div class="muted" style="font-size:12px">' + esc(l.desligamentos.map((d) => d.nome + " (" + calc.fmtData(d.data) + ")").join(", ")) + "</div>" : "") + "</td>" +
+        '<td class="n"><b>' + l.desligamentos.length + '</b></td><td class="n">' + l.solicitacoes + "</td><td>" +
+        (Object.keys(l.motivos).length ? Object.keys(l.motivos).map((k) => esc(k) + " (" + l.motivos[k] + ")").join(" · ") : '<span class="muted">—</span>') + "</td></tr>").join("") + "</tbody></table></div>"
+      : c.vazio("Nenhum desligamento registrado ainda.");
+    return '<div class="card"><h3>Histórico de desligamentos<span class="extra">' + seletor + (rh ? ' <button class="btn peq sec" data-acao="exportar-csv" data-conjunto="desligamentos">' + icone("baixar", 13) + " CSV</button>" : "") + "</span></h3>" +
+      '<p class="muted" style="margin-top:0;font-size:12px">Desligamentos: membros que passaram para Encerrado no processo Membros, na data da mudança. Solicitações: as que entraram pela esteira' + (rh ? "" : " (o RH vê as da esteira)") + " e pelo app, na data em que foram criadas.</p>" + corpo + "</div>";
+  }
+  ui.acoes["off-periodo"] = function (el) { E().filtros.offPeriodo = el.value; E().manterRolagem = true; ui.render(); };
 
   /* ================================================================ ENCERRAMENTO */
   function checagemHtml(v) {
@@ -247,6 +176,7 @@
     }
     if (e.estagio === "APROVADA") acoes += '<button class="btn" data-acao="registrar-conversa" data-id="' + esc(e.id) + '">Registrar a conversa</button>';
     if (["SUCCESS", "FAIL"].indexOf(e.estagio) < 0 && (rh || !posRH)) acoes += '<button class="btn link" data-acao="cancelar-encerramento" data-id="' + esc(e.id) + '">Cancelar a solicitação</button>';
+    acoes += c.botaoExcluir("encerramentos", e, { volta: "#/offboarding", descricao: "a solicitação de encerramento de contrato de " + m.nome });
     const idx = FLUXO.indexOf(e.estagio);
     const passos = '<div class="passos">' + FLUXO.map((s, i) => '<span class="p ' + (e.estagio === "SUCCESS" || (idx >= 0 && i < idx) ? "feito" : i === idx ? "atual" : "") + '">' + NOMES_FLUXO[s] + "</span>").join("") + (e.estagio === "BLOQUEADA" ? '<span class="p" style="background:var(--vermelho-bg);color:var(--vermelho);font-weight:600">Bloqueada</span>' : "") + (e.estagio === "FAIL" ? '<span class="p">Cancelada</span>' : "") + "</div>";
     const guia = GUIA[e.estagio];
@@ -260,7 +190,7 @@
       ["Apoio do RH na conversa", e.apoioRH], ["Coordenação responsável", dom.pessoa(ctx, e.coordenacao).nome], ["Quem solicitou", dom.pessoa(ctx, e.solicitante || e.criadoPor).nome], ["Data da conversa", calc.fmtDataAno(e.dataConversa)]]) +
       '<div class="sci" style="margin-top:14px">' + c.textoRegistro("Descrição do motivo", e.descricao) + c.textoRegistro("Justificativa do fluxo abreviado", e.justificativa) + c.textoRegistro("Liberação excepcional do RH", e.liberacaoRH) +
       (e.adendos ? '<div><div class="k">Comentários e adendos</div><div class="adendo">' + esc(e.adendos) + "</div></div>" : "") + "</div></div>" +
-      '<div class="card"><h3>Verificação de registros</h3>' + checagemHtml(ver) + (plano ? '<p style="margin-top:12px"><a href="#/offboarding/plano/' + esc(plano.id) + '">Abrir o plano vinculado →</a></p>' : "") + "</div>";
+      '<div class="card"><h3>Verificação de registros</h3>' + checagemHtml(ver) + (plano ? '<p style="margin-top:12px"><a href="#/rotinas/plano/' + esc(plano.id) + '">Abrir o plano de melhoria vinculado →</a></p>' : "") + "</div>";
     return h;
   }
 
@@ -483,5 +413,6 @@
   };
 
   GP.telas = GP.telas || {};
-  GP.telas.offboarding = { planoResumoHtml, encerramentoResumoHtml, abrirFormPlano };
+  // planoResumoHtml e abrirFormPlano ficam aqui só por compatibilidade: o plano mora em 63-ui-planos.js
+  GP.telas.offboarding = { encerramentoResumoHtml, planoResumoHtml: (p, x) => GP.telas.planos.planoResumoHtml(p, x), abrirFormPlano: (m) => GP.telas.planos.abrirFormPlano(m) };
 })(window);

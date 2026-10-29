@@ -228,6 +228,41 @@
   }
   async function criar(chave, dados) { const it = await estado.repo.criar(chave, dados); aplicarNoContexto(chave, it); return it; }
   async function atualizar(chave, id, dados) { const it = await estado.repo.atualizar(chave, id, dados); aplicarNoContexto(chave, it); return it; }
+  /** Exclui no Bitrix (lixeira do CRM) e tira do contexto */
+  async function excluir(chave, id) {
+    await estado.repo.excluir(chave, id);
+    const lista = estado.ctx.registros[chave] || [];
+    const i = lista.findIndex((x) => x.id === String(id));
+    if (i >= 0) lista.splice(i, 1);
+    dom.indexar(estado.ctx);
+  }
+
+  /* ---------------- excluir (pedido de 29/10/2026) ---------------- */
+  /** Botão "Excluir" de um registro, só para quem pode (dom.podeExcluir). o = { volta: rota depois de excluir, descricao } */
+  c.botaoExcluir = function (chave, item, o) {
+    if (!item || !estado.ctx || !dom.podeExcluir(estado.ctx, chave, item, estado.eu.id, agoraISO())) return "";
+    const op = o || {};
+    return '<button type="button" class="btn link excluir nao-imprimir" data-acao="excluir-registro" data-chave="' + esc(chave) + '" data-id="' + esc(item.id) + '"' +
+      (op.volta ? ' data-volta="' + esc(op.volta) + '"' : "") + (op.descricao ? ' data-descricao="' + esc(op.descricao) + '"' : "") + ">" + icone("lixeira", 14) + " " + esc(op.rotulo || "Excluir") + "</button>";
+  };
+  acoes["excluir-registro"] = function (el) {
+    const chave = el.dataset.chave, id = el.dataset.id;
+    const item = estado.ctx.idx.porId[chave] && estado.ctx.idx.porId[chave][id];
+    if (!item) return;
+    if (!dom.podeExcluir(estado.ctx, chave, item, estado.eu.id, agoraISO())) { avisar("Você não pode excluir este registro.", "erro"); return; }
+    const desc = el.dataset.descricao || item.titulo || "este registro";
+    if (!window.confirm("Excluir " + desc + "?\n\nO item vai para a lixeira do CRM do Bitrix, de onde um administrador consegue restaurar. O card do membro guarda quem excluiu e quando.")) return;
+    const membroId = item.membroId;
+    salvar(el, async () => {
+      await excluir(chave, id);
+      // o rastro fica no histórico do item do Membros, sem o conteúdo do registro
+      if (membroId && estado.ctx.idx.membro[membroId]) {
+        const quem = estado.eu.nome + (estado.verComo && estado.euReal ? " (registrado por " + estado.euReal.nome + ")" : "");
+        try { await estado.repo.comentar("membros", membroId, "Excluído no app Gestão de Pessoas: " + desc + ". Por " + quem + " em " + calc.fmtDataAno(estado.ctx.hoje) + "."); } catch (e) { /* o comentário não impede a exclusão */ }
+      }
+      if (el.dataset.volta) navegar(el.dataset.volta);
+    }, { mensagem: "Excluído. O item está na lixeira do CRM." });
+  };
   /** Texto do adendo: data, autor e justificativa automáticos (4.1) */
   function novoAdendo(atual, justificativa, texto) {
     const agora = new Date();
@@ -235,7 +270,12 @@
       (estado.verComo && estado.euReal ? " (registrado por " + estado.euReal.nome + ")" : "");
     return (atual ? atual + "\n\n" : "") + "[" + carimbo + "]\nJustificativa: " + justificativa.trim() + "\n" + texto.trim();
   }
-  function agoraISO() { return new Date().toISOString(); }
+  /** Agora, para o prazo de 48 horas. Na demonstração, o dia é o "hoje" dela (08/10/2026), como as datas
+      que o repositório de demonstração grava: senão nada criado ali seria editável. */
+  function agoraISO() {
+    if (estado.repo && estado.repo.modo === "demo" && estado.ctx) return estado.ctx.hoje + "T" + new Date().toTimeString().slice(0, 8) + "-03:00";
+    return new Date().toISOString();
+  }
 
   /* ---------------- rotas ---------------- */
   function lerRota() {
@@ -248,14 +288,17 @@
   /* ---------------- layout ---------------- */
   function menu() {
     const r = estado.rota.nome;
-    const item = (rota, ic, rotulo, contador) => '<a href="#/' + rota + '" class="' + (r === rota ? "ativo" : "") + '">' + icone(ic, 17) + "<span>" + rotulo + "</span>" +
-      (contador ? '<span class="contador" title="Pendências atrasadas">' + contador + "</span>" : "") + "</a>";
+    const item = (rota, ic, rotulo, contador, dica) => '<a href="#/' + rota + '" class="' + (r === rota ? "ativo" : "") + '">' + icone(ic, 17) + "<span>" + rotulo + "</span>" +
+      (contador ? '<span class="contador' + (dica ? " novo" : "") + '" title="' + esc(dica || "Pendências atrasadas") + '">' + contador + "</span>" : "") + "</a>";
     if (estado.visao === "ceo") return item("inicio", "inicio", "Início") + item("painel", "painel", "Painel geral");
     const atrasadas = dom.pendenciasDe(estado.ctx, minhaEquipe(), { uid: estado.eu.id }).filter((p) => p.atrasado).length;
     const links = (estado.config && estado.config.links) || {};
+    // Alerta vermelho nos módulos em que o RH recebe demandas novas (reunião de 29/10/2026)
+    const dem = estado.visao === "rh" ? dom.demandasRH(estado.ctx) : {};
+    const novas = "Solicitações novas aguardando o RH";
     let h = item("inicio", "inicio", "Início") + item("painel", "painel", "Painel", atrasadas) + item("equipe", "equipe", "Minha equipe") + item("agenda", "agenda", "Agenda da equipe") +
-      '<div class="grupo">Módulos</div>' + item("recrutamento", "recrutamento", "Recrutamento") + item("onboarding", "onboarding", "Onboarding") +
-      item("rotinas", "rotinas", "Rotinas") + item("desempenho", "desempenho", "Desempenho") + item("offboarding", "offboarding", "Offboarding") +
+      '<div class="grupo">Módulos</div>' + item("recrutamento", "recrutamento", "Recrutamento", dem.recrutamento, novas) + item("onboarding", "onboarding", "Onboarding") +
+      item("rotinas", "rotinas", "Feedbacks") + (dom.DESEMPENHO_ATIVO ? item("desempenho", "desempenho", "Desempenho") : "") + item("offboarding", "offboarding", "Offboarding", dem.offboarding, novas) +
       '<div class="grupo">Para consultar</div>' +
       (links.manual ? '<a href="' + esc(links.manual) + '" target="_blank" rel="noopener">' + icone("manual", 17) + "<span>Manual da liderança</span></a>" : "") +
       item("perfil", "perfil", "Perfil");
@@ -273,7 +316,24 @@
       '<div style="margin-top:8px">' + seletor + "</div>" +
       (podeVerComo() ? '<button class="btn peq sec" style="margin-top:10px;width:100%" data-acao="abrir-ver-como">' + icone("equipe", 13) + " Ver como outra pessoa</button>" : "") +
       "</div></aside>" +
-      '<main class="principal">' + faixaVerComo() + (demo ? faixaDemo() : "") + avisoEstrutura() + '<div class="conteudo">' + conteudo + "</div></main></div>";
+      '<main class="principal">' + faixaVerComo() + (demo ? faixaDemo() : "") + avisoEstrutura() + avisoAcesso() + '<div class="conteudo">' + conteudo + "</div></main></div>";
+  }
+  /** RH e administrador: avisa quando a função de acesso do CRM esconde registros do app. Sem isto, uma
+      equipe vazia em "Ver como" parece defeito do app (o caso do RH em 28/10/2026). Compara o que o
+      login leu com o total do processo no servidor (api/contagem.js) e com os processos negados. */
+  function avisoAcesso() {
+    if (!podeVerComo() || !estado.repo || estado.repo.modo === "demo" || !estado.ctx) return "";
+    const negados = estado.acessoNegado || [];
+    const total = estado.contagem || {};
+    const faltas = [];
+    GP.schema.PROCESSOS.forEach((p) => {
+      if (negados.indexOf(p.chave) >= 0) { faltas.push(p.nome + ": sem leitura"); return; }
+      const vistos = (estado.ctx.registros[p.chave] || []).length;
+      if (typeof total[p.chave] === "number" && total[p.chave] > vistos) faltas.push(p.nome + ": " + vistos + " de " + total[p.chave]);
+    });
+    if (!faltas.length) return "";
+    return '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>O Bitrix não deixa o seu usuário ler todos os registros do app</b> (' + esc(faltas.join(" · ")) + "). " +
+      "Por isso equipes, membros e registros podem aparecer vazios, inclusive em \"Ver como\". Um administrador do Bitrix resolve em CRM → Configurações → Permissões de acesso: a função do RH precisa de \"Todos\" em Ler e em Editar nos processos \"Gestão de Pessoas · …\". Depois, recarregue o app.</div></div>";
   }
   /* ---------------- ver como outra pessoa (administrador ou RH; somente leitura) ---------------- */
   /** Administrador do Bitrix ou quem está em Papéis -> RH (o RH já vê todas as equipes; o modo não grava nada) */
@@ -326,6 +386,11 @@
     if (e.origem === "ausente") {
       return '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>O app ainda não foi configurado no Bitrix.</b> ' +
         (estado.eu.admin ? 'Abra <a href="#/config">Configuração</a> e crie a estrutura (processos inteligentes, estágios e campos).' : "Avise o TI: falta criar a estrutura do app no Bitrix.") + "</div></div>";
+    }
+    const faltaProc = (e.processosFaltando || []).map((k) => GP.schema.processo(k)).filter(Boolean);
+    if (faltaProc.length && (estado.eu.admin || podeVerComo())) {
+      return '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>' + (faltaProc.length === 1 ? "Um processo novo do app ainda não existe" : faltaProc.length + " processos novos do app ainda não existem") + " no Bitrix</b> (" + esc(faltaProc.map((p) => p.nome).join(", ")) + "). " +
+        (estado.eu.admin ? 'Abra <a href="#/config">Configuração</a> e clique em "Criar ou completar a estrutura". Depois, dê à função do RH e às lideranças o acesso a ele no CRM, como nos outros processos.' : "Um administrador do Bitrix precisa abrir Configuração no app e criar a estrutura.") + "</div></div>";
     }
     if (e.ausentes && e.ausentes.length && estado.eu.admin) {
       return '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>' + e.ausentes.length + " campo(s) do app não existem no Bitrix.</b> " +
@@ -412,6 +477,6 @@
 
   GP.ui = {
     estado, rotas, acoes, c, render, podeVerComo, navegar, abrirPainel, fecharPainel, erroNoPainel, avisar, lerForm, validar,
-    salvar, criar, atualizar, aplicarNoContexto, novoAdendo, agoraISO, visoesDisponiveis, membrosDaVisao, minhaEquipe, podeVerConteudo, VISOES,
+    salvar, criar, atualizar, excluir, aplicarNoContexto, novoAdendo, agoraISO, visoesDisponiveis, membrosDaVisao, minhaEquipe, podeVerConteudo, VISOES,
   };
 })(window);

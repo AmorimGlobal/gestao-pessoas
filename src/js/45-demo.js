@@ -78,9 +78,18 @@
       links: {
         manual: "https://drive.google.com/file/d/1fZNxcYlnxcGshaoWlYZ9pjLljZOVkqcL/view",
         formVaga: "https://b24-ljukko.bitrix24.site/crm_form_4nlpe/",
-        formEncerramento: "", baseConhecimento: "", guiaOnboarding: "", guiaOffboarding: "", modelosSCI: "",
+        formOffboarding: "", baseConhecimento: "", guiaOnboarding: "", guiaOffboarding: "", modelosSCI: "",
       },
       recrutamento: { categoria: 77 },
+      offboarding: { categoria: 79 },
+      // glossário de exemplo: o do RH entra em Configuração (reunião de 29/10/2026)
+      competencias: [
+        { nome: "Comunicação clara", descricao: "Explica o andamento e os riscos sem precisar ser cobrado." },
+        { nome: "Organização", descricao: "Mantém a própria fila de casos em ordem de prazo." },
+        { nome: "Atenção aos detalhes", descricao: "Confere documentos e números antes de enviar." },
+        { nome: "Colaboração", descricao: "Pede e oferece ajuda à equipe no tempo certo." },
+        { nome: "Autonomia", descricao: "Resolve o que está no seu escopo e traz proposta para o que não está." },
+      ],
     });
 
     /* ---------- registros ---------- */
@@ -126,6 +135,24 @@
     membro("11", "121", "5", "2", "ATIVO", { funcao: "Negócios · Analista", ingresso: "2023-03-06", nivel: "Analista I", senioridade: "Júnior" });
     membro("12", "122", "5", "2", "ATIVO", { funcao: "Negócios · Analista", ingresso: "2020-11-16", nivel: "Especialista", senioridade: "Sênior" });
     membro("13", "123", "5", "2", "ATIVO", { funcao: "Negócios · Analista", ingresso: "2025-01-13", nivel: "Analista I", senioridade: "Júnior" });
+    // Saídas anteriores (item em Encerrado; o usuário já foi desativado no Bitrix): o histórico do offboarding
+    const saida = (id, uid, nome, lid, quando) => add("membros", { id, titulo: nome, responsavel: uid, estagio: "SUCCESS", lideranca: lid, coordenacao: "2", contrato: "Associado", movidoEm: quando + "T18:00:00-03:00", atualizadoEm: quando + "T18:00:00-03:00" });
+    saida("20", "190", "Paulo Viana", "4", "2026-08-29");
+    saida("21", "191", "Clara Neves", "3", "2026-03-31");
+    saida("22", "192", "Sérgio Lopes", "5", "2025-11-14");
+
+    /* 1:1 mensais (conversa breve do mês) */
+    const mensal = (mid, resp, data, autor, extra) => add("mensal", Object.assign({
+      titulo: "1:1 de " + calc.mesDe(data).curto + " · " + nomeDe(resp), membroId: mid, responsavel: resp, data, autor, estagio: "NEW", criadoEm: data + "T17:00:00-03:00",
+      comoEsta: "Bem, com a carga do mês organizada.", apoio: "", pontos: "Andamento dos casos do mês e prioridades da semana.", combinados: "",
+    }, extra));
+    mensal("1", "100", "2026-09-10", "3", { apoio: "Quer acompanhar uma reunião de cliente com a liderança." });
+    mensal("1", "100", "2026-10-06", "3", { pontos: "Preparação para o O2O do trimestre e os casos de cidadania.", combinados: "Trazer 2 temas para o O2O de 14/10." });
+    mensal("2", "101", "2026-09-17", "3");
+    mensal("4", "103", "2026-09-24", "3", { comoEsta: "Mais tranquilo depois do check-in do plano.", pontos: "Fila de pareceres e tempo de resposta." });
+    ["10", "11", "12", "13"].forEach((mid, i) => mensal(mid, String(120 + i), "2026-09-" + String(8 + i * 3).padStart(2, "0"), "5"));
+    mensal("10", "120", "2026-10-02", "5");
+    mensal("12", "122", "2026-10-05", "5");
 
     /* Ciclo trimestral */
     const T3 = { trimestre: "2026-T3", fimTrimestre: "2026-09-30", prazoEvidencias: "2026-10-15", criadoEm: "2026-07-01T09:00:00-03:00" };
@@ -224,7 +251,7 @@
       fichaEscopo: "Atendimento dos pedidos de cidadania e vistos da carteira de Salvador.", fichaPadroes: "Checklist de documentos completo antes de cada protocolo.",
       fichaIndicadores: "Protocolos sem exigência; prazo de resposta ao cliente.",
       entregasAncoragem: "Triagem de documentos de 2 processos; checklist de requerimento.", entregasImersao: "Dossiê completo; parecer de elegibilidade; 1 atendimento acompanhado.",
-      entregasMarAberto: "Carteira de 6 casos no volume regular.", fichaEm: "2026-08-26", entregasPlanejadasEm: "2026-09-10",
+      entregasMarAberto: "Carteira de 6 casos no volume regular.", fichaEm: "2026-08-26", fichaEnviadaEm: "2026-08-26T18:20:00-03:00", entregasPlanejadasEm: "2026-09-10",
       al1Data: "2026-09-25", al1Nota: 85, al1Resultado: "Dentro do esperado",
       al1Retorno: "Feedback de reconhecimento: a triagem chegou completa nas duas entregas.", al1Combinados: "Na Imersão, assumir o dossiê completo com revisão da supervisão.", autor: "3",
     });
@@ -287,7 +314,31 @@
       ],
     };
 
-    return { usuarios, departamentos, config, registros: reg, ausencias, vagas };
+    /* Funil "HR | Offboarding" (formulário CRM): o mesmo formato que o repositório do Bitrix devolve */
+    const offboarding = {
+      etapas: [
+        { id: "C79:NEW", nome: "Nova solicitação", semantica: "" }, { id: "C79:PREPARATION", nome: "Aguardando coordenação", semantica: "" },
+        { id: "C79:PREPAYMENT_INVOIC", nome: "Em análise (RH)", semantica: "" }, { id: "C79:EXECUTING", nome: "Aprovada", semantica: "" },
+        { id: "C79:FINAL_INVOICE", nome: "Conversa realizada", semantica: "" }, { id: "C79:POS_ENC", nome: "Pós-encerramento", semantica: "" },
+        { id: "C79:WON", nome: "Concluída", semantica: "S" }, { id: "C79:LOSE", nome: "Cancelada", semantica: "F" },
+      ],
+      negocios: [
+        { ID: "9101", TITLE: "Encerramento · Igor Santos", STAGE_ID: "C79:NEW", DATE_CREATE: "2026-10-07T16:20:00-03:00", DATE_MODIFY: "2026-10-07T16:20:00-03:00",
+          UF_CRM_OFF_SOLICIT: "Livia Prado", UF_CRM_OFF_EMAIL: "livia.prado@amorimglobal.com", UF_CRM_OFF_PAPEL: "Coordenação", UF_CRM_OFF_MEMBRO: "Igor Santos",
+          UF_CRM_OFF_SETOR: "Soluções · Tributário", UF_CRM_OFF_CONTRATO: "Associado", UF_CRM_OFF_MOTIVO: "Reestruturação da área", UF_CRM_OFF_DATA_DES: "2026-10-30", UF_CRM_OFF_REPOSICAO: "Sem reposição" },
+        { ID: "9102", TITLE: "Encerramento · Paulo Viana", STAGE_ID: "C79:WON", DATE_CREATE: "2026-08-10T10:00:00-03:00", DATE_MODIFY: "2026-08-29T18:00:00-03:00", CLOSEDATE: "2026-08-29",
+          UF_CRM_OFF_SOLICIT: "Livia Prado", UF_CRM_OFF_EMAIL: "livia.prado@amorimglobal.com", UF_CRM_OFF_PAPEL: "Coordenação", UF_CRM_OFF_MEMBRO: "Paulo Viana",
+          UF_CRM_OFF_SETOR: "Soluções · Tributário", UF_CRM_OFF_CONTRATO: "Associado", UF_CRM_OFF_MOTIVO: "Pedido do membro", UF_CRM_OFF_DATA_EFET: "2026-08-29" },
+        { ID: "9103", TITLE: "Encerramento · Clara Neves", STAGE_ID: "C79:WON", DATE_CREATE: "2026-03-02T10:00:00-03:00", DATE_MODIFY: "2026-03-31T18:00:00-03:00", CLOSEDATE: "2026-03-31",
+          UF_CRM_OFF_SOLICIT: "Carla Mendes", UF_CRM_OFF_EMAIL: "carla.mendes@amorimglobal.com", UF_CRM_OFF_PAPEL: "Liderança direta (sem coordenação acima)", UF_CRM_OFF_MEMBRO: "Clara Neves",
+          UF_CRM_OFF_SETOR: "Soluções · Imigração", UF_CRM_OFF_CONTRATO: "Estágio", UF_CRM_OFF_MOTIVO: "Fim do prazo previsto no contrato", UF_CRM_OFF_DATA_EFET: "2026-03-31" },
+        { ID: "9104", TITLE: "Encerramento · (cancelada)", STAGE_ID: "C79:LOSE", DATE_CREATE: "2026-09-15T10:00:00-03:00", DATE_MODIFY: "2026-09-18T10:00:00-03:00",
+          UF_CRM_OFF_SOLICIT: "Rafael Souza", UF_CRM_OFF_EMAIL: "rafael.souza@amorimglobal.com", UF_CRM_OFF_PAPEL: "Liderança direta (sem coordenação acima)", UF_CRM_OFF_MEMBRO: "Otávio Ramos",
+          UF_CRM_OFF_SETOR: "Soluções · Negócios", UF_CRM_OFF_MOTIVO: "Desalinhamento de perfil" },
+      ],
+    };
+
+    return { usuarios, departamentos, config, registros: reg, ausencias, vagas, offboarding };
   }
 
   /** Repositório em memória com a interface de GP.bitrix.criarRepositorio() */
@@ -344,7 +395,29 @@
         return copia(it);
       },
       buscar: async (chave, id) => copia((d.registros[chave] || []).find((x) => x.id === String(id))),
+      excluir: async (chave, id) => {
+        await atraso();
+        const lista = d.registros[chave] || [];
+        const i = lista.findIndex((x) => x.id === String(id));
+        if (i < 0) throw { descricao: "registro " + id + " não encontrado" };
+        lista.splice(i, 1);
+      },
+      temProcesso: () => true,
+      acessoNegado: [],
       abrirCard: () => {},
+      abrirNegocio: () => {},
+      offboarding: async () => copia(d.offboarding),
+      contagemServidor: async () => null, // fora do Bitrix não há servidor para comparar
+      /** Na demonstração a Ficha não sai por e-mail: só marca o envio */
+      enviarFicha: async (onboardingId) => {
+        await atraso();
+        const o = (d.registros.onboarding || []).find((x) => x.id === String(onboardingId));
+        const m = o && (d.registros.membros || []).find((x) => x.id === o.membroId);
+        const u = m && d.usuarios.find((x) => x.id === m.responsavel);
+        if (!o || !u) throw { descricao: "onboarding não encontrado" };
+        o.fichaEnviadaEm = agora();
+        return { ok: true, para: u.email, enviadaEm: o.fichaEnviadaEm, demo: true };
+      },
       feriadosNacionais: async (ano) => calc.feriadosNacionais(ano),
       ausencias: async (ids) => copia(d.ausencias.filter((a) => ids.indexOf(a.pessoa) >= 0)),
       agendarPendencia: async () => { await atraso(); return true; },

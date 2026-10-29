@@ -64,6 +64,26 @@
   /** Prazo das evidências: fim do trimestre + 15 dias */
   function prazoEvidencias(t) { return addDias(t.fim, 15); }
 
+  /* ---------- mês (1:1 mensal) e semestre (histórico do offboarding) ---------- */
+  const MESES_LONGOS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  function mesDe(iso) {
+    const ano = Number(iso.slice(0, 4)), mes = Number(iso.slice(5, 7));
+    const inicio = iso.slice(0, 7) + "-01";
+    const fim = addDias(paraISO(new Date(Date.UTC(ano, mes, 1))), -1);
+    return { ano, mes, chave: iso.slice(0, 7), rotulo: MESES_LONGOS[mes - 1] + " de " + ano, curto: MESES_LONGOS[mes - 1], inicio, fim };
+  }
+  function semestreDe(iso) {
+    const ano = Number(iso.slice(0, 4)), s = Number(iso.slice(5, 7)) <= 6 ? 1 : 2;
+    return { ano, s, chave: ano + "-S" + s, rotulo: s + "º semestre de " + ano, inicio: ano + (s === 1 ? "-01-01" : "-07-01"), fim: ano + (s === 1 ? "-06-30" : "-12-31") };
+  }
+  /** Período de uma data na granularidade pedida: "trimestre", "semestre" ou "ano" */
+  function periodoDe(iso, granularidade) {
+    if (granularidade === "ano") { const a = iso.slice(0, 4); return { chave: a, rotulo: a, inicio: a + "-01-01", fim: a + "-12-31" }; }
+    if (granularidade === "semestre") return semestreDe(iso);
+    const t = trimestreDe(iso);
+    return { chave: t.chave, rotulo: t.rotulo, inicio: t.inicio, fim: t.fim };
+  }
+
   /* ---------- feriados e dia útil (regra 2) ---------- */
   /** Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher) */
   function pascoa(ano) {
@@ -181,7 +201,8 @@
   /** Alinhamentos do onboarding: Dias 30, 60 e 90, com a regra do dia útil */
   function datasAlinhamentos(ingresso, feriados) {
     return [30, 60, 90].map((n, i) => ({
-      numero: i + 1, dia: n, rotulo: i === 2 ? "Alinhamento final" : "Alinhamento " + (i + 1),
+      // reunião de 29/10/2026: as avaliações do 1º, 2º e 3º mês (Ancoragem, Imersão e Mar Aberto)
+      numero: i + 1, dia: n, rotulo: "Avaliação do " + (i + 1) + "º mês",
       fase: ["Ancoragem", "Imersão", "Mar Aberto"][i],
       data: ajustarPrazo(dataDoDia(ingresso, n), feriados),
     }));
@@ -240,6 +261,7 @@
     fmtData, fmtDataAno, fmtDiaSemana, MESES, DIAS_SEMANA,
     diaN, dataDoDia, terminoPlano,
     trimestreDe, trimestre, trimestreAnterior, trimestrePorChave, prazoEvidencias,
+    MESES_LONGOS, mesDe, semestreDe, periodoDe,
     pascoa, feriadosNacionais, conjuntoFeriados, ehDiaUtil, ajustarPrazo, voltaEm, addDiasUteis,
     diasAtraso, atrasado, dataAviso, pertoDoAvisoDe14,
     arredondar, percentual, media, mediana,

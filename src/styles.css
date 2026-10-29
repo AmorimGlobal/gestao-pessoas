@@ -313,3 +313,28 @@ details.modelos .modelo b { color: var(--navy); }
   .conteudo { max-width: none; padding: 0; }
   .card { box-shadow: none; border: 1px solid var(--borda); break-inside: avoid; }
 }
+
+/* ---------------- reunião de 29/10/2026: excluir, competências, avaliações do onboarding ---------------- */
+.btn.link.excluir { color: var(--vermelho); }
+.nav a .contador.novo { box-shadow: 0 0 0 2px rgba(255,87,82,.35); }
+.competencias { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.competencias .escolha { align-items: flex-start; max-width: 100%; }
+.competencias .escolha small { display: block; color: var(--suave); font-size: 11.5px; margin-top: 2px; }
+.linha-add { display: flex; gap: 8px; margin-top: 10px; }
+.linha-add .entrada { flex: 1; }
+.entregas-aval { display: flex; flex-direction: column; gap: 8px; }
+.entregas-aval .linha-entrega { display: grid; grid-template-columns: minmax(0, 1fr) 190px 34px; gap: 8px; align-items: center; }
+.entregas-aval .linha-entrega .btn { padding: 6px; }
+.previa-nota { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; background: var(--sutil); border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+.previa-nota .num { font-size: 24px; font-weight: 800; color: var(--navy); }
+.evolucao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.evolucao .coluna { display: flex; flex-direction: column; gap: 6px; }
+.evolucao .trilho { position: relative; height: 90px; background: var(--sutil); border-radius: 8px; overflow: hidden; }
+.evolucao .valor { position: absolute; left: 0; right: 0; bottom: 0; background: var(--azul); opacity: .85; }
+.evolucao .valor.verde { background: var(--verde); }
+.evolucao .valor.ambar { background: #e2a33b; }
+.evolucao .valor.vermelho { background: var(--vermelho); }
+.evolucao .patamar { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--navy); }
+.nota-mini { display: inline-flex; flex-direction: column; gap: 2px; min-width: 74px; }
+.nota-mini b { color: var(--navy); font-size: 15px; }
+@media (max-width: 700px) { .entregas-aval .linha-entrega { grid-template-columns: 1fr; } .evolucao { grid-template-columns: 1fr; } }
