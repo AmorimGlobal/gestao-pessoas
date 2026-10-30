@@ -217,11 +217,11 @@ test("segurança: token errado 401, sem configuração 503, GET 405, outros proc
   const r5 = resposta();
   await handler(requisicao(corpoEvento("ONCRMCONTACTUPDATE", 3, 10)), r5, { env: ENV, chamar: c.bx.chamar });
   assert.match(r5.corpo.ignorado, /ONCRMCONTACTUPDATE/);
-  // negócio (e-mails dos funis, test/avisos-negocios.test.js) sem o SMTP configurado: ignorado sem chamar o Bitrix
+  // negócio: os e-mails dos funis são automação do Bitrix desde 30/10/2026; o evento é ignorado sem chamar o Bitrix
   const r6 = resposta();
   const chamadasAntes = c.bx.estado.chamadas.length;
   await handler(requisicao(corpoEvento("ONCRMDEALUPDATE", 2, 10)), r6, { env: ENV, chamar: c.bx.chamar });
-  assert.match(r6.corpo.ignorado, /e-mail não configurado/);
+  assert.match(r6.corpo.ignorado, /ONCRMDEALUPDATE/);
   assert.equal(c.bx.estado.chamadas.length, chamadasAntes);
   assert.equal(c.bx.estado.avisos.length, 0);
   assert.ok(schema.processo("encerramentos"));

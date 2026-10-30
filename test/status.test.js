@@ -37,8 +37,9 @@ test("configurado: liga as rotinas e não devolve nenhum valor", async () => {
   ["segredo123", "cron-xyz", "tok-abc", "marketplace", "senha-smtp-789", "rh@exemplo.com", "mail.exemplo.com"].forEach((v) => assert.ok(r.bruto.indexOf(v) < 0, "vazou " + v));
 });
 
-test("e-mail: sem as variáveis do SMTP, a ficha e os avisos dos funis ficam desligados", async () => {
+test("e-mail: sem as variáveis do SMTP, a ficha fica desligada", async () => {
   const r = await chamar({ BITRIX_WEBHOOK_URL: "https://portal/rest/1/x/", BITRIX_EVENTO_TOKEN: "t", SMTP_HOST: "mail.exemplo.com" });
   assert.deepEqual(r.corpo.rotinas.email, { ligada: false, falta: ["SMTP_USUARIO", "SMTP_SENHA"] });
-  assert.deepEqual(r.corpo.rotinas.avisosNegocios.falta, ["SMTP_USUARIO", "SMTP_SENHA"]);
+  // os e-mails dos funis de vagas e de offboarding saíram do app em 30/10/2026 (automação do Bitrix)
+  assert.equal(r.corpo.rotinas.avisosNegocios, undefined);
 });

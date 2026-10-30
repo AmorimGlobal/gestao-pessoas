@@ -150,8 +150,7 @@
     ["avisos", "Avisos da 4.4", "Resumo semanal, dia do atraso, 7 e 14 dias. Todo dia às 8h."],
     ["trava", "Trava do encerramento no servidor", "Precisa também do webhook de saída no Bitrix, com o endereço abaixo."],
     ["painelCEO", "Painel da CEO", "Números calculados no servidor; a CEO não precisa de leitura nos processos."],
-    ["email", "E-mail: Ficha do onboarding", "Manda a Ficha ao novo membro. Precisa de uma caixa de e-mail (SMTP_HOST, SMTP_USUARIO, SMTP_SENHA)."],
-    ["avisosNegocios", "E-mails das solicitações de vaga e de offboarding", "Avisa quem pediu quando a solicitação chega e quando muda de etapa. Precisa do e-mail e do webhook de saída com ONCRMDEALADD e ONCRMDEALUPDATE."],
+    ["email", "E-mail: Ficha do onboarding", "Manda a Ficha ao novo membro. Precisa de uma caixa de e-mail (SMTP_HOST, SMTP_USUARIO, SMTP_SENHA). Sem ela, o app mostra a Ficha para mandar à mão."],
   ];
   const idsDoPapel = (cfg, papel) => ((cfg.papeis || {})[papel] || []).map((p) => p.id).filter(Boolean);
   function carregarStatus() {
@@ -181,7 +180,6 @@
       ["GP_EXCECOES_IDS", fora.join(","), "CEO e Fora do app: nunca recebem aviso"],
       ["GP_LINK_APP", ref, "endereço deste app no Bitrix, no fim de cada aviso"],
       ["GP_CATEGORIA_VAGAS", String((cfg.recrutamento || {}).categoria || 77), "funil HR | Requisição de Vagas"],
-      ["GP_CATEGORIA_OFFBOARDING", String((cfg.offboarding || {}).categoria || 79), "funil HR | Offboarding (os e-mails a quem pediu)"],
     ];
     return '<div class="card"><h3>Rotinas no servidor (Vercel)</h3>' +
       '<p class="muted" style="margin-top:0">O que precisa rodar fora da tela. Cada rotina liga quando as variáveis dela estão gravadas na Vercel (Settings → Environment Variables, seguido de Redeploy). O webhook de entrada (BITRIX_WEBHOOK_URL), o CRON_SECRET e o BITRIX_EVENTO_TOKEN são segredos: grave direto na Vercel e não mande para ninguém.</p>' +
@@ -189,7 +187,7 @@
       '<div class="grupo-form"><div class="rotulo-grupo">Valores para copiar na Vercel</div><div class="tabela-wrap"><table class="tabela"><tbody>' +
       valores.map((v) => '<tr><td class="num"><b>' + esc(v[0]) + '</b></td><td class="num">' + (v[1] ? esc(v[1]) : '<span class="muted">—</span>') + '</td><td class="muted" style="font-size:12px">' + esc(v[2]) + "</td></tr>").join("") +
       "</tbody></table></div>" +
-      '<p class="muted" style="font-size:12px">Webhook de saída (Bitrix → Desenvolvedores → Outros → Webhook de saída), com os eventos ONCRMDYNAMICITEMADD, ONCRMDYNAMICITEMUPDATE, ONCRMDEALADD e ONCRMDEALUPDATE: <b class="num">' + esc((/^https?:/.test(location.origin) ? location.origin : "https://gestao-pessoas-bice.vercel.app") + "/api/eventos") + "</b></p></div></div>";
+      '<p class="muted" style="font-size:12px">Webhook de saída (Bitrix → Desenvolvedores → Outros → Webhook de saída), com os eventos ONCRMDYNAMICITEMADD e ONCRMDYNAMICITEMUPDATE: <b class="num">' + esc((/^https?:/.test(location.origin) ? location.origin : "https://gestao-pessoas-bice.vercel.app") + "/api/eventos") + "</b></p></div></div>";
   }
 
   async function gravarConfig(novo, botao, mensagem) {

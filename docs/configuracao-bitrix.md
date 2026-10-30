@@ -237,9 +237,9 @@ A aprovação da coordenação pode ser feita de duas formas:
 - **Painéis do BI Builder (RH e CEO):** o app já tem uma versão própria. O BI Builder entra se o RH quiser os gráficos nativos.
 - **Base de Conhecimento:** guias, modelos SCI e o guia de offboarding. Cadastre os links em Configuração.
 
-## 9. E-mails: ficha do onboarding e funis de vagas e de offboarding
+## 9. E-mail da Ficha do onboarding
 
-Decisões da reunião de 29/10/2026: o novo membro recebe por e-mail a Ficha da função, e quem pede uma vaga ou um encerramento de contrato recebe um e-mail quando a solicitação chega e a cada mudança de etapa. O Bitrix não tem um método REST para mandar e-mail a um endereço qualquer, então o servidor envia pelo SMTP de uma caixa da Amorim (`lib/email.js`).
+Decisão da reunião de 29/10/2026: o novo membro recebe por e-mail a Ficha da função. O Bitrix não tem um método REST que mande e-mail para um endereço qualquer, então o servidor envia pelo SMTP de uma caixa da Amorim (`lib/email.js`). Sem a caixa, o app mostra a Ficha em texto para mandar à mão e o botão "Marcar como enviada".
 
 - **Ficha do onboarding** (`api/ficha.js`): botão no onboarding do membro. Só envia quem o próprio Bitrix deixa ler aquele onboarding (o servidor pergunta ao portal com o login de quem clicou), e nunca o próprio membro.
   - O e-mail leva o escopo, as competências comportamentais, os indicadores, as entregas de cada fase com as datas das conversas dos Dias 30, 60 e 90 e quem acompanha o membro.
@@ -247,12 +247,6 @@ Decisões da reunião de 29/10/2026: o novo membro recebe por e-mail a Ficha da 
   - A resposta ao e-mail vai para quem enviou.
   - O item ganha "Ficha enviada ao membro em" e um comentário no histórico.
   - As datas usam os feriados nacionais. Os de SP e Salvador ficam na Configuração do app, que só o navegador lê.
-- **Funis de negócios** (`lib/avisos-negocios.js`, pelo `api/eventos.js`):
-  - Quem pediu recebe um e-mail na chegada ("Recebemos a sua solicitação…") e a cada mudança de etapa.
-  - Na chegada, o RH (`GP_AVISAR_IDS`) recebe uma notificação do Bitrix com o link do negócio.
-  - O e-mail do offboarding leva só o nome do membro digitado no formulário e a etapa, nunca o motivo ou a descrição.
-  - **Uma vez por etapa:** o servidor grava a etapa avisada num campo do negócio. Sem esse campo, nada é enviado, porque cada atualização repetiria o mesmo e-mail.
-  - **Negócios que já existiam:** a primeira atualização depois de ligar só grava a etapa, sem e-mail, a não ser que a etapa tenha acabado de mudar.
 
 | Variável (Vercel) | Valor |
 |---|---|
@@ -261,34 +255,10 @@ Decisões da reunião de 29/10/2026: o novo membro recebe por e-mail a Ficha da 
 | `SMTP_USUARIO` | O e-mail completo da caixa que envia |
 | `SMTP_SENHA` | A senha da caixa. No Google, uma senha de app, que exige a verificação em duas etapas. É segredo: grave direto na Vercel |
 | `EMAIL_REMETENTE` | Opcional: outro endereço de remetente. Muitos servidores só aceitam o próprio login |
-| `GP_CATEGORIA_VAGAS` | Opcional, padrão 77 (HR \| Requisição de Vagas). É a mesma variável do painel da CEO |
-| `GP_CATEGORIA_OFFBOARDING` | `CATEGORY_ID` do funil de offboarding. Sem ela, esse funil não manda e-mail |
 
-Campos de controle nos negócios. São tipo string, ficam fora dos formulários e o RH não precisa ver:
+Depois de gravar, faça um Redeploy e confira a linha "E-mail: Ficha do onboarding" em Configuração → Rotinas no servidor.
 
-| Campo | Funil |
-|---|---|
-| `UF_CRM_RV_ULT_AVISO` | Vagas |
-| `UF_CRM_OFF_ULT_AVISO` | Offboarding |
-
-Quem pediu vem destes campos:
-
-| Funil | E-mail | Nome, só para o "Olá, …" |
-|---|---|---|
-| Vagas | `UF_CRM_RV_EMAIL` | `UF_CRM_RV_LIDER` |
-| Offboarding | `UF_CRM_OFF_EMAIL` | `UF_CRM_OFF_SOLICIT` |
-
-No offboarding, o nome do membro vem de `UF_CRM_OFF_MEMBRO`.
-
-Para ligar os e-mails dos funis:
-
-1. No mesmo webhook de saída da seção 7 (mesmo endereço `…/api/eventos` e mesmo `BITRIX_EVENTO_TOKEN`), marque também **ONCRMDEALADD** e **ONCRMDEALUPDATE**.
-2. Grave as variáveis do SMTP e faça um Redeploy.
-3. Em Configuração → Rotinas no servidor, confira as linhas "E-mail" e "Avisos dos funis".
-
-O Bitrix manda o evento de todos os funis de negócios. A função lê o negócio (`crm.deal.get`) e ignora os de outros funis.
-
-Para testar, envie uma solicitação pelo formulário de vagas com o seu e-mail. Em até um minuto chega "Recebemos a sua solicitação de vaga", e o RH recebe a notificação. Depois mova o card de etapa: chega o e-mail com a etapa nova.
+**E-mails dos funis de vagas (77) e de offboarding (79):** saíram do app em 30/10/2026. O usuário configura nas regras de automação de cada funil, no próprio Bitrix: um robô "Enviar e-mail" para o e-mail de quem pediu (`UF_CRM_RV_EMAIL` / `UF_CRM_OFF_EMAIL`) na etapa de entrada e em cada etapa que deve avisar, e um robô "Notificação" para o RH na entrada. Os campos `UF_CRM_RV_ULT_AVISO` e `UF_CRM_OFF_ULT_AVISO`, que serviam de controle aos e-mails do app, não são mais usados: podem ficar ou ser apagados. O webhook de saída da seção 7 não precisa dos eventos de negócio (ONCRMDEAL*): se chegarem, são ignorados.
 
 ## 10. Reunião de 29/10/2026: o que muda no Bitrix
 

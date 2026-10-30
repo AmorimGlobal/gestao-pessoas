@@ -25,7 +25,7 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
   - `api/painel.js`: números da CEO, que não tem leitura nos processos.
   - `api/contagem.js`: total de itens de cada processo, para o aviso do RH quando a permissão do CRM esconde registros.
   - `api/ficha.js`: manda a Ficha do onboarding ao membro por e-mail (SMTP, `lib/email.js`).
-  - `api/eventos.js`, com ONCRMDEALADD e ONCRMDEALUPDATE: e-mail a quem pediu nos funis 77 e 79 (`lib/avisos-negocios.js`).
+  - Os e-mails a quem pede nos funis 77 e 79 saíram do app em 30/10/2026: são regras de automação de cada funil no Bitrix.
   
   Todos calculam com as mesmas regras do navegador (`src/js/50-dominio.js`, `35-registros.js`). Variáveis e passo a passo: `docs/configuracao-bitrix.md`.
 - **Acesso:** a versão publicada (`api/app.js`) só sai para um POST do Bitrix com sessão confirmada no portal (`lib/acesso.js`). Ela é marcada com `window.GP_SO_BITRIX` pelo `build.js` e nunca cai na demonstração.
@@ -67,7 +67,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 133 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 122 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -128,7 +128,7 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
     - o formulário de offboarding (o script em `amorim-api/offboarding-bitrix` está pronto, mas não foi rodado: o usuário pediu para esperar o da Luciele).
 - **30/10/2026:**
   - **Visual novo:** feito pela referência que o usuário mandou, em lugar da referência visual que se esperava do RH.
-  - **Offboarding, e-mails e exportar:** o usuário disse que vai fazer a maior parte por automação no próprio Bitrix, mas ainda não decidiu o que sai do app.
+  - **Offboarding:** os e-mails dos funis 77 e 79 saíram do app e viraram automação do Bitrix, feita pelo usuário. O pedido de encerramento continua no app até o formulário da Luciele existir. O alerta, a esteira, o histórico e o Exportar ficam.
   - **Vocabulário:** "processo" confundiu o usuário, que entendeu "Processos" do Bitrix (fluxos com grupos e tarefas). Fale em "tabela do CRM (processo inteligente)".
 - **Portal:**
   - A estrutura de 21/10 está completa: 9 processos e a primeira carga do Membros (59 itens).
@@ -137,5 +137,5 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
     - criar no app o processo "1:1 mensais" e o campo "Ficha enviada ao membro em" (Configuração → Criar ou completar a estrutura; o webhook não tem `userfieldconfig`);
     - dar as permissões de CRM (docs, seção 4), com o RH em "Todos";
     - escolher a caixa de e-mail do SMTP.
-- **Vercel:** as variáveis da seção 3 de `docs/configuracao-bitrix.md`, mais as da seção 9 (SMTP, `GP_CATEGORIA_OFFBOARDING` = 79). O webhook de saída (`BITRIX_EVENTO_TOKEN`) ainda não existe.
+- **Vercel:** as variáveis da seção 3 de `docs/configuracao-bitrix.md`, mais as da seção 9 (SMTP, opcional, só para a Ficha). O webhook de saída (`BITRIX_EVENTO_TOKEN`) ainda não existe.
 - **Pendências e riscos:** `docs/tabela-2.7-e-validacoes.md`.
