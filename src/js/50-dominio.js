@@ -803,7 +803,7 @@
       });
       lista.push({
         id: "ordem-leituras", titulo: pendLeit.length + " entregas aguardam leitura",
-        texto: "Comece por \"" + ord[0].titulo + "\"" + (ord[0].origem === "Plano de alinhamento" ? ", que está ligada a um plano de alinhamento" : ", que tem o prazo mais próximo") + ".",
+        texto: "Comece por \"" + ord[0].titulo + "\"" + (ord[0].origem === "Plano de alinhamento" ? ", que está ligada a um plano de melhoria" : ", que tem o prazo mais próximo") + ".",
         referencia: "Regra do app · Leituras de entrega (3.4)", acao: { rotulo: "Ver leituras pendentes", rota: "#/desempenho" },
         porque: pendLeit.length + " leituras pendentes na equipe.",
       });

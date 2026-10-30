@@ -21,6 +21,13 @@ test("Volta em: Bruno, fora até 16/10 (sexta), volta em 19/10", () => {
   assert.equal(c.voltaEm("2026-10-16", FERIADOS_2026), "2026-10-19");
 });
 
+test("Data por extenso do topo das telas: dia útil com -feira, fim de semana sem", () => {
+  assert.equal(c.fmtDataLonga("2026-10-16"), "sexta-feira, 16 de outubro de 2026");
+  assert.equal(c.fmtDataLonga("2026-11-01"), "domingo, 1 de novembro de 2026");
+  assert.equal(c.fmtDataLonga("2026-10-31"), "sábado, 31 de outubro de 2026");
+  assert.equal(c.fmtDataLonga(""), "");
+});
+
 test("Prazo em feriado ou fim de semana passa para o próximo dia útil", () => {
   assert.equal(c.ajustarPrazo("2026-10-10", FERIADOS_2026), "2026-10-13"); // sáb → (12/10 é feriado) → 13/10
   assert.equal(c.ajustarPrazo("2026-10-14", FERIADOS_2026), "2026-10-14");

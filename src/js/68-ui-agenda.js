@@ -52,7 +52,7 @@
     const maxFora = Math.max(1, ...foraNaSemana);
     const nac = ag.feriadosNacionais;
     h += '<div class="card" style="margin-top:16px"><h3>Linha do tempo</h3><div class="tempo"><table><thead><tr><th></th>' + semanas.map((s) => '<th colspan="1">' + calc.fmtData(s) + "</th>").join("") + "</tr>" +
-      '<tr class="calor-semana"><td class="muted" style="font-size:10.5px">Equipe fora</td>' + foraNaSemana.map((n) => '<td><div class="c" title="' + n + ' fora" style="background:rgba(0,68,255,' + (n ? 0.15 + 0.7 * (n / maxFora) : 0.04) + ')"></div></td>').join("") + "</tr></thead><tbody>" +
+      '<tr class="calor-semana"><td class="muted" style="font-size:10.5px">Equipe fora</td>' + foraNaSemana.map((n) => '<td><div class="c" title="' + n + ' fora" style="background:rgba(65,84,238,' + (n ? 0.15 + 0.7 * (n / maxFora) : 0.04) + ')"></div></td>').join("") + "</tr></thead><tbody>" +
       ag.linhas.map((l) => '<tr><td class="quem">' + c.pessoa(l.pessoa, l.sigla + (l.pessoa.ehLideranca ? " · liderança" : ""), 26) + "</td>" +
         '<td colspan="13"><div class="trilho">' +
         nac.map((f) => '<span class="fer" style="left:' + pos(f.data) + '%" title="Feriado nacional · ' + calc.fmtData(f.data) + '"></span>').join("") +

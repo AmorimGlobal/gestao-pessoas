@@ -72,6 +72,13 @@
     const fim = addDias(paraISO(new Date(Date.UTC(ano, mes, 1))), -1);
     return { ano, mes, chave: iso.slice(0, 7), rotulo: MESES_LONGOS[mes - 1] + " de " + ano, curto: MESES_LONGOS[mes - 1], inicio, fim };
   }
+  /** "sexta-feira, 30 de outubro de 2026" (a linha de cima do título das telas) */
+  function fmtDataLonga(iso) {
+    if (!dataValida(iso)) return "";
+    const [a, m, d] = iso.slice(0, 10).split("-");
+    const ds = diaSemana(iso);
+    return DIAS_SEMANA[ds] + (ds % 6 ? "-feira" : "") + ", " + Number(d) + " de " + MESES_LONGOS[Number(m) - 1] + " de " + a;
+  }
   function semestreDe(iso) {
     const ano = Number(iso.slice(0, 4)), s = Number(iso.slice(5, 7)) <= 6 ? 1 : 2;
     return { ano, s, chave: ano + "-S" + s, rotulo: s + "º semestre de " + ano, inicio: ano + (s === 1 ? "-01-01" : "-07-01"), fim: ano + (s === 1 ? "-06-30" : "-12-31") };
@@ -261,7 +268,7 @@
     fmtData, fmtDataAno, fmtDiaSemana, MESES, DIAS_SEMANA,
     diaN, dataDoDia, terminoPlano,
     trimestreDe, trimestre, trimestreAnterior, trimestrePorChave, prazoEvidencias,
-    MESES_LONGOS, mesDe, semestreDe, periodoDe,
+    MESES_LONGOS, mesDe, semestreDe, periodoDe, fmtDataLonga,
     pascoa, feriadosNacionais, conjuntoFeriados, ehDiaUtil, ajustarPrazo, voltaEm, addDiasUteis,
     diasAtraso, atrasado, dataAviso, pertoDoAvisoDe14,
     arredondar, percentual, media, mediana,

@@ -22,6 +22,25 @@
   const acoes = {};
   GP.estado = estado;
 
+  /* ---------------- tema claro/escuro e logo ---------------- */
+  // O <head> (src/index.html) já aplicou o tema antes do primeiro desenho. Começa no claro, como o Bitrix em
+  // volta (não segue o sistema: um Windows escuro com o Bitrix claro deixaria o app destoando); o botão ao
+  // lado da logo troca e a escolha fica salva em gp_tema.
+  let tema = "claro";
+  try { if (localStorage.getItem("gp_tema") === "escuro") tema = "escuro"; } catch (e) { /* sem storage */ }
+  function aplicarTema() { document.documentElement.setAttribute("data-tema", tema); }
+  aplicarTema();
+  // Impressão sempre no claro: no escuro, o texto claro sumiria no papel
+  window.addEventListener("beforeprint", () => document.documentElement.setAttribute("data-tema", "claro"));
+  window.addEventListener("afterprint", aplicarTema);
+  acoes["trocar-tema"] = function () {
+    tema = tema === "escuro" ? "claro" : "escuro";
+    try { localStorage.setItem("gp_tema", tema); } catch (e) { /* sem storage: vale até recarregar */ }
+    aplicarTema();
+  };
+  // A logo branca vira máscara (.logo no CSS), então a cor vem do tema. Fica no :root uma vez, e não a cada render.
+  if (GP.marca && GP.marca.logoBranco) document.documentElement.style.setProperty("--logo", 'url("' + GP.marca.logoBranco + '")');
+
   /* ---------------- escopo pela visão ---------------- */
   const VISOES = {
     lideranca: "Liderança", coordenacao: "Coordenação", rh: "RH", ceo: "CEO",
@@ -79,9 +98,29 @@
       (o.meta ? '<div class="meta" style="left:' + o.meta + '%" title="Meta ' + o.meta + '%"></div>' : "") + "</div>" +
       (o.nota ? '<div class="barra-nota">' + o.nota + "</div>" : "") + "</div>";
   };
+  /** Linha de cima do título: hoje por extenso ("sexta-feira, 30 de outubro de 2026"), o "hoje" da demonstração inclusive */
+  c.sobre = function () {
+    return '<div class="sobre">' + esc(calc.fmtDataLonga(estado.ctx ? estado.ctx.hoje : calc.hojeISO())) + "</div>";
+  };
+  /** "Ao vivo": os números saem do Bitrix na hora. Na demonstração, deixa claro que não são reais. */
+  c.vivo = function () {
+    return estado.repo && estado.repo.modo === "demo" ? '<span class="vivo demo"><i></i>Demonstração</span>' : '<span class="vivo"><i></i>Ao vivo</span>';
+  };
+  /** Quadro de números: [{ valor, rotulo, tom: azul|ambar|roxo|vermelho|verde|cinza, rota?, nota? }].
+      O número e o rótulo saem na cor do tom; zero fica esmaecido e "sem dado" vira "—". */
+  c.kpis = function (lista) {
+    return '<div class="kpis">' + lista.map((k) => {
+      const v = k.valor === null || k.valor === undefined || k.valor === "" ? "—" : String(k.valor);
+      const jeito = v === "—" ? " vazio" : v === "0" ? " zero" : v.length > 7 ? " longo" : "";
+      const corpo = '<div class="n num' + jeito + '">' + esc(v) + '</div><div class="r">' + esc(k.rotulo) + "</div>" + (k.nota ? '<div class="nota">' + k.nota + "</div>" : "");
+      const cls = "kpi " + (k.tom || "azul");
+      return k.rota ? '<a class="' + cls + '" href="' + esc(k.rota) + '">' + corpo + "</a>" : '<div class="' + cls + '">' + corpo + "</div>";
+    }).join("") + "</div>";
+  };
+  /** Topo das telas dos módulos. O ícone do módulo (ic) fica só no menu desde o visual de 30/10/2026. */
   c.cabecalho = function (ic, titulo, numeros, acoesHtml) {
-    return '<div class="cab-modulo"><div class="icone-mod">' + icone(ic, 20) + '</div><div><h1 class="titulo-pagina">' + esc(titulo) + "</h1>" +
-      (numeros ? '<div class="linha-numeros">' + numeros + "</div>" : "") + "</div>" + (acoesHtml ? '<div class="acoes">' + acoesHtml + "</div>" : "") + "</div>";
+    return '<header class="topo-tela"><div class="texto">' + c.sobre() + '<h1 class="titulo-pagina">' + esc(titulo) + "</h1>" +
+      (numeros ? '<div class="linha-numeros">' + numeros + "</div>" : "") + "</div>" + (acoesHtml ? '<div class="acoes">' + acoesHtml + "</div>" : "") + "</header>";
   };
   c.vazio = function (t) { return '<div class="vazio">' + t + "</div>"; };
   c.abas = function (lista, ativa) {
@@ -99,7 +138,7 @@
   c.pendencia = function (p, comMembro) {
     return '<div class="item clicavel" data-rota="' + esc(p.rota) + '">' +
       (comMembro !== false && p.membro ? c.avatar(p.membro, 30) : '<span class="av" style="width:30px;height:30px;background:var(--sutil);color:var(--navy)">' + icone("calendario", 15) + "</span>") +
-      '<div class="principal-item"><div class="t">' + esc(p.titulo) + '</div><div class="d">' + esc(p.tipo) + (p.destaque ? " · ligada a plano de alinhamento" : "") + "</div></div>" +
+      '<div class="principal-item"><div class="t">' + esc(p.titulo) + '</div><div class="d">' + esc(p.tipo) + (p.destaque ? " · ligada a plano de melhoria" : "") + "</div></div>" +
       '<div class="lado">' + c.prazo(p.prazo) + (p.prazo ? '<button class="btn peq sec nao-imprimir" data-acao="agendar-pendencia" data-id="' + esc(p.id) + '" title="Agendar na agenda">' + icone("calendario", 14) + "</button>" : "") + "</div></div>";
   };
 
@@ -310,9 +349,11 @@
     const seletor = estado.visoes.length > 1 ? '<label>Ver como<select data-mudar="trocar-visao">' + estado.visoes.map((v) =>
       '<option value="' + v + '"' + (v === estado.visao ? " selected" : "") + ">" + VISOES[v] + "</option>").join("") + "</select></label>" : (VISOES[estado.visao] || "");
     return '<div class="gp"><aside class="lateral"><div class="marca">' +
-      (GP.marca && GP.marca.logoBranco ? '<img src="' + GP.marca.logoBranco + '" alt="Amorim">' : "") +
+      (GP.marca && GP.marca.logoBranco ? '<span class="logo" role="img" aria-label="Amorim"></span>' : "<b>Amorim</b>") +
+      '<button type="button" class="tema" data-acao="trocar-tema" title="Modo claro ou escuro" aria-label="Alternar entre o modo claro e o escuro">' +
+      icone("lua", 16, "so-claro") + icone("sol", 16, "so-escuro") + "</button>" +
       '<div class="app">Gestão de Pessoas</div></div><nav class="nav" aria-label="Menu">' + menu() + "</nav>" +
-      '<div class="rodape">' + c.pessoa({ nome: estado.eu.nome, foto: estado.eu.foto }, "", 26).replace('class="nome"', 'class="nome" style="color:#fff"') +
+      '<div class="rodape">' + c.pessoa({ nome: estado.eu.nome, foto: estado.eu.foto }, "", 26) +
       '<div style="margin-top:8px">' + seletor + "</div>" +
       (podeVerComo() ? '<button class="btn peq sec" style="margin-top:10px;width:100%" data-acao="abrir-ver-como">' + icone("equipe", 13) + " Ver como outra pessoa</button>" : "") +
       "</div></aside>" +
@@ -343,7 +384,7 @@
   }
   function faixaVerComo() {
     if (!estado.verComo) return "";
-    return '<div class="faixa-demo nao-imprimir" style="background:var(--navy);color:#fff"><b>Vendo como ' + esc(estado.verComo.nome) + "</b> (" + esc(VISOES[estado.visao] || "sem papel no app") +
+    return '<div class="faixa-demo ver-como nao-imprimir"><b>Vendo como ' + esc(estado.verComo.nome) + "</b> (" + esc(VISOES[estado.visao] || "sem papel no app") +
       "). O que você registrar fica em nome dela; o histórico do Bitrix mostra que foi você. " + '<button class="btn peq" data-acao="sair-ver-como">Voltar para a minha visão</button></div>';
   }
   acoes["abrir-ver-como"] = function () {

@@ -35,9 +35,9 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
 
 ```
 src/index.html        casca (marcadores /*__CSS__*/ e /*__JS__*/)
-src/styles.css        visual (navy #000c33, azul #0044ff, neon #00ff5f, Poppins)
+src/styles.css        visual de 30/10/2026 (referência "Quadro de Dependências": índigo #4154ee, Poppins), claro e escuro por tokens
 src/js/00-util.js     esc(), ícones, nomes
-src/js/05-marca.js    logos da Amorim em base64 (copiados do app Inovação). Não leia o arquivo inteiro.
+src/js/05-marca.js    logo da Amorim (PNG branco em base64, copiada do app Inovação), usada como máscara na cor do tema. Não leia o arquivo inteiro.
 src/js/10-calc.js     regras de cálculo da 4.5 (datas, Dia N, dia útil, %, notas, situação)  [Node + navegador]
 src/js/20-schema.js   ESQUEMA: processos, estágios (com cor) e campos — fonte única           [Node + navegador]
 src/js/30-provision.js cria/completa a estrutura no Bitrix (idempotente, com simulação)      [Node + navegador]
@@ -67,7 +67,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 132 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 133 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -79,6 +79,10 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
 
 ## Convenções e armadilhas
 
+- **Visual (30/10/2026), pela referência do "Quadro de Dependências" que o usuário mandou:**
+  - **Topo das telas:** a data por extenso, o título e as ações em pílula. Os módulos usam `c.cabecalho`. As telas de entrada (Início, Painéis, Meu setor) usam `faixa()` em `61-ui-inicio.js`, que soma o "ao vivo" ("Demonstração" na demo) e o quadro de números `c.kpis` (`tom`: azul, ambar, roxo, vermelho, verde; zero fica esmaecido).
+  - **Claro e escuro:** toda cor é token em `styles.css`, com `<html data-tema="claro|escuro">`. Não ponha cor fixa no JS, senão o modo escuro quebra.
+  - **Tema inicial:** começa no claro, como o Bitrix em volta, e não segue o sistema. O botão ao lado da logo troca o tema e salva `gp_tema` no `localStorage`. O `<head>` aplica o tema antes do primeiro desenho, e a impressão sai sempre no claro.
 - **Modelo de render:** cada tela é uma função que devolve uma string de HTML, e `render()` redesenha a área principal. Formulários abrem no **painel lateral** (`#painel`), que o `render()` não toca, então o que foi digitado sobrevive. Interação por delegação (`data-acao`, `data-rota`, `data-mudar`, `data-filtro`). Todo dado externo passa por `esc()`.
 - **Gravação:** `ui.salvar(botao, async () => { await ui.criar/atualizar(...) })`. A tarefa atualiza o registro no contexto, reindexa e redesenha. Erros aparecem no rodapé do painel, nunca são engolidos.
 - **Campos:** o código do campo é `UF_CRM_<typeId>_<SUFIXO>`, e na API `crm.item.*` vira camelCase: `ufCrm41DataIngresso`. Listas gravam o ID do item da lista (vem de `crm.item.fields`). Sim/não grava 1/0. Arquivo grava `[{id}, …, [nome, base64]]`. Lista vazia não atravessa o `callMethod`, então para limpar se manda `""`. Esse formato vem do widget-rotina-contabil, que foi testado.
@@ -121,8 +125,11 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
     - os campos e a fórmula das avaliações do onboarding;
     - a estrutura do plano de melhoria;
     - as especificações do 1:1 e do O2O;
-    - o formulário de offboarding (o script em `amorim-api/offboarding-bitrix` está pronto, mas não foi rodado: o usuário pediu para esperar o da Luciele);
-    - a referência visual.
+    - o formulário de offboarding (o script em `amorim-api/offboarding-bitrix` está pronto, mas não foi rodado: o usuário pediu para esperar o da Luciele).
+- **30/10/2026:**
+  - **Visual novo:** feito pela referência que o usuário mandou, em lugar da referência visual que se esperava do RH.
+  - **Offboarding, e-mails e exportar:** o usuário disse que vai fazer a maior parte por automação no próprio Bitrix, mas ainda não decidiu o que sai do app.
+  - **Vocabulário:** "processo" confundiu o usuário, que entendeu "Processos" do Bitrix (fluxos com grupos e tarefas). Fale em "tabela do CRM (processo inteligente)".
 - **Portal:**
   - A estrutura de 21/10 está completa: 9 processos e a primeira carga do Membros (59 itens).
   - Em 29/10 foi criado o funil de negócios **HR | Offboarding (79)**, com 18 campos `UF_CRM_OFF_*` e `UF_CRM_RV_ULT_AVISO`.

@@ -23,7 +23,7 @@
     return (p[0][0] + p[p.length - 1][0]).toUpperCase();
   }
   function primeiroNome(nome) { return String(nome || "").trim().split(/\s+/)[0] || ""; }
-  const PALETA = ["#0044ff", "#000c33", "#3d5afe", "#2a3a8f", "#5b6cff"];
+  const PALETA = ["#4154ee", "#2a3a8f", "#5b4bd1", "#2f6fdb", "#6f5be8"];
   function corDoNome(nome) {
     let h = 0;
     const s = String(nome || "?");
@@ -67,6 +67,8 @@
     lixeira: '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
     email: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
     baixar: '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/>',
+    lua: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+    sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   };
   function icone(nome, tamanho, extraClasse) {
     const t = tamanho || 18;

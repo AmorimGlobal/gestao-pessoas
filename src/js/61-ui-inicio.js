@@ -8,11 +8,13 @@
   const calc = GP.calc, dom = GP.dominio, ui = GP.ui, c = GP.ui.c;
   const E = () => ui.estado;
 
-  function faixa(titulo, sub, numeros, links) {
-    const simbolo = GP.marca && GP.marca.simboloBranco ? '<img class="curvas" src="' + GP.marca.simboloBranco + '" alt="">' : "";
-    return '<section class="faixa">' + simbolo + '<div class="ola">' + esc(sub) + '</div><div class="titulo">' + esc(titulo) + "</div>" +
-      (numeros ? '<div class="numeros">' + numeros.map((n) => '<div><div class="n' + (n.alerta ? " alerta" : "") + '">' + esc(n.valor) + '</div><div class="r">' + esc(n.rotulo) + "</div></div>").join("") + "</div>" : "") +
-      (links ? '<div class="links">' + links + "</div>" : "") + "</section>";
+  /** Topo das telas de entrada (Início, Painéis, Meu setor), no visual da referência de 30/10/2026: data, título,
+      "ao vivo", a ação principal e o quadro de números. o = { titulo, sub, numeros: [{ valor, rotulo, tom }], links, acao } */
+  function faixa(o) {
+    return '<header class="topo-tela"><div class="texto">' + c.sobre() + '<h1 class="titulo-pagina">' + esc(o.titulo) + "</h1>" +
+      (o.sub ? '<div class="sub">' + esc(o.sub) + "</div>" : "") + "</div>" +
+      '<div class="acoes">' + c.vivo() + (o.acao || "") + "</div></header>" +
+      (o.numeros ? c.kpis(o.numeros) : "") + (o.links ? '<div class="links-topo">' + o.links + "</div>" : "");
   }
   function saudacao() {
     const h = new Date().getHours();
@@ -34,14 +36,16 @@
     const links = (E().config && E().config.links) || {};
     const onde = visao === "rh" ? "em todas as equipes" : amplo ? "no setor" : "";
     const numeros = [
-      { valor: atrasadas, rotulo: (atrasadas === 1 ? "pendência atrasada" : "pendências atrasadas") + (onde ? " " + onde : ""), alerta: atrasadas > 0 },
-      { valor: semana, rotulo: "vencem nos próximos 7 dias" + (onde ? " " + onde : "") },
-      { valor: base.length, rotulo: (base.length === 1 ? "membro" : "membros") + (onde ? " " + onde : " na equipe") },
+      { valor: atrasadas, rotulo: (atrasadas === 1 ? "pendência atrasada" : "pendências atrasadas") + (onde ? " " + onde : ""), tom: "vermelho" },
+      { valor: semana, rotulo: "vencem nos próximos 7 dias" + (onde ? " " + onde : ""), tom: "ambar" },
+      { valor: base.length, rotulo: (base.length === 1 ? "membro" : "membros") + (onde ? " " + onde : " na equipe"), tom: "azul" },
     ];
     let linksFaixa = '<a href="#/painel">Ver o que depende de você →</a>';
     if (links.manual) linksFaixa += '<a href="' + esc(links.manual) + '" target="_blank" rel="noopener">' + icone("manual", 14) + " Manual da liderança</a>";
     linksFaixa += '<a href="#" data-acao="abrir-tour">Rever o tour</a>';
-    let h = faixa(saudacao(), "Gestão de Pessoas", numeros, linksFaixa);
+    const acao = visao === "rh" ? '<a class="btn" href="#/painel/hoje">Abrir a fila do RH</a>'
+      : '<button class="btn" data-acao="novo-feedback">' + icone("mais", 15) + " Registrar feedback</button>";
+    let h = faixa({ titulo: saudacao(), sub: ctx.tri.rotulo, numeros, links: linksFaixa, acao });
 
     if (E().visao === "coordenacao") h += atalhosCoordenacao();
     if (E().visao === "rh") h += atalhosRH();
@@ -83,11 +87,11 @@
     const mapa = dom.mapaCoordenacao(ctx, uid);
     const atrasos = mapa.reduce((s, l) => s + l.atrasos.length, 0);
     const atencao = mapa.filter((l) => l.ind.situacao.chave !== "em-dia");
-    const at = (n, rot, rota, alerta) => '<a class="card" href="' + rota + '" style="display:block;text-decoration:none;' + (alerta ? "border-left:4px solid var(--ambar)" : "") + '"><div style="font-size:24px;font-weight:800;color:var(--navy)" class="num">' + n + '</div><div class="muted">' + rot + "</div></a>";
-    return '<div class="grade c3" style="margin-bottom:16px">' +
-      at(aprov.length, "aprovações aguardando você", "#/offboarding", aprov.some((a) => a.dias > 3)) +
-      at(atrasos, "itens atrasados nas outras equipes", "#/painel/setor", atrasos > 0) +
-      at(atencao.length, atencao.length === 1 ? "liderança em Atenção ou Precisa de apoio" : "lideranças em Atenção ou Precisa de apoio", "#/painel/setor", atencao.length > 0) + "</div>";
+    return c.kpis([
+      { valor: aprov.length, rotulo: "aprovações aguardando você", tom: "ambar", rota: "#/offboarding" },
+      { valor: atrasos, rotulo: "itens atrasados nas outras equipes", tom: "vermelho", rota: "#/painel/setor" },
+      { valor: atencao.length, rotulo: atencao.length === 1 ? "liderança em Atenção ou Precisa de apoio" : "lideranças em Atenção ou Precisa de apoio", tom: "roxo", rota: "#/painel/setor" },
+    ]);
   }
   function atalhosRH() {
     const d = dom.demandasRH(E().ctx);
@@ -98,12 +102,12 @@
   }
   function inicioCEO() {
     const g = geral();
-    if (!g) return faixa(saudacao(), "Visão geral", null, "") + semResumoCEO();
-    return faixa(saudacao(), "Visão geral", [
-      { valor: g.ind.um1a1.curto, rotulo: "O2O do trimestre agendados" },
-      { valor: g.areasEmDia.texto.split(" · ")[1] || g.areasEmDia.texto, rotulo: "áreas em dia" },
-      { valor: g.ind.atrasadas, rotulo: "itens atrasados", alerta: g.ind.atrasadas > 0 },
-    ], '<a href="#/painel">Abrir o painel geral →</a>') +
+    if (!g) return faixa({ titulo: saudacao(), sub: "Visão geral" }) + semResumoCEO();
+    return faixa({ titulo: saudacao(), sub: "Visão geral", numeros: [
+      { valor: g.ind.um1a1.curto, rotulo: "O2O do trimestre agendados", tom: "azul" },
+      { valor: g.areasEmDia.texto.split(" · ")[1] || g.areasEmDia.texto, rotulo: "áreas em dia", tom: "verde" },
+      { valor: g.ind.atrasadas, rotulo: "itens atrasados", tom: "vermelho" },
+    ], acao: '<a class="btn" href="#/painel">Abrir o painel geral</a>' }) +
       '<div class="aviso-info">Esta visão mostra números, prazos e situação das equipes. O conteúdo escrito dos registros (feedbacks, leituras, planos e motivos) não aparece aqui.</div>';
   }
 
@@ -125,11 +129,11 @@
     const ctx = E().ctx;
     const equipe = ui.minhaEquipe();
     const ind = dom.indicadoresEquipe(ctx, equipe, { uid: E().eu.id });
-    const h0 = faixa("Painel da sua equipe", ctx.tri.rotulo, [
-      { valor: ind.atrasadas, rotulo: "atrasadas", alerta: ind.atrasadas > 0 },
-      { valor: ind.rotinas.curto, rotulo: "rotinas no prazo" },
-      { valor: ind.situacao.rotulo, rotulo: "situação da equipe" },
-    ]);
+    const h0 = faixa({ titulo: "Painel da sua equipe", sub: ctx.tri.rotulo, numeros: [
+      { valor: ind.atrasadas, rotulo: "atrasadas", tom: "vermelho" },
+      { valor: ind.rotinas.curto, rotulo: "rotinas no prazo", tom: "azul" },
+      { valor: ind.situacao.rotulo, rotulo: "situação da equipe", tom: ind.situacao.cor },
+    ] });
     const lista = ind.pendencias;
     const pendHtml = lista.length ? '<div class="lista">' + lista.map((p) => c.pendencia(p)).join("") + "</div>" : '<div class="vazio">✓ Tudo em dia nesta semana.</div>';
     const conq = ind.conquistas;
@@ -209,20 +213,19 @@
     const aprov = dom.aprovacoesPendentes(ctx, uid);
     const perto = mapa.reduce((acc, l) => acc.concat(l.atrasos.filter((a) => a.atrasoDias >= 7 && a.atrasoDias <= 13)), []);
     const planos = mapa.reduce((acc, l) => acc.concat(l.equipe.map((m) => dom.planoAtivoDo(ctx, m.id)).filter(Boolean)), []);
-    const cartao = (t, n, nota, alerta, rota) => '<a class="card" href="' + rota + '" style="display:block;text-decoration:none;color:inherit;' + (alerta ? "border-left:4px solid var(--ambar)" : "") + '"><div class="muted" style="font-size:12px">' + t + '</div><div class="num" style="font-size:26px;font-weight:800;color:var(--navy)">' + n + '</div><div class="muted" style="font-size:12px">' + nota + "</div></a>";
     const membrosSetor = mapa.reduce((n, l) => n + l.tamanho, 0);
     const atrasosSetor = mapa.reduce((n, l) => n + l.atrasos.length, 0);
     const emDia = mapa.filter((l) => l.ind.situacao.chave === "em-dia").length;
-    let h = abas + faixa("Meu setor", "Lideranças do seu departamento", [
-      { valor: mapa.length, rotulo: mapa.length === 1 ? "liderança" : "lideranças" },
-      { valor: membrosSetor, rotulo: "membros no setor" },
-      { valor: atrasosSetor, rotulo: atrasosSetor === 1 ? "item atrasado" : "itens atrasados", alerta: atrasosSetor > 0 },
-      { valor: emDia + " de " + mapa.length, rotulo: "equipes em dia" },
-    ]) +
-      '<div class="grade c3" style="margin-bottom:16px">' +
-      cartao("Suas aprovações", aprov.length, aprov.length ? "a mais antiga há " + Math.max.apply(null, aprov.map((a) => a.dias)) + " dias (prazo de 3)" : "nenhuma aguardando", aprov.some((a) => a.dias > 3), "#/offboarding") +
-      cartao("Perto do aviso de 14 dias", perto.length, perto.length ? "aviso a partir de " + calc.fmtData(perto.map((p) => p.avisoCoordenacao).sort()[0]) : "nenhum item com 7 a 13 dias de atraso", perto.length > 0, "#/painel/setor") +
-      cartao("Planos de melhoria", planos.length, planos.length ? "em andamento no setor" : "nenhum em andamento", false, "#/rotinas") + "</div>";
+    let h = abas + faixa({ titulo: "Meu setor", sub: "Lideranças do seu departamento", numeros: [
+      { valor: mapa.length, rotulo: mapa.length === 1 ? "liderança" : "lideranças", tom: "azul" },
+      { valor: membrosSetor, rotulo: "membros no setor", tom: "roxo" },
+      { valor: atrasosSetor, rotulo: atrasosSetor === 1 ? "item atrasado" : "itens atrasados", tom: "vermelho" },
+      { valor: emDia + " de " + mapa.length, rotulo: "equipes em dia", tom: "verde" },
+    ] }) + c.kpis([
+      { valor: aprov.length, rotulo: "Suas aprovações", nota: aprov.length ? "a mais antiga há " + Math.max.apply(null, aprov.map((a) => a.dias)) + " dias (prazo de 3)" : "nenhuma aguardando", tom: "ambar", rota: "#/offboarding" },
+      { valor: perto.length, rotulo: "Perto do aviso de 14 dias", nota: perto.length ? "aviso a partir de " + calc.fmtData(perto.map((p) => p.avisoCoordenacao).sort()[0]) : "nenhum item com 7 a 13 dias de atraso", tom: "vermelho", rota: "#/painel/setor" },
+      { valor: planos.length, rotulo: "Planos de melhoria", nota: planos.length ? "em andamento no setor" : "nenhum em andamento", tom: "roxo", rota: "#/rotinas" },
+    ]);
     h += '<div class="card"><h3>Lideranças do setor<span class="extra muted">ordem alfabética, sem ranking</span></h3><div class="tabela-wrap"><table class="tabela"><thead><tr>' +
       "<th>Liderança</th><th class='n'>Equipe</th><th>1:1 do mês</th><th>O2O do tri</th><th>Feedback 90 dias</th><th>Onboarding</th><th class='n'>Atrasadas</th><th>Reconhec. : desenv.</th><th>Situação</th></tr></thead><tbody>" +
       mapa.map((l) => {
@@ -255,12 +258,12 @@
   function painelGeral(rh, aba0) {
     const ctx = E().ctx;
     const g = geral();
-    if (!g) return faixa("Painel geral", ctx.tri.rotulo, null, "") + semResumoCEO();
+    if (!g) return faixa({ titulo: "Painel geral", sub: ctx.tri.rotulo }) + semResumoCEO();
     const aba = aba0 || (rh ? "hoje" : "indicadores");
     const lista = (rh ? [{ chave: "hoje", rotulo: "Hoje", rota: "#/painel/hoje" }] : [])
       .concat([{ chave: "indicadores", rotulo: "Indicadores", rota: "#/painel/indicadores" }, { chave: "setores", rotulo: "Setores e retenção", rota: "#/painel/setores" }])
       .concat(rh ? [{ chave: "processos", rotulo: "Processos e cadastros", rota: "#/painel/processos" }, { chave: "exportar", rotulo: "Exportar", rota: "#/painel/exportar" }] : []);
-    let h = faixa(rh ? "Painel do RH" : "Painel geral", g.nMembros + " membros · " + ctx.tri.rotulo, null, atencaoHoje(g)) + c.abas(lista, aba);
+    let h = faixa({ titulo: rh ? "Painel do RH" : "Painel geral", sub: g.nMembros + " membros · " + ctx.tri.rotulo, links: atencaoHoje(g) }) + c.abas(lista, aba);
     if (aba === "hoje" && rh) h += abaHoje(g);
     else if (aba === "setores") h += abaSetores(g, rh);
     else if (aba === "processos" && rh) h += abaProcessos(g);
@@ -282,7 +285,7 @@
     return frases.slice(0, 3).join("");
   }
   function cartaoIndicador(rotulo, valor, contexto, meta) {
-    return '<div class="card"><div class="muted" style="font-size:12px;font-weight:600">' + esc(rotulo) + '</div><div class="num" style="font-size:28px;font-weight:800;color:var(--navy);line-height:1.2">' + esc(valor) +
+    return '<div class="card"><div class="muted" style="font-size:12px;font-weight:600">' + esc(rotulo) + '</div><div class="num" style="font-size:28px;font-weight:700;color:var(--navy);line-height:1.2">' + esc(valor) +
       '</div><div class="muted" style="font-size:12px">' + contexto + "</div>" + (meta ? '<div class="suave" style="font-size:11.5px;margin-top:6px">Meta: ' + esc(meta) + "</div>" : "") +
       '<div class="suave" style="font-size:11px;margin-top:6px">Comparação com o trimestre anterior: sem histórico ainda.</div></div>';
   }
@@ -300,9 +303,12 @@
       cartaoIndicador("Tempo para preencher vaga", g.tempoVaga === null ? "sem dado" : Math.round(g.tempoVaga) + " dias", "mediana das vagas fechadas nos últimos 6 meses"),
     ];
     let h = '<div class="grade c4">' + cartoes.join("") + "</div>";
-    h += '<div class="card" style="margin-top:16px"><h3>Fluxos hoje</h3><div class="grade c4">' +
-      [["Itens atrasados", i.atrasadas], ["Vagas abertas", g.vagasAbertas], ["Pessoas em onboarding", g.emOnboarding], ["Encerramentos em andamento", g.encerramentosAndamento]]
-        .map((x) => '<div><div class="num" style="font-size:22px;font-weight:800;color:var(--navy)">' + x[1] + '</div><div class="muted" style="font-size:12px">' + x[0] + "</div></div>").join("") + "</div></div>";
+    h += '<div class="h3" style="margin:24px 0 10px">Fluxos hoje</div>' + c.kpis([
+      { valor: i.atrasadas, rotulo: "Itens atrasados", tom: "vermelho" },
+      { valor: g.vagasAbertas, rotulo: "Vagas abertas", tom: "azul" },
+      { valor: g.emOnboarding, rotulo: "Pessoas em onboarding", tom: "roxo" },
+      { valor: g.encerramentosAndamento, rotulo: "Encerramentos em andamento", tom: "ambar" },
+    ]);
     return h;
   }
   function abaSetores(g, rh) {
