@@ -135,11 +135,13 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - **App:** a esteira lê os campos novos e avisa quando faltam os 2 registros de feedback anexados. Também mostra os riscos e exporta as colunas novas.
   - **Falta o usuário:** colar o script no console, ativar e testar o formulário, e pôr o link em Configuração → Links. Enquanto isso, a solicitação continua pelo app.
 - **Portal:**
-  - A estrutura de 21/10 está completa: 9 processos e a primeira carga do Membros (59 itens).
+  - A estrutura está completa: os 10 processos e a primeira carga do Membros (59 itens, 21/10).
+  - Em 03/11, com o ok do usuário, `tools/provisionar.js` criou o "1:1 mensais" (`entityTypeId 1134`) e o campo "Ficha enviada ao membro em" do Onboarding. Usou o webhook de administrador do Mathias, o único com `userfieldconfig`. Depois disso, a simulação não acha mais nada a criar.
   - Em 29/10 foi criado o funil de negócios **HR | Offboarding (79)**. Os campos `UF_CRM_OFF_*` seguem o formulário da Luciele desde 03/11.
   - **Falta o administrador:**
-    - criar no app o processo "1:1 mensais" e o campo "Ficha enviada ao membro em" (Configuração → Criar ou completar a estrutura; o webhook não tem `userfieldconfig`);
-    - dar as permissões de CRM (docs, seção 4), com o RH em "Todos";
+    - dar as permissões de CRM (docs, seção 4), com o RH em "Todos", inclusive no "1:1 mensais";
     - escolher a caixa de e-mail do SMTP.
-- **Vercel:** as variáveis da seção 3 de `docs/configuracao-bitrix.md`, mais as da seção 9 (SMTP, opcional, só para a Ficha). O webhook de saída (`BITRIX_EVENTO_TOKEN`) ainda não existe.
+- **Vercel:**
+  - As variáveis estão na seção 3 de `docs/configuracao-bitrix.md`, mais as da seção 9 (SMTP, opcional, só para a Ficha). O webhook de saída (`BITRIX_EVENTO_TOKEN`) ainda não existe.
+  - Em 03/11/2026 a Vercel pausou a conta, que é Hobby. Os 4 projetos dela (este, `recebimentos-docs`, `webflow-btrix-api` e `widget-rotina-contabil`) passaram a responder `402 DEPLOYMENT_DISABLED`. A tela de Usage da Vercel mostra qual limite estourou, e a saída é o plano Pro ou o suporte.
 - **Pendências e riscos:** `docs/tabela-2.7-e-validacoes.md`.
