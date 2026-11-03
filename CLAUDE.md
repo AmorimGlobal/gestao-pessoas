@@ -124,15 +124,19 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
     - o glossário de competências (Configuração → Cadastros);
     - os campos e a fórmula das avaliações do onboarding;
     - a estrutura do plano de melhoria;
-    - as especificações do 1:1 e do O2O;
-    - o formulário de offboarding (o script em `amorim-api/offboarding-bitrix` está pronto, mas não foi rodado: o usuário pediu para esperar o da Luciele).
+    - as especificações do 1:1 e do O2O.
 - **30/10/2026:**
   - **Visual novo:** feito pela referência que o usuário mandou, em lugar da referência visual que se esperava do RH.
   - **Offboarding:** os e-mails dos funis 77 e 79 saíram do app e viraram automação do Bitrix, feita pelo usuário. O pedido de encerramento continua no app até o formulário da Luciele existir. O alerta, a esteira, o histórico e o Exportar ficam.
   - **Vocabulário:** "processo" confundiu o usuário, que entendeu "Processos" do Bitrix (fluxos com grupos e tarefas). Fale em "tabela do CRM (processo inteligente)".
+- **03/11/2026, formulário de offboarding:** a Luciele mandou o dela (Google Forms "Solicitação de Encerramento de Contrato"). Feito:
+  - **Funil 79:** os campos `UF_CRM_OFF_*` foram acertados e criados por `criar-funil.js --gravar`, com o card em 5 seções. Os da v1 sem pergunta ficaram no portal, fora do formulário e do card.
+  - **Script do formulário:** `form-console.txt` está gerado. As perguntas "Caso..." só aparecem quando se aplicam.
+  - **App:** a esteira lê os campos novos e avisa quando faltam os 2 registros de feedback anexados. Também mostra os riscos e exporta as colunas novas.
+  - **Falta o usuário:** colar o script no console, ativar e testar o formulário, e pôr o link em Configuração → Links. Enquanto isso, a solicitação continua pelo app.
 - **Portal:**
   - A estrutura de 21/10 está completa: 9 processos e a primeira carga do Membros (59 itens).
-  - Em 29/10 foi criado o funil de negócios **HR | Offboarding (79)**, com 18 campos `UF_CRM_OFF_*` e `UF_CRM_RV_ULT_AVISO`.
+  - Em 29/10 foi criado o funil de negócios **HR | Offboarding (79)**. Os campos `UF_CRM_OFF_*` seguem o formulário da Luciele desde 03/11.
   - **Falta o administrador:**
     - criar no app o processo "1:1 mensais" e o campo "Ficha enviada ao membro em" (Configuração → Criar ou completar a estrutura; o webhook não tem `userfieldconfig`);
     - dar as permissões de CRM (docs, seção 4), com o RH em "Todos";

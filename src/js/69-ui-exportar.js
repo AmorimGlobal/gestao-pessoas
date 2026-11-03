@@ -93,12 +93,15 @@
     },
     solicitacoes: {
       rotulo: "Solicitações de encerramento", nota: "Pela data em que a solicitação foi criada (esteira e app).",
-      linhas: (ctx) => dom.solicitacoesOffboarding(ctx).map((s) => ({ _data: s.criadaEm, "Origem": "Esteira HR | Offboarding", "Membro": s.membro, "Setor": s.setor, "Contrato": s.contrato, "Motivo": s.motivo, "Solicitante": s.solicitante,
-        "Etapa": s.etapa, "Criada em": s.criadaEm, "Data desejada": s.dataDesejada, "Data efetiva": s.dataEfetiva }))
+      // as mesmas colunas nas duas origens (o cabeçalho sai da primeira linha); as do formulário da Luciele ficam vazias nas do app
+      linhas: (ctx) => dom.solicitacoesOffboarding(ctx).map((s) => ({ _data: s.criadaEm, "Origem": "Esteira HR | Offboarding", "Membro": s.membro, "Setor": s.setor, "Motivo": s.motivoTexto, "Solicitante": s.solicitante,
+        "Etapa": s.etapa, "Criada em": s.criadaEm, "Data limite": s.dataLimite, "Data efetiva": s.dataEfetiva,
+        "Feedbacks formais": s.feedbacksFormais, "Registros anexados": s.anexos, "Sucessor interno": s.sucessor, "Nova contratação": s.novaContratacao, "Pontos a considerar": s.riscos.join("; ") }))
         .concat((ctx.registros.encerramentos || []).map((e) => {
           const m = membroDe(e);
-          return { _data: dia(e.criadoEm), "Origem": "App", "Membro": m.nome, "Setor": m.funcao || "", "Contrato": m.contrato || "", "Motivo": e.motivo, "Solicitante": nome(e.solicitante || e.autor),
-            "Etapa": e.estagioNome || e.estagio, "Criada em": dia(e.criadoEm), "Data desejada": dia(e.dataDesejada), "Data efetiva": dia(e.concluidaEm) };
+          return { _data: dia(e.criadoEm), "Origem": "App", "Membro": m.nome, "Setor": m.funcao || "", "Motivo": e.motivo, "Solicitante": nome(e.solicitante || e.autor),
+            "Etapa": e.estagioNome || e.estagio, "Criada em": dia(e.criadoEm), "Data limite": dia(e.dataDesejada), "Data efetiva": dia(e.concluidaEm),
+            "Feedbacks formais": "", "Registros anexados": "", "Sucessor interno": "", "Nova contratação": "", "Pontos a considerar": "" };
         })),
     },
     vagas: {

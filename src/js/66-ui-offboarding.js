@@ -83,9 +83,19 @@
     if (!n) return "";
     return '<div class="card acao vermelho"><h3>' + icone("alerta", 16) + " " + plural(n, "solicitação nova aguarda o RH", "solicitações novas aguardam o RH") + "</h3><div class=\"lista\">" +
       novasFunil.map((s) => '<div class="item clicavel" data-acao="abrir-negocio" data-id="' + esc(s.id) + '"><div class="principal-item"><div class="t">' + esc(s.membro || s.titulo) + '</div><div class="d">' +
-        esc([s.setor, s.motivo, s.solicitante ? "pedida por " + s.solicitante : "", s.criadaEm ? "em " + calc.fmtData(s.criadaEm) : ""].filter(Boolean).join(" · ")) + '</div></div><div class="lado">' + c.tag("Nova · esteira", "vermelho") + "</div></div>").join("") +
+        esc([s.setor, s.motivoTexto, s.solicitante ? "pedida por " + s.solicitante : "", s.criadaEm ? "em " + calc.fmtData(s.criadaEm) : ""].filter(Boolean).join(" · ")) + "</div>" + atencaoFunil(s) +
+        '</div><div class="lado">' + c.tag("Nova · esteira", "vermelho") + "</div></div>").join("") +
       doApp.map((f) => linhaEnc(f.item)).join("") + "</div>" +
       '<p class="muted" style="font-size:12px;margin:10px 0 0">O alerta some quando a solicitação sai de "Nova solicitação" na esteira (ou de "Enviada ao RH", nas feitas pelo app).</p></div>';
+  }
+
+  /** O que pede a atenção do RH numa solicitação da esteira: os registros de feedback que o formulário
+      exige (no mínimo 2, por desempenho ou incompatibilidade com a função) e os pontos marcados em Riscos */
+  function atencaoFunil(s) {
+    let h = "";
+    if (s.faltamFeedbacks) h += '<div class="d" style="color:var(--vermelho)">' + esc((s.anexos ? plural(s.anexos, "registro de feedback anexado", "registros de feedback anexados") : "Nenhum registro de feedback anexado") + ": o formulário pede no mínimo 2") + "</div>";
+    if (s.riscos.length) h += '<div class="d" style="color:var(--ambar)">' + esc("Considerar: " + s.riscos.join(", ")) + "</div>";
+    return h;
   }
 
   /** Quem envia a solicitação (3.6): com coordenação acima da liderança, é a coordenação que envia; sem
@@ -116,7 +126,7 @@
     else if (!off.categoria) corpo = c.vazio("A esteira de offboarding ainda não está ligada ao app (Configuração → funil de offboarding).");
     else corpo = abertas.length ? '<div class="lista">' + abertas.map((s) =>
       '<div class="item clicavel" data-acao="abrir-negocio" data-id="' + esc(s.id) + '"><div class="principal-item"><div class="t">' + esc(s.membro || s.titulo) + '</div><div class="d">' +
-      esc([s.setor, s.motivo, s.solicitante ? "pedida por " + s.solicitante : "", s.dataDesejada ? "data desejada " + calc.fmtData(s.dataDesejada) : ""].filter(Boolean).join(" · ")) + "</div>" +
+      esc([s.setor, s.motivoTexto, s.solicitante ? "pedida por " + s.solicitante : "", s.dataLimite ? "data limite " + calc.fmtData(s.dataLimite) : ""].filter(Boolean).join(" · ")) + "</div>" + atencaoFunil(s) +
       '<div class="barra" style="margin-top:8px;max-width:360px"><div class="preench" style="width:' + (s.posicao ? Math.round((s.posicao / s.totalEtapas) * 100) : 0) + '%"></div></div></div>' +
       '<div class="lado">' + c.tag(s.nova ? "Nova solicitação" : s.etapa, s.nova ? "vermelho" : "azul") + '<span class="prazo">desde ' + calc.fmtData(s.criadaEm) + "</span></div></div>").join("") + "</div>"
       : c.vazio("Nenhuma solicitação em andamento na esteira.");

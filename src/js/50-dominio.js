@@ -614,8 +614,13 @@
   }
 
   /* ================================================================ offboarding pelo funil de negócios (29/10/2026) */
-  /** Solicitações do funil "HR | Offboarding", que nascem do formulário CRM. ctx.offboarding vem no
-      mesmo formato das vagas ({etapas, negocios}); as listas já chegam com o texto da opção. */
+  // Formulário da Luciele (03/11/2026): estas justificativas pedem no mínimo 2 registros de feedback anexados
+  const PEDE_FEEDBACKS = /desempenho|incompatibilidade/i;
+  const emLista = (v) => (Array.isArray(v) ? v : v === undefined || v === null || v === "" || v === false ? [] : [v]);
+  const comOutro = (v, outro) => (v === "Outro" && outro ? "Outro: " + outro : v);
+  /** Solicitações do funil "HR | Offboarding", que nascem do formulário CRM "Solicitação de Encerramento
+      de Contrato". ctx.offboarding vem no mesmo formato das vagas ({etapas, negocios}); as listas já
+      chegam com o texto da opção. */
   function solicitacoesOffboarding(ctx) {
     const v = ctx.offboarding || { etapas: [], negocios: [] };
     const abertas = (v.etapas || []).filter((e) => !e.semantica);
@@ -623,13 +628,21 @@
       const etapa = (v.etapas || []).find((e) => e.id === n.STAGE_ID) || { id: n.STAGE_ID, nome: n.STAGE_ID, semantica: "" };
       const pos = abertas.findIndex((e) => e.id === n.STAGE_ID);
       const concluida = etapa.semantica === "S";
+      const motivo = n.UF_CRM_OFF_MOTIVO || "";
+      const anexos = emLista(n.UF_CRM_OFF_ANEXOS).length;
       return {
-        id: String(n.ID), titulo: n.TITLE || "", membro: n.UF_CRM_OFF_MEMBRO || n.TITLE || "", solicitante: n.UF_CRM_OFF_SOLICIT || "",
-        email: String(n.UF_CRM_OFF_EMAIL || "").toLowerCase(), papel: n.UF_CRM_OFF_PAPEL || "", setor: n.UF_CRM_OFF_SETOR || "",
-        contrato: n.UF_CRM_OFF_CONTRATO || "", motivo: n.UF_CRM_OFF_MOTIVO || "",
+        id: String(n.ID), titulo: n.TITLE || "", membro: n.UF_CRM_OFF_MEMBRO || n.TITLE || "",
+        // "Coordenação e Liderança" no formulário: quem pede
+        solicitante: n.UF_CRM_OFF_SOLICIT || "",
+        email: String(n.UF_CRM_OFF_EMAIL || "").toLowerCase(), setor: n.UF_CRM_OFF_SETOR || "",
+        // motivo: a opção marcada, para contar no histórico; motivoTexto: com o "Outro" escrito
+        motivo, motivoTexto: comOutro(motivo, n.UF_CRM_OFF_MOT_OUT),
+        feedbacksFormais: n.UF_CRM_OFF_FEEDBACKS || "", anexos, faltamFeedbacks: PEDE_FEEDBACKS.test(motivo) && anexos < 2,
+        sucessor: n.UF_CRM_OFF_SUCESSOR || "", novaContratacao: n.UF_CRM_OFF_REPOSICAO || "",
+        riscos: emLista(n.UF_CRM_OFF_RISCOS).map((r) => comOutro(r, n.UF_CRM_OFF_RISCO_OUT)),
         etapa: etapa.nome, etapaId: etapa.id, semantica: etapa.semantica || "", posicao: pos >= 0 ? pos + 1 : null, totalEtapas: abertas.length,
         nova: pos === 0, concluida, cancelada: etapa.semantica === "F",
-        criadaEm: dataDe(n.DATE_CREATE), atualizadaEm: dataDe(n.DATE_MODIFY), dataDesejada: dataDe(n.UF_CRM_OFF_DATA_DES),
+        criadaEm: dataDe(n.DATE_CREATE), atualizadaEm: dataDe(n.DATE_MODIFY), dataLimite: dataDe(n.UF_CRM_OFF_DATA_DES),
         dataEfetiva: dataDe(n.UF_CRM_OFF_DATA_EFET) || (concluida ? dataDe(n.CLOSEDATE || n.DATE_MODIFY) : ""),
       };
     }).sort((a, b) => (a.criadaEm < b.criadaEm ? 1 : -1));

@@ -294,6 +294,15 @@ test("offboarding: solicitações da esteira, alerta do RH e histórico por per�
   const sol = dom.solicitacoesOffboarding(ctx);
   assert.equal(sol.length, 4);
   assert.deepEqual(sol.filter((s) => s.nova).map((s) => s.membro), ["Igor Santos"]);
+  // formulário da Luciele: desempenho ou incompatibilidade pedem no mínimo 2 registros de feedback anexados
+  const porNome = Object.fromEntries(sol.map((s) => [s.membro, s]));
+  assert.equal(porNome["Igor Santos"].anexos, 1);
+  assert.equal(porNome["Igor Santos"].faltamFeedbacks, true);
+  assert.deepEqual(porNome["Igor Santos"].riscos, ["Clientes estratégicos"]);
+  assert.equal(porNome["Clara Neves"].faltamFeedbacks, false); // 2 anexos
+  assert.equal(porNome["Paulo Viana"].faltamFeedbacks, false); // otimização de custos não pede
+  assert.equal(porNome["Otávio Ramos"].motivo, "Outro");
+  assert.equal(porNome["Otávio Ramos"].motivoTexto, "Outro: Fim do projeto do cliente");
   const d = dom.demandasRH(ctx);
   assert.equal(d.offboarding, 2); // Igor (esteira, nova) + Fernanda (app, enviada ao RH)
   assert.equal(d.recrutamento, 0); // nenhuma vaga em "Nova solicitação" na demonstração
@@ -301,7 +310,7 @@ test("offboarding: solicitações da esteira, alerta do RH e histórico por per�
   assert.deepEqual(tri.map((l) => l.periodo.chave), ["2026-T4", "2026-T3", "2026-T1", "2025-T4"]);
   const t3 = tri.find((l) => l.periodo.chave === "2026-T3");
   assert.deepEqual(t3.desligamentos.map((x) => x.nome), ["Paulo Viana"]);
-  assert.deepEqual(t3.motivos, { "Pedido do membro": 1 });
+  assert.deepEqual(t3.motivos, { "Otimização de Custos": 1 });
   const ano = dom.historicoDesligamentos(ctx, "ano");
   assert.deepEqual(ano.map((l) => [l.periodo.chave, l.desligamentos.length]), [["2026", 2], ["2025", 1]]);
   const sem = dom.historicoDesligamentos(ctx, "semestre");

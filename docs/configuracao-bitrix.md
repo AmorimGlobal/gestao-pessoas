@@ -258,24 +258,24 @@ Decisão da reunião de 29/10/2026: o novo membro recebe por e-mail a Ficha da f
 
 Depois de gravar, faça um Redeploy e confira a linha "E-mail: Ficha do onboarding" em Configuração → Rotinas no servidor.
 
-**E-mails dos funis de vagas (77) e de offboarding (79):** saíram do app em 30/10/2026. O usuário configura nas regras de automação de cada funil, no próprio Bitrix: um robô "Enviar e-mail" para o e-mail de quem pediu (`UF_CRM_RV_EMAIL` / `UF_CRM_OFF_EMAIL`) na etapa de entrada e em cada etapa que deve avisar, e um robô "Notificação" para o RH na entrada. Os campos `UF_CRM_RV_ULT_AVISO` e `UF_CRM_OFF_ULT_AVISO`, que serviam de controle aos e-mails do app, não são mais usados: podem ficar ou ser apagados. O webhook de saída da seção 7 não precisa dos eventos de negócio (ONCRMDEAL*): se chegarem, são ignorados.
+**E-mails dos funis de vagas (77) e de offboarding (79):** saíram do app em 30/10/2026. O usuário configura nas regras de automação de cada funil, no próprio Bitrix: um robô "Enviar e-mail" para o e-mail de quem pediu (`UF_CRM_RV_EMAIL` / `UF_CRM_OFF_EMAIL`) na etapa de entrada e em cada etapa que deve avisar, e um robô "Notificação" para o RH na entrada. Os campos `UF_CRM_RV_ULT_AVISO` e `UF_CRM_OFF_ULT_AVISO`, que serviam de controle aos e-mails do app, não são mais usados: podem ficar ou ser apagados. Em 03/11/2026 as listas "Justificativa" (`UF_CRM_OFF_MOTIVO`) e "Será necessária nova contratação?" (`UF_CRM_OFF_REPOSICAO`) trocaram de opções: robô com condição numa opção antiga precisa ser refeito. O webhook de saída da seção 7 não precisa dos eventos de negócio (ONCRMDEAL*): se chegarem, são ignorados.
 
 ## 10. Reunião de 29/10/2026: o que muda no Bitrix
 
 O relatório da reunião (`Relatório.docx`) mudou o escopo do app. O que precisa de configuração no portal:
 
 1. **Processo novo "1:1 mensais"** (o 1:1 do mês, a conversa breve) e o campo "Ficha enviada ao membro em" no Onboarding. Um administrador abre o app → Configuração → **Criar ou completar a estrutura**. O webhook de entrada não tem o escopo `userfieldconfig`, então isso não roda pelo servidor. Depois dê as permissões da seção 4 ao processo novo. Até lá, o app avisa e não cobra o 1:1 de ninguém.
-2. **Esteira "HR \| Offboarding" (funil de negócios 79)**, já criada em 29/10/2026 por `amorim-api/offboarding-bitrix/criar-funil.js`:
+2. **Esteira "HR \| Offboarding" (funil de negócios 79)**, criada em 29/10/2026 por `amorim-api/offboarding-bitrix/criar-funil.js`:
    - etapas: Nova solicitação, Aguardando coordenação, Em análise (RH), Aprovada, Conversa realizada, Pós-encerramento, Concluída (ganho) e Cancelada (perda);
-   - 18 campos `UF_CRM_OFF_*`, uma primeira versão tirada da solicitação que o app já tinha;
+   - os campos `UF_CRM_OFF_*` seguem, desde 03/11/2026, o formulário "Solicitação de Encerramento de Contrato" da Luciele. São as perguntas dela, um campo por pergunta (justificativa, feedbacks formais e anexos, sucessor, nova contratação, riscos), mais a data efetiva e o motivo de saída, que só o RH preenche. Os campos da primeira versão sem pergunta no formulário (`OFF_PAPEL`, `OFF_CONTRATO`, `OFF_PLANO`, `OFF_APOIO_RH`, `OFF_ULT_AVISO`) ficaram no portal, fora do formulário e do card;
    - os negócios novos ficam com o RH como responsável.
-3. **Formulário de offboarding:** o RH (Luciele) vai mandar o formulário dela. Quando chegar:
-   - ajuste os campos com o `criar-funil.js`;
-   - gere o script com `gerar-form-console.js`;
-   - rode o script no console do Bitrix e ative o formulário;
-   - cole o link em Configuração → Links → "Formulário de solicitação de encerramento".
+3. **Formulário de offboarding:** o script está pronto em `amorim-api/offboarding-bitrix/form-console.txt` (a ordem completa está no README de lá):
+   - um administrador cola o script no console do Bitrix (F12), e o formulário nasce desativado;
+   - ative em CRM → Formulários e faça um envio de teste;
+   - cole o link `/pub/form.php?...` em Configuração → Links → "Formulário de solicitação de encerramento".
 
-   Sem o link, a aba Offboarding continua com a solicitação pelo app.
+   Sem o link, a aba Offboarding continua com a solicitação pelo app. Com ele, o botão abre o formulário.
+   Na esteira, o app avisa o RH quando a justificativa é "Desempenho abaixo da média" ou "Incompatibilidade com a função" e vieram menos de 2 registros de feedback anexados. Também mostra os pontos marcados em "Riscos".
 4. **Alerta vermelho do RH:** o menu mostra quantas solicitações novas aguardam o RH no Recrutamento (vagas em "Nova solicitação" no funil 77) e no Offboarding (cards em "Nova solicitação" no funil 79 e solicitações do app em "Enviada ao RH"). O alerta some quando o card sai da primeira etapa.
 5. **Robôs da seção 6 que deixaram de valer:**
    - "Planejar as 2 entregas" (Dia 15 do onboarding): o onboarding não cria mais tarefas;

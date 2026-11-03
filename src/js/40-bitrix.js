@@ -96,9 +96,10 @@
 
   const reg = GP.registros;
   const dataBitrix = reg.dataBitrix;
-  // Campos do funil "HR | Offboarding" que o app lê (amorim-api/offboarding-bitrix cria todos)
-  const CAMPOS_OFFBOARDING = ["UF_CRM_OFF_SOLICIT", "UF_CRM_OFF_EMAIL", "UF_CRM_OFF_PAPEL", "UF_CRM_OFF_MEMBRO", "UF_CRM_OFF_SETOR",
-    "UF_CRM_OFF_CONTRATO", "UF_CRM_OFF_MOTIVO", "UF_CRM_OFF_DATA_DES", "UF_CRM_OFF_DATA_EFET", "UF_CRM_OFF_REPOSICAO"];
+  // Campos do funil "HR | Offboarding" que o app lê (amorim-api/offboarding-bitrix cria todos, pelo formulário da Luciele de 03/11/2026)
+  const CAMPOS_OFFBOARDING = ["UF_CRM_OFF_SOLICIT", "UF_CRM_OFF_EMAIL", "UF_CRM_OFF_MEMBRO", "UF_CRM_OFF_SETOR", "UF_CRM_OFF_MOTIVO", "UF_CRM_OFF_MOT_OUT",
+    "UF_CRM_OFF_FEEDBACKS", "UF_CRM_OFF_ANEXOS", "UF_CRM_OFF_SUCESSOR", "UF_CRM_OFF_REPOSICAO", "UF_CRM_OFF_RISCOS", "UF_CRM_OFF_RISCO_OUT",
+    "UF_CRM_OFF_DATA_DES", "UF_CRM_OFF_DATA_EFET"];
 
   function semPermissao(e) {
     return !!e && (e.codigo === "ACCESS_DENIED" || /access denied|not allowed|permission|acesso negado/i.test(String(e.descricao || e.message || "")));
@@ -399,8 +400,8 @@
       },
 
       /* ---------- offboarding: funil "HR | Offboarding" (formulário CRM, 29/10/2026) ---------- */
-      /** Só o RH costuma ter leitura neste funil. As listas chegam com o texto da opção, e a descrição
-          do motivo não é lida (fica só no card do Bitrix). */
+      /** Só o RH costuma ter leitura neste funil. As listas chegam com o texto da opção (a de várias
+          escolhas, como lista de textos), e os textos longos não são lidos (ficam só no card do Bitrix). */
       offboarding: async function (categoria) {
         const cat = Number(categoria);
         if (!cat) return { etapas: [], negocios: [] };
@@ -417,7 +418,13 @@
           const f = campos && campos[k];
           if (f && Array.isArray(f.items)) { textos[k] = {}; f.items.forEach(function (i) { textos[k][String(i.ID)] = i.VALUE; }); }
         });
-        negocios.forEach(function (n) { Object.keys(textos).forEach(function (k) { if (n[k] !== undefined && n[k] !== null && n[k] !== "") n[k] = textos[k][String(n[k])] || n[k]; }); });
+        const texto = function (k, v) { return textos[k][String(v)] || v; };
+        negocios.forEach(function (n) {
+          Object.keys(textos).forEach(function (k) {
+            if (Array.isArray(n[k])) n[k] = n[k].map(function (v) { return texto(k, v); });
+            else if (n[k] !== undefined && n[k] !== null && n[k] !== "" && n[k] !== false) n[k] = texto(k, n[k]);
+          });
+        });
         return { etapas: reg.etapasDoFunil(etapas), negocios };
       },
       abrirNegocio: function (id) { if (BX24.openPath) BX24.openPath("/crm/deal/details/" + id + "/"); },
