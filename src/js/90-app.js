@@ -129,7 +129,11 @@
         hoje, eu, config, usuarios, departamentos, registros, vagas, offboarding, ausencias: [],
         feriados: { nacionais: fer1.concat(fer2) },
         // processo novo que ainda não foi criado no portal: a tela avisa em vez de falhar
-        recursos: { mensal: repo.temProcesso ? repo.temProcesso("mensal") : true },
+        recursos: {
+          mensal: repo.temProcesso ? repo.temProcesso("mensal") : true,
+          ferias: repo.temProcesso ? repo.temProcesso("ferias") : true,
+          feriados: repo.temProcesso ? repo.temProcesso("feriados") : true,
+        },
       });
       const papeis = dom.papeis(ctx, eu.id);
       await carregarAusencias(repo, ctx, eu.id);
@@ -144,9 +148,12 @@
       E.semAcesso = !E.visoes.length && !eu.admin;
       if (!E.visoes.length) E.visoes = ["lideranca"];
       try { E.dispensadas = JSON.parse(localStorage.getItem("gp_dicas_" + eu.id) || "{}"); } catch (e) { E.dispensadas = {}; }
+      // o sino: o que chegou depois da última vez que a pessoa abriu fica como novo
+      E.notifVisto = repo.lerPreferencia("gp_notif_visto") || "";
       E.carregando = false;
       const visto = repo.lerPreferencia("gp_tour_visto");
-      if (!visto && q.get("tour") !== "0") E.tourPasso = 0;
+      // o tour mostra as telas da liderança: o membro, que só pede férias, não vê
+      if (!visto && q.get("tour") !== "0" && E.visao !== "membro") E.tourPasso = 0;
       ui.render();
       // RH e administrador: confere no servidor se a permissão do CRM esconde registros (aviso no topo)
       if (repo.modo === "bitrix" && ui.podeVerComo() && repo.contagemServidor) {

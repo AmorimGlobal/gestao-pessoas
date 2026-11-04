@@ -48,6 +48,7 @@
     ctx.idx = idx;
     ctx.tri = calc.trimestreDe(ctx.hoje);
     ctx.triAnterior = calc.trimestreAnterior(ctx.tri);
+    ctx._feriadosDe = null; // os feriados do RH podem ter mudado
     return ctx;
   }
   const doMembro = (ctx, chave, membroId) => (ctx.idx.porMembro[chave] && ctx.idx.porMembro[chave][membroId]) || [];
@@ -180,11 +181,49 @@
     return lista.filter((m) => (vistos[m.id] ? false : (vistos[m.id] = true)));
   }
 
-  /* ================================================================ feriados (4.5, regra 2) */
-  function feriadosDe(ctx, sigla) {
-    const f = ctx.feriados || {};
+  /* ================================================================ feriados (4.5, regra 2; Políticas de Férias e Ausências, parte IV) */
+  // Desde 04/11/2026 o RH cadastra o calendário da empresa no processo Feriados. Um ano com itens lá
+  // substitui, naquele ano, a lista oficial (nacionais) e os locais de SP e Salvador da Configuração.
+  const SIGLA_ABRANGENCIA = { "Todos": "", "São Paulo (SP)": "SP", "Salvador (BA)": "BA" };
+  const porData = (a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0);
+  /** Feriados oficiais de um ano: os nacionais da lei (calculados), mais as datas a mais do calendário do Bitrix, mais os
+      locais da Configuração. O calendário do portal sozinho não basta: em 11/2026 ele tinha só 01/01 e 25/12. */
+  function feriadosOficiais(ctx, ano) {
+    const a = String(ano);
+    const lista = calc.feriadosNacionais(Number(ano)).map((f) => ({ data: f.data, nome: f.nome, sigla: "", considera: true, fonte: "oficial" }));
+    const datas = new Set(lista.map((f) => f.data));
+    ((ctx.feriados && ctx.feriados.nacionais) || []).filter((f) => String(f.data).slice(0, 4) === a && !datas.has(f.data))
+      .forEach((f) => { datas.add(f.data); lista.push({ data: f.data, nome: f.nome && f.nome !== "Feriado" ? f.nome : "Feriado (calendário do Bitrix)", sigla: "", considera: true, fonte: "oficial" }); });
     const locais = (ctx.config && ctx.config.feriadosLocais) || {};
-    return calc.conjuntoFeriados([f.nacionais || [], locais[sigla || "SP"] || []]);
+    ["SP", "BA"].forEach((s) => (locais[s] || []).filter((f) => String(f.data).slice(0, 4) === a).forEach((f) => lista.push({ data: f.data, nome: f.nome, sigla: s, considera: true, fonte: "configuracao" })));
+    return lista.sort(porData);
+  }
+  /** Os feriados que o RH cadastrou para um ano (sem os descartados) */
+  function feriadosCadastrados(ctx, ano) {
+    return ((ctx.registros && ctx.registros.feriados) || []).filter((f) => f.estagio !== "FAIL" && String(f.data || "").slice(0, 4) === String(ano))
+      .map((f) => ({ data: f.data, nome: f.titulo || "Feriado", sigla: SIGLA_ABRANGENCIA[f.abrangencia] || "", considera: !!f.considera, fonte: "rh", id: f.id, observacao: f.observacao || "", abrangencia: f.abrangencia || "Todos" }))
+      .sort(porData);
+  }
+  /** Calendário de um ano: o do RH, se ele cadastrou; senão o oficial. [{data, nome, sigla: ""|"SP"|"BA", considera, fonte}] */
+  function feriadosDoAno(ctx, ano) {
+    const cad = feriadosCadastrados(ctx, ano);
+    return cad.length ? cad : feriadosOficiais(ctx, ano);
+  }
+  /** Feriados entre duas datas (os não considerados vêm marcados, para a tela mostrar que são dias úteis) */
+  function calendarioFeriados(ctx, inicio, fim) {
+    const lista = [];
+    for (let a = Number(inicio.slice(0, 4)); a <= Number(fim.slice(0, 4)); a++) feriadosDoAno(ctx, a).forEach((f) => { if (f.data >= inicio && f.data <= fim) lista.push(f); });
+    return lista.sort(porData);
+  }
+  /** Datas que não são dias úteis para quem segue SP ou BA (do ano anterior ao seguinte ao de hoje) */
+  function feriadosDe(ctx, sigla) {
+    const s = sigla || "SP";
+    ctx._feriadosDe = ctx._feriadosDe || {};
+    if (ctx._feriadosDe[s]) return ctx._feriadosDe[s];
+    const ano = Number(String(ctx.hoje || calc.hojeISO()).slice(0, 4));
+    const set = new Set();
+    [ano - 1, ano, ano + 1].forEach((a) => feriadosDoAno(ctx, a).forEach((f) => { if (f.considera && (!f.sigla || f.sigla === s)) set.add(f.data); }));
+    return (ctx._feriadosDe[s] = set);
   }
   function feriadosDoMembro(ctx, m) { return feriadosDe(ctx, /BA/.test((m && m.cidade) || "") ? "BA" : "SP"); }
   function prazo(ctx, m, iso) { return iso ? calc.ajustarPrazo(iso, feriadosDoMembro(ctx, m)) : ""; }
@@ -716,24 +755,31 @@
   }
 
   /* ================================================================ agenda da equipe (3.6) */
+  /** Férias, day off e pausas aprovados pelo RH e confirmados pela liderança: entram na agenda como ausência */
+  function ausenciasAprovadas(ctx) {
+    return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => p.estagio === "SUCCESS" && p.inicio)
+      .map((p) => ({ pessoa: String(p.responsavel), inicio: p.inicio, fim: p.fim || p.inicio, origem: "app", tipo: p.tipo }));
+  }
   function agendaEquipe(ctx, pessoas, opcoes) {
     const o = opcoes || {};
     const inicio = o.inicio || ctx.hoje;
     const semanas = o.semanas || 13;
     const fim = calc.addDias(inicio, semanas * 7 - 1);
-    const nacionais = (ctx.feriados && ctx.feriados.nacionais) || [];
-    const locais = (ctx.config && ctx.config.feriadosLocais) || {};
+    const calendario = calendarioFeriados(ctx, inicio, fim);
+    const valem = calendario.filter((f) => f.considera);
+    const nacionais = valem.filter((f) => !f.sigla);
+    const doApp = ausenciasAprovadas(ctx);
     const linhas = pessoas.map((p) => {
       const sigla = p.cidadeSigla || "SP";
       const fer = feriadosDe(ctx, sigla);
-      const aus = (ctx.ausencias || []).filter((a) => a.pessoa === p.userId && a.fim >= inicio && a.inicio <= fim)
+      const aus = (ctx.ausencias || []).concat(doApp).filter((a) => a.pessoa === p.userId && a.fim >= inicio && a.inicio <= fim)
         .map((a) => Object.assign({}, a, { volta: calc.voltaEm(a.fim, fer) }));
       let aniv = "";
       if (p.aniversario) {
         const ano = Number(inicio.slice(0, 4));
         [ano, ano + 1].forEach((y) => { const d = y + "-" + p.aniversario; if (!aniv && d >= inicio && d <= fim) aniv = d; });
       }
-      return { pessoa: p, sigla, ausencias: aus, aniversario: aniv, feriadosLocais: (locais[sigla] || []).filter((f) => f.data >= inicio && f.data <= fim) };
+      return { pessoa: p, sigla, ausencias: aus, aniversario: aniv, feriadosLocais: valem.filter((f) => f.sigla === sigla) };
     });
     const todasAus = [];
     linhas.forEach((l) => l.ausencias.forEach((a) => todasAus.push({ pessoa: l.pessoa.userId, inicio: a.inicio, fim: a.fim })));
@@ -751,8 +797,10 @@
     const lim14 = calc.addDias(ctx.hoje, 13);
     return {
       inicio, fim, linhas,
-      feriadosNacionais: nacionais.filter((f) => f.data >= inicio && f.data <= fim),
-      feriadosLocais: ["SP", "BA"].map((s) => ({ sigla: s, lista: (locais[s] || []).filter((f) => f.data >= inicio && f.data <= fim) })),
+      feriadosNacionais: nacionais,
+      feriadosLocais: ["SP", "BA"].map((s) => ({ sigla: s, lista: valem.filter((f) => f.sigla === s) })),
+      // o calendário inteiro do período, com os que a empresa não considera (dia útil)
+      feriados: calendario,
       pico: Object.assign({}, pico, { fim: picoFim }), aviso,
       proximos14: {
         fora: linhas.flatMap((l) => l.ausencias.filter((a) => a.inicio <= lim14 && a.fim >= ctx.hoje).map((a) => ({ pessoa: l.pessoa, ate: a.fim, volta: a.volta }))),
@@ -1014,7 +1062,8 @@
   return {
     MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE, DESEMPENHO_ATIVO, TIPOS_FEEDBACK_REGISTRO, ORIGEM_APP,
     indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, deptoPrincipal, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancaNaEstrutura, coordenacaoNaEstrutura, liderancaEfetiva, coordenacaoEfetiva, liderancasDoSetor, membrosVisiveis,
-    feriadosDe, feriadosDoMembro, feedbackValido, feedbacksDo, editavel, ultimoFeedback,
+    feriadosDe, feriadosDoMembro, feriadosOficiais, feriadosCadastrados, feriadosDoAno, calendarioFeriados, ausenciasAprovadas, SIGLA_ABRANGENCIA,
+    feedbackValido, feedbacksDo, editavel, ultimoFeedback,
     cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
     temMensal, mensaisDo, mensalNoMes, situacaoMensal, ultimoDiaUtil,
     verificarRegistros, destinoEncerramento, aprovadorDe,

@@ -220,7 +220,13 @@
         return {
           id: String(u.ID || ""), nome: [u.NAME, u.LAST_NAME].filter(Boolean).join(" ").trim() || u.EMAIL || "",
           foto: u.PERSONAL_PHOTO || "", email: u.EMAIL || "", admin: !!(r.a && r.a.ok && r.a.dados === true),
+          // só para preencher o "Meu aniversário": as telas mostram dia e mês, nunca o ano (3.6)
+          nascimento: dataBitrix(u.PERSONAL_BIRTHDAY),
         };
+      },
+      /** A própria pessoa grava o aniversário no perfil do Bitrix (escopo user; o Bitrix deixa cada um editar o próprio perfil) */
+      salvarAniversario: async function (uid, dataNascimento) {
+        await bx("user.update", { ID: Number(uid), PERSONAL_BIRTHDAY: dataNascimento });
       },
       usuarios: async function () {
         const lista = await bxTudo("user.get", { FILTER: { ACTIVE: true }, ADMIN_MODE: false });

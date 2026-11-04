@@ -122,7 +122,7 @@ A rotina `api/avisos.js` roda todo dia às 8h (horário de Brasília, com a marg
 
 ## 4. Funções de acesso (2.4) — à mão
 
-Configure em CRM → Configurações → Permissões. Para cada um dos 10 processos (o "1:1 mensais" entrou em 29/10/2026):
+Configure em CRM → Configurações → Permissões. Para cada um dos 10 processos de registros da equipe (o "1:1 mensais" entrou em 29/10/2026). Os dois de 04/11/2026, "Férias e ausências" e "Feriados", têm regras próprias, logo abaixo da tabela:
 
 | Função | Ler | Criar e editar | Observação |
 |---|---|---|---|
@@ -130,6 +130,15 @@ Configure em CRM → Configurações → Permissões. Para cada um dos 10 proces
 | Coordenação | Departamento e subdepartamentos | Departamento e subdepartamentos | — |
 | RH | Todos | Todos | Administra estágios |
 | Membros e demais usuários | Nenhum | Nenhum | O membro não vê os próprios registros |
+
+**Férias e ausências e Feriados (04/11/2026).** Desde essa data todo funcionário entra no app: quem não lidera ninguém vê só "Férias e ausências" e o Perfil. Para isso, crie uma função do CRM para todos os funcionários (por exemplo "Membros", ligada ao departamento raiz) com acesso só a estes dois processos:
+
+| Processo | Membros (todos) | Liderança | Coordenação | RH |
+|---|---|---|---|---|
+| Férias e ausências | Ler, Adicionar e Editar: Próprios | Ler e Editar: Do departamento | Ler e Editar: Departamento e subdepartamentos | Todos |
+| Feriados | Ler: Todos | Ler: Todos | Ler: Todos | Todos (o RH cadastra) |
+
+Quem tem mais de uma função soma as permissões, então a liderança continua com as dela nos outros processos. Sem a função "Membros", quem não lidera ninguém abre o app mas não consegue registrar o pedido. Sem leitura em "Feriados", a pessoa vê a lista oficial de feriados, e não o calendário do RH.
 
 **O RH precisa de "Todos" mesmo.** O app lê os registros com o login de quem usa. Com "Do departamento", a pessoa do RH só enxerga o próprio setor, e em "Ver como outra pessoa" a equipe da liderança escolhida aparece vazia. Foi o que aconteceu em 28/10/2026. Desde 29/10/2026 o app avisa o RH e o administrador no topo da tela quando a permissão esconde registros: ele compara o que o login leu com o total do processo, contado no servidor por `api/contagem.js`, com o mesmo `BITRIX_WEBHOOK_URL` e `GP_AVISAR_IDS`.
 
@@ -286,3 +295,23 @@ O relatório da reunião (`Relatório.docx`) mudou o escopo do app. O que precis
    - "Leituras · Aguardando leitura": as entregas do onboarding são avaliadas direto na avaliação do mês.
 
    O Ciclo trimestral continua: é nele que fica o O2O (o antigo "1:1 do trimestre").
+
+## 11. Férias e ausências, feriados do RH, notificações e aniversário (04/11/2026)
+
+Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Ausências Programadas" do RH. As regras ficam em `src/js/53-ferias.js`.
+
+1. **Estrutura:** dois processos novos, "Gestão de Pessoas · Férias e ausências" e "Gestão de Pessoas · Feriados". Um administrador cria pelo app: Configuração → "Criar ou completar a estrutura". Até lá, o app mostra o aviso no topo e a tela de férias diz o que falta. Depois, dê as permissões da seção 4, inclusive a função "Membros" para todos os funcionários.
+2. **Férias e ausências:** cada pessoa pede férias, day off ou pausa contratual no próprio app.
+   - Antes do formulário, ela lê as regras do tipo escolhido e marca que leu (fica registrado no pedido).
+   - O app confere o pedido com a política: antecedência, segunda-feira, partes de 15 e 8 dias, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. O que não bate não trava: vira "ponto fora da política", a pessoa justifica, e o RH decide.
+   - O e-mail que a política pede (para hr@amorimlawfirm.com, com cópia para a liderança direta) sai pronto: Gmail, e-mail do computador ou copiar. A pessoa marca "Já enviei".
+   - O RH aprova ou recusa (prazo de 3 dias úteis, 5 na pausa). Depois a liderança direta confirma ou recusa (2 dias úteis, 5 na pausa). A resposta por e-mail também sai pronta.
+   - Só o pedido aprovado pelo RH e confirmado pela liderança entra na Agenda da equipe.
+3. **Feriados:** o RH cadastra o calendário de cada ano em Agenda da equipe → Editar feriados. O cadastro começa pela lista oficial (nacionais da lei, mais as datas a mais do calendário do Bitrix, mais os locais de SP e Salvador da Configuração). Depois o RH marca o que não vale ("não considerar", vira dia útil), exclui ou acrescenta (recesso, por exemplo), para todos ou só para quem segue SP ou Salvador. Um ano cadastrado substitui a lista oficial naquele ano, nos prazos do app, nos pedidos de day off e na agenda. Atenção: em 11/2026, o calendário do portal (Configurações do calendário) tinha só 01/01 e 25/12. Por isso a lista oficial do app passou a somar os feriados nacionais da lei.
+4. **Notificações:** o sino no topo do menu mostra os pedidos e as decisões dos últimos 30 dias para quem vê:
+   - pedidos de férias e ausências (RH e liderança direta), decisões (liderança e quem pediu);
+   - solicitações de vaga (RH e coordenação do setor) e de encerramento de contrato (RH);
+   - finalistas para avaliar e o calendário de feriados atualizado.
+
+   As notificações saem dos próprios registros, sem nada guardado à parte, e o "lido" é de cada pessoa (`gp_notif_visto` no BX24.userOption). Cada evento também sai como aviso do Bitrix (im.notify).
+5. **Aniversário:** cada pessoa cadastra o seu em Perfil, na Agenda ou na tela de férias. A data vem preenchida quando o perfil do Bitrix já tem. Ela é gravada no próprio perfil do Bitrix (`user.update`, escopo `user`), de onde a agenda já lia. O app mostra só o dia e o mês.

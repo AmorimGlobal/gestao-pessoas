@@ -61,6 +61,11 @@
     origemLeitura: ["Plano de alinhamento", "Onboarding", "Marcada como relevante", "Prazo vencido sem conclusão"],
     fase: ["Ancoragem", "Imersão", "Mar Aberto"],
     parecerFinalista: ["Seguir com a proposta", "Não seguir", "Quero conversar com o RH antes"],
+    // Políticas de Férias e Ausências do RH (04/11/2026)
+    tipoAusencia: ["Férias", "Day off", "Pausa contratual"],
+    motivoDayOff: ["Aniversário", "Desempenho", "Campanha institucional"],
+    decisao: ["Aprovada", "Recusada"],
+    abrangenciaFeriado: ["Todos", "São Paulo (SP)", "Salvador (BA)"],
   };
 
   const PROCESSOS = [
@@ -362,6 +367,54 @@
         c("parecer", "PARECER", "lista", "Parecer da liderança", { opcoes: OPCOES.parecerFinalista }),
         c("pontos", "PONTOS", "textoLongo", "Pontos fortes e pontos de atenção", { ajuda: "O que a liderança viu na entrevista." }),
         c("prazo", "PRAZO", "data", "Prazo do parecer", { ajuda: "5 dias úteis depois da entrada em Finalistas." }),
+      ],
+    },
+    /* ---------------- Férias e ausências (Políticas de Férias e Ausências, 04/11/2026) ---------------- */
+    {
+      chave: "ferias", nome: "Férias e ausências", modulo: "Férias e ausências", pai: null,
+      descricao: "Pedidos de férias, day off e pausa contratual, feitos pela própria pessoa no app. Responsável = quem pede. O RH analisa e depois a liderança direta confirma; só então o período entra na Agenda da equipe.",
+      estagios: [
+        { codigo: "NEW", nome: "Aguardando o RH", cor: COR.azul },
+        { codigo: "AG_LIDERANCA", nome: "Aguardando a liderança", cor: COR.amarelo },
+        { codigo: "SUCCESS", nome: "Aprovada", cor: COR.verde },
+        { codigo: "FAIL", nome: "Recusada ou cancelada", cor: COR.cinza },
+      ],
+      campos: [
+        c("tipo", "TIPO", "lista", "Tipo", { opcoes: OPCOES.tipoAusencia }),
+        c("motivoDayOff", "MOTIVO_DAYOFF", "lista", "Day off · motivo", { opcoes: OPCOES.motivoDayOff }),
+        c("inicio", "INICIO", "data", "Primeiro dia"),
+        c("fim", "FIM", "data", "Último dia"),
+        c("dias", "DIAS", "numero", "Dias corridos"),
+        c("cobertura", "COBERTURA", "textoLongo", "Cobertura das atividades no período"),
+        c("justificativa", "JUSTIFICATIVA", "textoLongo", "Justificativa"),
+        c("foraDaPolitica", "FORA_POLITICA", "textoLongo", "Pontos fora da política", { ajuda: "O que o app apontou na hora do pedido. A justificativa de quem pediu explica cada um." }),
+        c("regrasLidasEm", "REGRAS_LIDAS_EM", "dataHora", "Regras lidas em"),
+        c("emailEnviadoEm", "EMAIL_EM", "dataHora", "E-mail ao RH enviado em", { ajuda: "Marcado por quem pediu depois de enviar o e-mail para hr@amorimlawfirm.com com cópia à liderança." }),
+        c("lideranca", "LIDERANCA", "pessoa", "Liderança direta"),
+        c("rhDecisao", "RH_DECISAO", "lista", "Decisão do RH", { opcoes: OPCOES.decisao }),
+        c("rhEm", "RH_EM", "dataHora", "RH respondeu em"),
+        c("rhComentario", "RH_COMENTARIO", "textoLongo", "Comentário do RH"),
+        c("liderancaDecisao", "LID_DECISAO", "lista", "Decisão da liderança", { opcoes: OPCOES.decisao }),
+        c("liderancaEm", "LID_EM", "dataHora", "Liderança respondeu em"),
+        c("liderancaComentario", "LID_COMENTARIO", "textoLongo", "Comentário da liderança"),
+        c("canceladaEm", "CANCELADA_EM", "dataHora", "Cancelada por quem pediu em"),
+        autor(), adendos(),
+      ],
+    },
+    /* ---------------- Feriados da empresa (o RH cadastra; Políticas, parte IV) ---------------- */
+    {
+      chave: "feriados", nome: "Feriados", modulo: "Agenda da equipe", pai: null,
+      descricao: "Calendário de feriados da empresa, cadastrado pelo RH a cada ano: o que vale para todos e o que vale só para quem segue São Paulo ou Salvador. Um ano com itens aqui substitui a lista oficial que o app usa.",
+      estagios: [
+        { codigo: "NEW", nome: "Cadastrado", cor: COR.azul },
+        { codigo: "SUCCESS", nome: "Publicado", cor: COR.verde },
+        { codigo: "FAIL", nome: "Descartado", cor: COR.cinza },
+      ],
+      campos: [
+        c("data", "DATA", "data", "Data"),
+        c("abrangencia", "ABRANGENCIA", "lista", "Vale para", { opcoes: OPCOES.abrangenciaFeriado }),
+        c("considera", "CONSIDERA", "simNao", "A empresa considera", { ajuda: "Desmarcado: a data aparece no calendário, mas é dia útil na Amorim (por exemplo, um ponto facultativo)." }),
+        c("observacao", "OBSERVACAO", "texto", "Observação"),
       ],
     },
   ];

@@ -16,7 +16,8 @@
   "use strict";
 
   const HOJE_PADRAO = "2026-10-08";
-  const PAPEL_USUARIO = { lideranca: "3", coordenacao: "2", rh: "6", ceo: "1" };
+  // membro: quem não lidera ninguém entra só em Férias e ausências e no Perfil (04/11/2026)
+  const PAPEL_USUARIO = { lideranca: "3", coordenacao: "2", rh: "6", ceo: "1", membro: "100" };
 
   function dadosDemo() {
     const U = (id, nome, deptos, aniversario, cargo, registro) => ({
@@ -243,6 +244,18 @@
       dataDesejada: "2026-10-23", reposicao: "Sem reposição", apoioRH: "Sim", primeiraVerificacao: "Aceita na 1ª verificação", enviadaRHEm: "2026-10-05",
     });
 
+    /* Férias e ausências (Políticas de Férias e Ausências): um de cada situação */
+    const pedido = (resp, lid, base) => add("ferias", Object.assign({ titulo: base.tipo + " · " + nomeDe(resp), responsavel: resp, lideranca: lid, autor: resp,
+      regrasLidasEm: base.criadoEm, emailEnviadoEm: base.criadoEm }, base));
+    pedido("100", "3", { id: "300", tipo: "Férias", inicio: "2026-12-07", fim: "2026-12-21", dias: 15, estagio: "NEW", criadoEm: "2026-10-07T09:30:00-03:00",
+      cobertura: "Bruno acompanha os protocolos da carteira; os casos novos esperam a volta." });
+    pedido("101", "3", { id: "301", tipo: "Day off", motivoDayOff: "Aniversário", inicio: "2026-11-13", fim: "2026-11-13", dias: 1, estagio: "AG_LIDERANCA", criadoEm: "2026-10-05T16:00:00-03:00",
+      rhDecisao: "Aprovada", rhEm: "2026-10-07T15:00:00-03:00", rhComentario: "Dentro do mês do aniversário." });
+    pedido("110", "4", { id: "302", tipo: "Férias", inicio: "2026-10-19", fim: "2026-11-02", dias: 15, estagio: "SUCCESS", criadoEm: "2026-08-10T10:00:00-03:00",
+      cobertura: "Júlia assume a carteira tributária.", rhDecisao: "Aprovada", rhEm: "2026-08-11T11:00:00-03:00", liderancaDecisao: "Aprovada", liderancaEm: "2026-08-12T09:00:00-03:00" });
+    pedido("111", "4", { id: "303", tipo: "Pausa contratual", inicio: "2026-11-23", fim: "2026-11-27", dias: 5, estagio: "FAIL", criadoEm: "2026-09-20T10:00:00-03:00",
+      justificativa: "Mudança de cidade.", cobertura: "Kátia cobre os pareceres.", canceladaEm: "2026-09-22T10:00:00-03:00" });
+
     /* Onboarding */
     add("onboarding", {
       id: "60", titulo: "Onboarding · Daniela Rocha", membroId: "3", responsavel: "102", estagio: "IMERSAO", criadoEm: "2026-08-20T10:00:00-03:00",
@@ -364,7 +377,12 @@
       provisionar: async () => { throw new Error("Na demonstração não há portal para configurar."); },
       eu: async () => {
         const u = d.usuarios.find((x) => x.id === euId);
-        return { id: u.id, nome: u.nome, foto: "", email: u.email, admin: euId === "6" };
+        return { id: u.id, nome: u.nome, foto: "", email: u.email, admin: euId === "6", nascimento: u.aniversario ? "1990-" + u.aniversario : "" };
+      },
+      salvarAniversario: async (uid, data) => {
+        await atraso();
+        const u = d.usuarios.find((x) => x.id === String(uid));
+        if (u) u.aniversario = String(data).slice(5, 10);
       },
       usuarios: async () => copia(d.usuarios),
       departamentos: async () => copia(d.departamentos),

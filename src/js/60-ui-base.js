@@ -43,19 +43,23 @@
 
   /* ---------------- escopo pela visão ---------------- */
   const VISOES = {
-    lideranca: "Liderança", coordenacao: "Coordenação", rh: "RH", ceo: "CEO",
+    lideranca: "Liderança", coordenacao: "Coordenação", rh: "RH", ceo: "CEO", membro: "Membro",
   };
+  // Quem não lidera ninguém entra como membro (04/11/2026): só Férias e ausências e o Perfil
+  const ROTAS_MEMBRO = ["ferias", "perfil", "config"];
   function visoesDisponiveis(p) {
     const v = [];
     if (p.coordenacao) v.push("coordenacao");
     if (p.rh) v.push("rh");
     if (p.lideranca && !p.coordenacao) v.push("lideranca");
     if (p.ceo) v.push("ceo");
+    if (!v.length) v.push("membro");
     return v;
   }
   /** Membros que a visão atual enxerga */
   function membrosDaVisao() {
     const ctx = estado.ctx, uid = estado.eu.id;
+    if (estado.visao === "membro") return [];
     if (estado.visao === "rh" || estado.visao === "ceo") return dom.membrosAtivos(ctx.registros.membros || []);
     if (estado.visao === "coordenacao") return dom.membrosVisiveis(ctx, uid);
     return dom.equipeDe(ctx, uid);
@@ -330,6 +334,11 @@
     const item = (rota, ic, rotulo, contador, dica) => '<a href="#/' + rota + '" class="' + (r === rota ? "ativo" : "") + '">' + icone(ic, 17) + "<span>" + rotulo + "</span>" +
       (contador ? '<span class="contador' + (dica ? " novo" : "") + '" title="' + esc(dica || "Pendências atrasadas") + '">' + contador + "</span>" : "") + "</a>";
     if (estado.visao === "ceo") return item("inicio", "inicio", "Início") + item("painel", "painel", "Painel geral");
+    // Férias e ausências: o número é o que espera esta pessoa (o RH analisa; a liderança confirma)
+    const F = GP.ferias;
+    const naFila = F ? (estado.visao === "rh" ? F.paraRH(estado.ctx).length : 0) + F.paraLideranca(estado.ctx, estado.eu.id).length : 0;
+    const itemFerias = item("ferias", "ferias", "Férias e ausências", naFila, "Pedidos aguardando você");
+    if (estado.visao === "membro") return itemFerias + item("perfil", "perfil", "Perfil") + (estado.eu.admin ? item("config", "config", "Configuração") : "");
     const atrasadas = dom.pendenciasDe(estado.ctx, minhaEquipe(), { uid: estado.eu.id }).filter((p) => p.atrasado).length;
     const links = (estado.config && estado.config.links) || {};
     // Alerta vermelho nos módulos em que o RH recebe demandas novas (reunião de 29/10/2026)
@@ -338,6 +347,7 @@
     let h = item("inicio", "inicio", "Início") + item("painel", "painel", "Painel", atrasadas) + item("equipe", "equipe", "Minha equipe") + item("agenda", "agenda", "Agenda da equipe") +
       '<div class="grupo">Módulos</div>' + item("recrutamento", "recrutamento", "Recrutamento", dem.recrutamento, novas) + item("onboarding", "onboarding", "Onboarding") +
       item("rotinas", "rotinas", "Feedbacks") + (dom.DESEMPENHO_ATIVO ? item("desempenho", "desempenho", "Desempenho") : "") + item("offboarding", "offboarding", "Offboarding", dem.offboarding, novas) +
+      itemFerias +
       '<div class="grupo">Para consultar</div>' +
       (links.manual ? '<a href="' + esc(links.manual) + '" target="_blank" rel="noopener">' + icone("manual", 17) + "<span>Manual da liderança</span></a>" : "") +
       item("perfil", "perfil", "Perfil");
@@ -348,11 +358,16 @@
     const demo = estado.repo.modo === "demo";
     const seletor = estado.visoes.length > 1 ? '<label>Ver como<select data-mudar="trocar-visao">' + estado.visoes.map((v) =>
       '<option value="' + v + '"' + (v === estado.visao ? " selected" : "") + ">" + VISOES[v] + "</option>").join("") + "</select></label>" : (VISOES[estado.visao] || "");
+    const nNotif = estado.visao === "ceo" ? 0 : notificacoes().filter((n) => n.nova).length;
     return '<div class="gp"><aside class="lateral"><div class="marca">' +
       (GP.marca && GP.marca.logoBranco ? '<span class="logo" role="img" aria-label="Amorim"></span>' : "<b>Amorim</b>") +
       '<button type="button" class="tema" data-acao="trocar-tema" title="Modo claro ou escuro" aria-label="Alternar entre o modo claro e o escuro">' +
       icone("lua", 16, "so-claro") + icone("sol", 16, "so-escuro") + "</button>" +
-      '<div class="app">Gestão de Pessoas</div></div><nav class="nav" aria-label="Menu">' + menu() + "</nav>" +
+      // o sino fica na linha do nome do app, à direita
+      '<div class="app">Gestão de Pessoas</div>' +
+      (estado.visao === "ceo" ? "" : '<button type="button" class="tema sino" data-acao="abrir-notificacoes" title="Notificações" aria-label="Notificações' + (nNotif ? ": " + nNotif + " novas" : "") + '">' + icone("sino", 16) +
+        (nNotif ? '<span class="bolha">' + (nNotif > 9 ? "9+" : nNotif) + "</span>" : "") + "</button>") +
+      '</div><nav class="nav" aria-label="Menu">' + menu() + "</nav>" +
       '<div class="rodape">' + c.pessoa({ nome: estado.eu.nome, foto: estado.eu.foto }, "", 26) +
       '<div style="margin-top:8px">' + seletor + "</div>" +
       (podeVerComo() ? '<button class="btn peq sec" style="margin-top:10px;width:100%" data-acao="abrir-ver-como">' + icone("equipe", 13) + " Ver como outra pessoa</button>" : "") +
@@ -376,6 +391,33 @@
     return '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>O Bitrix não deixa o seu usuário ler todos os registros do app</b> (' + esc(faltas.join(" · ")) + "). " +
       "Por isso equipes, membros e registros podem aparecer vazios, inclusive em \"Ver como\". Um administrador do Bitrix resolve em CRM → Configurações → Permissões de acesso: a função do RH precisa de \"Todos\" em Ler e em Editar nos processos \"Gestão de Pessoas · …\". Depois, recarregue o app.</div></div>";
   }
+  /* ---------------- notificações (54-notificacoes.js, 04/11/2026) ---------------- */
+  /** As notificações de quem está na tela. O "lido" é da pessoa real: em "Ver como" ele não muda. */
+  function notificacoes() {
+    if (!estado.ctx || !GP.notificacoes || !estado.eu) return [];
+    try { return GP.notificacoes.notificacoesDe(estado.ctx, estado.eu.id, { visto: estado.notifVisto || "" }); } catch (e) { console.warn("Notificações:", e); return []; }
+  }
+  function quandoFoi(v) {
+    const d = String(v || "").slice(0, 10);
+    if (!calc.dataValida(d) || !estado.ctx) return "";
+    const n = calc.diffDias(d, estado.ctx.hoje);
+    return n <= 0 ? "hoje" : n === 1 ? "ontem" : n < 7 ? "há " + n + " dias" : calc.fmtData(d);
+  }
+  acoes["abrir-notificacoes"] = function () {
+    const lista = notificacoes();
+    abrirPainel({
+      titulo: "Notificações", sub: "Pedidos e decisões dos últimos 30 dias para você. Cada um também chega como aviso no Bitrix.",
+      corpo: lista.length ? '<div class="lista notificacoes">' + lista.map((n) => '<a class="item notif' + (n.nova ? " nova" : "") + '" href="' + esc(n.rota) + '" data-acao="ir-notificacao">' +
+        '<div class="principal-item"><div class="t">' + esc(n.titulo) + '</div><div class="d">' + esc([n.area, quandoFoi(n.quando), n.texto].filter(Boolean).join(" · ")) + "</div></div>" +
+        '<div class="lado">' + (n.acao ? c.tag("Pede ação", "ambar") : "") + "</div></a>").join("") + "</div>" : c.vazio("Nada nos últimos 30 dias."),
+    });
+    // o sino aberto: o que estava nele passa a lido
+    estado.notifVisto = new Date().toISOString();
+    if (estado.repo && !estado.verComo) estado.repo.gravarPreferencia("gp_notif_visto", estado.notifVisto);
+    render();
+  };
+  acoes["ir-notificacao"] = function (el) { fecharPainel(true); navegar(el.getAttribute("href")); };
+
   /* ---------------- ver como outra pessoa (administrador ou RH; somente leitura) ---------------- */
   /** Administrador do Bitrix ou quem está em Papéis -> RH (o RH já vê todas as equipes; o modo não grava nada) */
   function podeVerComo() {
@@ -418,7 +460,7 @@
     const papel = new URLSearchParams(location.search).get("papel") || "lideranca";
     return '<div class="faixa-demo nao-imprimir"><b>Demonstração</b> com os 6 casos do protótipo, hoje = ' + calc.fmtDataAno(estado.ctx.hoje) +
       '. Nada é gravado. <label>Entrar como <select data-mudar="demo-papel">' +
-      [["lideranca", "Carla (liderança)"], ["coordenacao", "Livia (coordenação)"], ["rh", "Helena (RH)"], ["ceo", "Beatriz (CEO)"]].map((p) =>
+      [["lideranca", "Carla (liderança)"], ["coordenacao", "Livia (coordenação)"], ["rh", "Helena (RH)"], ["ceo", "Beatriz (CEO)"], ["membro", "Ana (membro)"]].map((p) =>
         '<option value="' + p[0] + '"' + (p[0] === papel ? " selected" : "") + ">" + p[1] + "</option>").join("") + "</select></label></div>";
   }
   function avisoEstrutura() {
@@ -461,6 +503,7 @@
     }
     estado.rota = lerRota();
     if (estado.visao === "ceo" && ["inicio", "painel"].indexOf(estado.rota.nome) < 0) estado.rota = { nome: "painel", partes: [] };
+    if (estado.visao === "membro" && ROTAS_MEMBRO.indexOf(estado.rota.nome) < 0) estado.rota = { nome: "ferias", partes: [] };
     const fn = rotas[estado.rota.nome] || rotas.inicio;
     let html;
     try { html = fn(estado.rota.partes); } catch (e) {
@@ -519,5 +562,6 @@
   GP.ui = {
     estado, rotas, acoes, c, render, podeVerComo, navegar, abrirPainel, fecharPainel, erroNoPainel, avisar, lerForm, validar,
     salvar, criar, atualizar, excluir, aplicarNoContexto, novoAdendo, agoraISO, visoesDisponiveis, membrosDaVisao, minhaEquipe, podeVerConteudo, VISOES,
+    notificacoes,
   };
 })(window);

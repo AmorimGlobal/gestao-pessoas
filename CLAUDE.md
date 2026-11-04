@@ -4,11 +4,11 @@ Guia para o Claude Code (e para quem mantiver) o app **Gestão de Pessoas** da A
 
 ## O que é
 
-App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança executa as rotinas de gestão da equipe: Minha equipe, Agenda, Recrutamento, Onboarding, Feedbacks (feedbacks SCI, 1:1 mensal, O2O trimestral e plano de melhoria) e Offboarding, além do Painel. A aba Desempenho saiu em 29/10/2026 e volta em 2027 (`dom.DESEMPENHO_ATIVO = false`; o código continua no app). A especificação do RH está em `../Gestão de Pessoas · Especificação para TI.docx` (08/10/2026, revisão de arquitetura de 13/10). Telas, campos e textos seguem o glossário da seção 1.4: "membro", "liderança", "encerramento de contrato", "feedback de reconhecimento/desenvolvimento". Nunca "colaborador", "líder", "desligamento", "faltas" ou linguagem impositiva.
+App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança executa as rotinas de gestão da equipe: Minha equipe, Agenda, Recrutamento, Onboarding, Feedbacks (feedbacks SCI, 1:1 mensal, O2O trimestral e plano de melhoria) e Offboarding, além do Painel. Desde 04/11/2026 todo funcionário entra: quem não lidera ninguém vê só Férias e ausências e o Perfil (visão "membro"). A aba Desempenho saiu em 29/10/2026 e volta em 2027 (`dom.DESEMPENHO_ATIVO = false`; o código continua no app). A especificação do RH está em `../Gestão de Pessoas · Especificação para TI.docx` (08/10/2026, revisão de arquitetura de 13/10). Telas, campos e textos seguem o glossário da seção 1.4: "membro", "liderança", "encerramento de contrato", "feedback de reconhecimento/desenvolvimento". Nunca "colaborador", "líder", "desligamento", "faltas" ou linguagem impositiva.
 
 ## Arquitetura: o servidor só entrega a página
 
-- **Dados:** 10 processos inteligentes nativos ("Gestão de Pessoas · Membros", "· Feedbacks SCI", "· 1:1 mensais", "· Ciclo trimestral", "· Planos de alinhamento de resultados", "· Encerramentos de contrato", "· Onboarding", "· Leituras de entrega", "· Planejamento da função", "· Avaliações de finalistas"), agrupados na solução automatizada "Gestão de Pessoas". Dois funis de negócios são lidos, e desde 04/11/2026 também recebem os cards dos formulários do app:
+- **Dados:** 12 processos inteligentes nativos: os 10 de registros da equipe ("Gestão de Pessoas · Membros", "· Feedbacks SCI", "· 1:1 mensais", "· Ciclo trimestral", "· Planos de alinhamento de resultados", "· Encerramentos de contrato", "· Onboarding", "· Leituras de entrega", "· Planejamento da função", "· Avaliações de finalistas"), mais "· Férias e ausências" e "· Feriados" (04/11/2026), agrupados na solução automatizada "Gestão de Pessoas". Dois funis de negócios são lidos, e desde 04/11/2026 também recebem os cards dos formulários do app:
   - **HR | Requisição de Vagas (categoria 77):** as vagas. O "Solicitar vaga" do Recrutamento cria o card.
   - **HR | Offboarding (categoria 79, 29/10/2026):** a esteira das solicitações de encerramento, criada por `amorim-api/offboarding-bitrix`. Só o RH lê. O "Solicitar encerramento" do Offboarding cria o card e grava na timeline dele o histórico do membro (feedbacks SCI, 1:1 mensais e planos de melhoria).
 - **Formulários de vaga e de encerramento (04/11/2026):** são os antigos formulários CRM do Bitrix (o 259 e o da Luciele), com as mesmas perguntas, feitos no app (`52-formularios.js` + `60-ui-formulario.js`). O card nasce com quem pede como responsável, recebe o histórico e passa ao responsável do funil (Configuração → Parâmetros; vazio, o primeiro do RH). Por isso a liderança precisa de Ler, Adicionar e Editar "Próprios" nos funis 77 e 79 (docs, seção 4). Listas vão pelo texto da opção, que o repositório troca pelo ID lido do `crm.item.fields` do negócio (entityTypeId 2).
@@ -55,9 +55,11 @@ lib/avisos.js         avisos da 4.4: planejar() puro (marcos cruzados desde o di
 api/sincronizar.js, api/avisos.js, api/eventos.js, api/painel.js  funções da Vercel (escritas à mão; crons em vercel.json)
 src/js/50-dominio.js  regras de negócio puras: papéis, equipe, pendências, indicadores, verificação do encerramento, agenda, dicas  [Node + navegador]
 src/js/52-formularios.js as perguntas da Solicitação de Contratação e da Solicitação de Encerramento, condições, regra dos 2 registros, histórico para a timeline  [Node + navegador]
+src/js/53-ferias.js  Políticas de Férias e Ausências: texto das regras, conferência do pedido, prazos, saldo, e-mails prontos (Gmail/mailto)  [Node + navegador]
+src/js/54-notificacoes.js o sino: notificações calculadas dos registros (pedidos e decisões), lido por pessoa  [Node + navegador]
 src/js/60-ui-base.js  estado, rotas (hash), layout, componentes, painel lateral, eventos
 src/js/60-ui-formulario.js formulário a partir da definição (seções, condicionais, grade de níveis) e enviarCard (cria o card, histórico, passa ao RH)
-src/js/61..70-ui-*.js telas: início/painel, equipe/card do membro, feedbacks (63-ui-rotinas: SCI, 1:1 mensal, O2O), plano de melhoria (63-ui-planos), desempenho (fora até 2027), onboarding, offboarding, recrutamento, agenda, exportar CSV do RH (69), configuração
+src/js/61..70-ui-*.js telas: início/painel, equipe/card do membro, feedbacks (63-ui-rotinas: SCI, 1:1 mensal, O2O), plano de melhoria (63-ui-planos), desempenho (fora até 2027), onboarding, offboarding, recrutamento, agenda (e o calendário de feriados do RH), férias e ausências (68-ui-ferias, com o "Meu aniversário"), exportar CSV do RH (69), configuração
 src/js/90-app.js      inicialização (Bitrix ou demonstração)
 build.js              junta tudo em dist/index.html e gera api/app.js
 tools/provisionar.js  CLI de provisionamento por webhook (crm + userfieldconfig)
@@ -70,7 +72,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 132 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 144 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -136,6 +138,7 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - **Funil 79:** os campos `UF_CRM_OFF_*` foram acertados e criados por `criar-funil.js --gravar`, com o card em 5 seções. Os da v1 sem pergunta ficaram no portal, fora do formulário e do card.
   - **App:** a esteira lê os campos novos e avisa quando faltam os 2 registros de feedback. Também mostra os riscos e exporta as colunas novas.
 - **04/11/2026, formulários no app (pedido do usuário):** a Solicitação de Contratação (aba Recrutamento) e a Solicitação de Encerramento de Contrato (aba Offboarding) passaram a ser formulários do próprio app, com as perguntas dos formulários CRM. Cada envio cria o card no funil (77 ou 79). No encerramento, o histórico de feedbacks SCI, 1:1 mensais e planos de melhoria do membro vai para a timeline do card. O script do console de 03/11 e os links de formulário em Configuração deixaram de ser usados. O fluxo anterior do app (processo "Encerramentos de contrato", com aprovação da coordenação) ficou só para consulta: o único item no portal estava cancelado. Testado na demonstração com o Edge headless (liderança, RH e coordenação); no portal, o primeiro envio real é o teste (falta a permissão da seção 4).
+- **04/11/2026, férias, feriados, notificações e aniversário (pedido do usuário, docs seção 11):** fluxo de férias, day off e pausa contratual pela política do RH ("Políticas de Férias e Ausências Programadas", PDF de 04/11 em `amorim-api/`), com as regras lidas antes do pedido, o e-mail pronto para hr@amorimlawfirm.com com cópia à liderança, a aprovação do RH e depois a da liderança, e só então a agenda. O RH cadastra o calendário de feriados de cada ano. O sino mostra pedidos e decisões para o RH, as lideranças e quem pediu. Cada pessoa grava o aniversário no próprio perfil do Bitrix. **Falta no portal:** criar os 2 processos (Configuração → Criar ou completar a estrutura) e a função "Membros" do CRM para todos (seção 4).
 - **Portal:**
   - A estrutura está completa: os 10 processos e a primeira carga do Membros (59 itens, 21/10).
   - Em 03/11, com o ok do usuário, `tools/provisionar.js` criou o "1:1 mensais" (`entityTypeId 1134`) e o campo "Ficha enviada ao membro em" do Onboarding. Usou o webhook de administrador do Mathias, o único com `userfieldconfig`. Depois disso, a simulação não acha mais nada a criar.

@@ -411,3 +411,22 @@ details.modelos .modelo b { color: var(--navy); }
 .nota-mini { display: inline-flex; flex-direction: column; gap: 2px; min-width: 74px; }
 .nota-mini b { color: var(--navy); font-size: 15px; }
 @media (max-width: 700px) { .entregas-aval .linha-entrega { grid-template-columns: 1fr; } .evolucao { grid-template-columns: 1fr; } }
+
+/* ---------------- sino de notificações, férias e ausências, feriados do RH (04/11/2026) ---------------- */
+.sino { position: relative; }
+.lateral .marca .app:has(+ .sino) { flex: 1 1 120px; }
+.sino .bolha { position: absolute; top: -5px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--vermelho); color: #fff; font-size: 10px; font-weight: 700; line-height: 17px; text-align: center; }
+.notificacoes .item { text-decoration: none; color: inherit; }
+.notificacoes .item.nova { background: var(--azul-bg); border-radius: 8px; }
+.notificacoes .item.nova .t::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--azul); margin-right: 7px; vertical-align: 2px; }
+details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 6px; }
+.corpo-politica { margin-top: 10px; font-size: 13px; }
+.corpo-politica h4 { margin: 14px 0 6px; color: var(--navy); font-size: 13px; }
+.corpo-politica ul, .corpo-politica ol, .regras ul, .regras ol { margin: 0; padding-left: 20px; }
+.corpo-politica li, .regras li { margin-bottom: 4px; }
+.regras { background: var(--sutil); border-radius: 12px; padding: 12px 14px; margin: -4px 0 16px; font-size: 12.5px; }
+.regras .rotulo { font-weight: 700; color: var(--navy); margin: 4px 0 6px; }
+.regras .rotulo + ol { margin-bottom: 10px; }
+.regras .li-regras { margin-top: 12px; background: var(--campo); font-weight: 600; }
+.email-corpo { white-space: pre-wrap; background: var(--sutil); border-radius: 10px; padding: 12px 14px; font-family: inherit; font-size: 12.5px; margin-top: 12px; max-height: 320px; overflow: auto; }
+.lista .item.nao-vale .principal-item > div:first-child { text-decoration: line-through; color: var(--muted); }

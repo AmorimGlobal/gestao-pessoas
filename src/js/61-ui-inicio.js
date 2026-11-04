@@ -401,12 +401,17 @@
     const p = dom.papeis(ctx, eu.id);
     const papeisTxt = [p.ceo && "CEO", p.rh && "RH", p.coordenacao && "Coordenação", p.lideranca && "Liderança"].filter(Boolean).join(", ") || "sem papel no app";
     const deptos = p.chefia.map((d) => (ctx.idx.depto[d] || {}).nome).filter(Boolean);
+    const aniv = (dom.pessoa(ctx, eu.id) || {}).aniversario;
+    const membro = E().visao === "membro";
     return c.cabecalho("perfil", "Perfil", "") +
       '<div class="card"><div class="ficha-topo">' + c.avatar(eu, 64) + '<div class="info"><div class="nome-grande">' + esc(eu.nome) + '</div><div class="muted">' + esc(eu.email) + "</div></div></div>" +
-      c.dados([["Papel no app", papeisTxt], ["Departamentos que chefia", deptos.join(", ") || "nenhum"], ["Membros na equipe direta", String(dom.equipeDe(ctx, eu.id).length)]]) + "</div>" +
-      '<div class="card"><h3>' + icone("amora", 16) + " Perfil da liderança para a Amora</h3>" +
+      c.dados([["Papel no app", papeisTxt === "sem papel no app" ? "membro (Férias e ausências)" : papeisTxt]].concat(membro ? [] : [["Departamentos que chefia", deptos.join(", ") || "nenhum"], ["Membros na equipe direta", String(dom.equipeDe(ctx, eu.id).length)]])) + "</div>" +
+      // o aniversário fica no perfil do Bitrix; a agenda e o day off de aniversário usam o dia e o mês
+      '<div class="card"><h3>Meu aniversário</h3><div>' + (aniv ? "<b>" + calc.fmtData("2000-" + aniv) + "</b> · aparece só o dia e o mês" : '<span class="muted">Não cadastrado no seu perfil do Bitrix.</span>') + "</div>" +
+      (E().verComo ? "" : '<button class="btn sec peq" style="margin-top:10px" data-acao="meu-aniversario">' + (aniv ? "Atualizar" : "Cadastrar") + "</button>") + "</div>" +
+      (membro ? "" : '<div class="card"><h3>' + icone("amora", 16) + " Perfil da liderança para a Amora</h3>" +
       '<p class="muted">O formulário de cerca de 3 minutos (trajetória, contexto da equipe, desafios e preferências) entra quando o RH liberar o assistente de IA (especificação 4.7). Só você e o RH verão o perfil, e ele nunca serve para avaliar.</p>' +
-      "<p class=\"muted\">Hoje, as dicas da semana do Painel são as dicas-modelo da primeira fase: usam só datas, tipos e situações da sua equipe.</p></div>";
+      "<p class=\"muted\">Hoje, as dicas da semana do Painel são as dicas-modelo da primeira fase: usam só datas, tipos e situações da sua equipe.</p></div>");
   };
 
   /* ================================================================ TOUR (3 passos, uma vez por pessoa) */
