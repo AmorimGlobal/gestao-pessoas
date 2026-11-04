@@ -305,50 +305,8 @@
         if (e && BX24.openPath) BX24.openPath("/crm/type/" + e.eti + "/details/" + id + "/");
       },
 
-      /* ---------- feriados, ausências e agenda ---------- */
-      /** Feriados nacionais pelas configurações do calendário do Bitrix ("1.01,21.04,...").
-          Sem acesso, cai para a lista calculada (GP.calc.feriadosNacionais). */
-      feriadosNacionais: async function (ano) {
-        try {
-          const s = await bx("calendar.settings.get", {});
-          const txt = s && (s.year_holidays || s.YEAR_HOLIDAYS);
-          if (txt) {
-            return String(txt).split(",").map(function (x) {
-              const [d, m] = x.trim().split(".");
-              return d && m ? { data: ano + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0"), nome: "Feriado", abrangencia: "nacional", fonte: "bitrix" } : null;
-            }).filter(Boolean);
-          }
-        } catch (e) { /* sem escopo calendar: usa a lista calculada */ }
-        return GP.calc.feriadosNacionais(ano);
-      },
-      /** Ausências confirmadas: eventos "Ausente" na agenda de cada pessoa (calendar.accessibility.get).
-          A especificação pede o gráfico de ausências nativo; a leitura dele é validação pendente do TI (6.2). */
-      ausencias: async function (userIds, inicio, fim) {
-        if (!userIds.length) return [];
-        try {
-          const r = await bx("calendar.accessibility.get", { users: userIds.map(Number), from: inicio, to: fim });
-          const lista = [];
-          Object.keys(r || {}).forEach(function (uid) {
-            (r[uid] || []).forEach(function (ev) {
-              if (String(ev.ACCESSIBILITY || "").toLowerCase() !== "absent") return;
-              lista.push({ pessoa: String(uid), inicio: dataBitrix(ev.DATE_FROM), fim: dataBitrix(ev.DATE_TO) });
-            });
-          });
-          return lista.filter(function (a) { return a.inicio && a.fim; });
-        } catch (e) { return []; }
-      },
-      /** "Agendar na agenda" (4.4): compromisso na agenda da própria pessoa, com lembrete de 15 minutos */
-      agendarPendencia: async function (eu, p) {
-        const secoes = await bx("calendar.section.get", { type: "user", ownerId: Number(eu.id) });
-        const secao = (secoes || [])[0];
-        if (!secao) throw { codigo: "", descricao: "não encontrei a sua agenda no Bitrix" };
-        return bx("calendar.event.add", {
-          type: "user", ownerId: Number(eu.id), section: Number(secao.ID), name: p.titulo,
-          from: p.inicio, to: p.fim, skip_time: "N",
-          description: p.descricao || "", remind: [{ type: "min", count: 15 }],
-          accessibility: "busy", private_event: "Y",
-        });
-      },
+      /* O calendário do Bitrix não é usado (a empresa não usa, 04/11/2026): os feriados vêm da lei e do processo
+         Feriados, e as ausências dos pedidos de férias e ausências aprovados. */
 
       /* ---------- avisos, registro de dossiê e preferências por pessoa ---------- */
       /** Notificação do Bitrix (escopo im). Nunca leva conteúdo de feedback, leitura ou plano (4.4). */
@@ -476,13 +434,15 @@
         return mapaNegocio;
       },
       /** Cria o card. n = { categoria, titulo, responsavel, campos: {UF_CRM_...: texto | [textos] | data | [[nome, base64]]},
-          origem: {sistema, id}, restrito }. Sem estágio: o Bitrix põe na primeira etapa do funil ("Nova solicitação"). */
+          origem: {sistema, id}, restrito, observadores }. Sem estágio: o Bitrix põe na primeira etapa do funil ("Nova solicitação").
+          Quem pede entra como observador: depois que o card passa ao RH, ela continua abrindo o card pelo link (04/11/2026). */
       criarNegocio: async function (n) {
         const fields = Object.assign(camposParaItem(await repo.camposNegocio(), n.campos), {
           title: n.titulo, categoryId: Number(n.categoria), assignedById: Number(n.responsavel),
         });
         if (n.origem) { fields.originatorId = n.origem.sistema; fields.originId = String(n.origem.id); }
         if (n.restrito) fields.opened = "N"; // fora de "disponível para todos"
+        if (n.observadores && n.observadores.length) fields.observers = n.observadores.map(Number);
         const d = await bx("crm.item.add", { entityTypeId: 2, fields });
         return { id: String(d.item.id), estagio: d.item.stageId || "" };
       },
@@ -490,6 +450,8 @@
       passarNegocio: async function (id, responsavel) {
         await bx("crm.item.update", { entityTypeId: 2, id: Number(id), fields: { assignedById: Number(responsavel) } });
       },
+      /** Endereço do card no portal, para quem pede acompanhar a solicitação na pipe */
+      linkNegocio: function (id) { return "https://" + BX24.getDomain() + "/crm/deal/details/" + id + "/"; },
       /** Comentário na timeline do card de negócio */
       comentarNegocio: async function (id, texto) {
         await bx("crm.timeline.comment.add", { fields: { ENTITY_ID: Number(id), ENTITY_TYPE: "deal", COMMENT: texto } });

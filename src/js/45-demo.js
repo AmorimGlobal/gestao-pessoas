@@ -253,6 +253,14 @@
       rhDecisao: "Aprovada", rhEm: "2026-10-07T15:00:00-03:00", rhComentario: "Dentro do mês do aniversário." });
     pedido("110", "4", { id: "302", tipo: "Férias", inicio: "2026-10-19", fim: "2026-11-02", dias: 15, estagio: "SUCCESS", criadoEm: "2026-08-10T10:00:00-03:00",
       cobertura: "Júlia assume a carteira tributária.", rhDecisao: "Aprovada", rhEm: "2026-08-11T11:00:00-03:00", liderancaDecisao: "Aprovada", liderancaEm: "2026-08-12T09:00:00-03:00" });
+    // aprovados há mais de 30 dias (fora do sino): são as ausências da agenda da equipe da Carla
+    const aprovado = (resp, lid, id, tipo, inicio, fim) => pedido(resp, lid, { id, tipo, inicio, fim, dias: calc.diffDias(inicio, fim) + 1, estagio: "SUCCESS", criadoEm: "2026-08-03T10:00:00-03:00",
+      cobertura: "Combinado com a equipe.", justificativa: "Período combinado com a liderança.", rhDecisao: "Aprovada", rhEm: "2026-08-04T10:00:00-03:00", liderancaDecisao: "Aprovada", liderancaEm: "2026-08-05T10:00:00-03:00" });
+    aprovado("101", "3", "310", "Pausa contratual", "2026-10-13", "2026-10-16");
+    aprovado("102", "3", "311", "Pausa contratual", "2026-11-09", "2026-11-13");
+    aprovado("3", "2", "312", "Férias", "2026-12-26", "2027-01-02");
+    aprovado("105", "3", "313", "Férias", "2026-12-28", "2027-01-05");
+    aprovado("103", "3", "314", "Pausa contratual", "2026-12-30", "2027-01-01");
     pedido("111", "4", { id: "303", tipo: "Pausa contratual", inicio: "2026-11-23", fim: "2026-11-27", dias: 5, estagio: "FAIL", criadoEm: "2026-09-20T10:00:00-03:00",
       justificativa: "Mudança de cidade.", cobertura: "Kátia cobre os pareceres.", canceladaEm: "2026-09-22T10:00:00-03:00" });
 
@@ -299,13 +307,6 @@
       parecerRH: "Boa experiência em vistos de trabalho; inglês fluente; pretensão dentro da faixa.", prazo: "2026-10-13", criadoEm: "2026-10-06T15:00:00-03:00",
     });
 
-    const ausencias = [
-      { pessoa: "101", inicio: "2026-10-13", fim: "2026-10-16" },
-      { pessoa: "102", inicio: "2026-11-09", fim: "2026-11-13" },
-      { pessoa: "3", inicio: "2026-12-26", fim: "2027-01-02" },
-      { pessoa: "100", inicio: "2026-12-28", fim: "2027-01-05" },
-      { pessoa: "103", inicio: "2026-12-30", fim: "2027-01-01" },
-    ];
 
     const vagas = {
       etapas: [
@@ -352,7 +353,7 @@
       ],
     };
 
-    return { usuarios, departamentos, config, registros: reg, ausencias, vagas, offboarding };
+    return { usuarios, departamentos, config, registros: reg, vagas, offboarding };
   }
 
   /** Repositório em memória com a interface de GP.bitrix.criarRepositorio() */
@@ -438,7 +439,7 @@
         const estagio = (funil.etapas[0] || {}).id || "";
         funil.negocios.unshift(Object.assign({ ID: id, TITLE: n.titulo, STAGE_ID: estagio, DATE_CREATE: agora(), DATE_MODIFY: agora(), ASSIGNED_BY_ID: String(n.responsavel) },
           n.origem ? { ORIGINATOR_ID: n.origem.sistema, ORIGIN_ID: String(n.origem.id) } : {}, campos));
-        this.negociosCriados.push({ id, categoria: Number(n.categoria), titulo: n.titulo, responsavel: String(n.responsavel), campos: n.campos, origem: n.origem || null });
+        this.negociosCriados.push({ id, categoria: Number(n.categoria), titulo: n.titulo, responsavel: String(n.responsavel), campos: n.campos, origem: n.origem || null, observadores: (n.observadores || []).map(String) });
         return { id, estagio };
       },
       passarNegocio: async function (id, responsavel) {
@@ -446,6 +447,7 @@
         const n = this.negociosCriados.find((x) => x.id === String(id));
         if (n) n.responsavel = String(responsavel);
       },
+      linkNegocio: (id) => "https://amorimglobal.bitrix24.com.br/crm/deal/details/" + id + "/",
       comentarNegocio: async function (id, texto) { this.comentarios.push({ chave: "negocio", id: String(id), texto }); },
       contagemServidor: async () => null, // fora do Bitrix não há servidor para comparar
       /** Na demonstração a Ficha não sai por e-mail: só marca o envio */
@@ -458,9 +460,6 @@
         o.fichaEnviadaEm = agora();
         return { ok: true, para: u.email, enviadaEm: o.fichaEnviadaEm, demo: true };
       },
-      feriadosNacionais: async (ano) => calc.feriadosNacionais(ano),
-      ausencias: async (ids) => copia(d.ausencias.filter((a) => ids.indexOf(a.pessoa) >= 0)),
-      agendarPendencia: async () => { await atraso(); return true; },
       vagas: async () => copia(d.vagas),
       notificacoes: [],
       notificar: async function (ids, mensagem) { this.notificacoes.push({ ids, mensagem }); },

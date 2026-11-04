@@ -11,7 +11,7 @@ function contexto(euId, hoje) {
   const h = hoje || "2026-10-08";
   return dom.indexar({
     hoje: h, eu: { id: euId || "3", admin: false }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos,
-    registros: d.registros, ausencias: d.ausencias, vagas: d.vagas,
+    registros: d.registros, vagas: d.vagas,
     feriados: { nacionais: calc.feriadosNacionais(2026).concat(calc.feriadosNacionais(2027)) },
   });
 }

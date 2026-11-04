@@ -4,7 +4,8 @@
    Dentro do Bitrix (página em iframe): carrega o SDK BX24 e usa o repositório Bitrix.
    Fora (aberto direto no navegador) ou com ?demo=1: usa a demonstração em memória.
    Ordem: SDK -> usuário -> configuração/estrutura -> pessoas, departamentos e registros
-   (em paralelo) -> feriados, vagas e ausências -> contexto -> render.
+   (em paralelo) -> vagas e esteira -> contexto -> render. O calendário do Bitrix não é lido (a empresa
+   não usa): feriados pela lei e pelo processo Feriados, ausências pelos pedidos aprovados (04/11/2026).
    ===================================================================================== */
 (function (raiz) {
   "use strict";
@@ -64,14 +65,6 @@
     return c;
   }
 
-  /** Ausências das pessoas visíveis (e da própria pessoa), nas próximas 13 semanas */
-  async function carregarAusencias(repo, ctx, uid) {
-    const papeis = dom.papeis(ctx, uid);
-    const visiveis = dom.membrosVisiveis(ctx, uid).map((m) => m.responsavel).concat([uid]);
-    const ids = papeis.rh ? (ctx.usuarios || []).map((u) => u.id) : visiveis;
-    ctx.ausencias = await repo.ausencias(ids.slice(0, 400), ctx.hoje, calc.addDias(ctx.hoje, 13 * 7 + 7)).catch(() => []);
-  }
-
   /** Agindo como outra pessoa: grava normalmente (pedido do RH em 27/10/2026), só não mexe nas
       preferências pessoais de quem está sendo representado (tour, dicas) */
   function emNomeDe(repo) {
@@ -112,22 +105,19 @@
         repo = GP.demo.criarRepositorioDemo({ papel: q.get("papel") || "lideranca", hoje: q.get("hoje") || undefined });
       }
       E.repo = repo;
+      if (repo.modo === "bitrix") ui.modoBitrix();
       const eu = await repo.eu();
       const est = await repo.lerConfig();
       const config = mesclarConfig(est.config);
       const hoje = repo.modo === "demo" ? repo.hoje : calc.hojeISO();
-      const ano = Number(hoje.slice(0, 4));
-      const [usuarios, departamentos, registros, fer1, fer2] = await Promise.all([
-        repo.usuarios(), repo.departamentos(), repo.listarTodos(), repo.feriadosNacionais(ano), repo.feriadosNacionais(ano + 1),
-      ]);
+      const [usuarios, departamentos, registros] = await Promise.all([repo.usuarios(), repo.departamentos(), repo.listarTodos()]);
       const vagas = await repo.vagas(config.recrutamento.categoria).catch((e) => ({ etapas: [], negocios: [], historico: [], erro: repo.mensagemErro(e) }));
       // A esteira de offboarding só é lida por quem pode: o RH e o administrador (as lideranças não têm leitura no funil)
       const ehRH = eu.admin || ((config.papeis && config.papeis.rh) || []).some((p) => String(p.id) === String(eu.id));
       const catOff = Number(config.offboarding.categoria) || 0;
       const offboarding = Object.assign({ etapas: [], negocios: [] }, ehRH && catOff && repo.offboarding ? await repo.offboarding(catOff).catch((e) => ({ etapas: [], negocios: [], erro: repo.mensagemErro(e) })) : {}, { categoria: catOff });
       const ctx = dom.indexar({
-        hoje, eu, config, usuarios, departamentos, registros, vagas, offboarding, ausencias: [],
-        feriados: { nacionais: fer1.concat(fer2) },
+        hoje, eu, config, usuarios, departamentos, registros, vagas, offboarding,
         // processo novo que ainda não foi criado no portal: a tela avisa em vez de falhar
         recursos: {
           mensal: repo.temProcesso ? repo.temProcesso("mensal") : true,
@@ -136,7 +126,6 @@
         },
       });
       const papeis = dom.papeis(ctx, eu.id);
-      await carregarAusencias(repo, ctx, eu.id);
 
       Object.assign(E, { eu, config, ctx, estrutura: { origem: est.origem, ausentes: est.ausentes || [], processosFaltando: est.processosFaltando || [] }, acessoNegado: repo.acessoNegado || [] });
       if (papeis.ceo) carregarResumoCEO(repo, ctx);
@@ -191,11 +180,7 @@
     E.semAcesso = !E.visoes.length && !eu.admin;
     if (!E.visoes.length) E.visoes = ["lideranca"];
     location.hash = "#/inicio";
-    E.carregando = true;
-    ui.render();
-    await carregarAusencias(repoReal, ctx, eu.id);
     if (papeis.ceo) carregarResumoCEO(repoReal, ctx);
-    E.carregando = false;
     ui.render();
   }
 

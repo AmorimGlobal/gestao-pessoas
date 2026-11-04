@@ -154,7 +154,7 @@
     const E = ui.estado;
     let neg;
     try {
-      neg = await E.repo.criarNegocio({ categoria: o.categoria, titulo: o.titulo, responsavel: E.eu.id, campos: o.campos, origem: o.origem, restrito: o.restrito });
+      neg = await E.repo.criarNegocio({ categoria: o.categoria, titulo: o.titulo, responsavel: E.eu.id, campos: o.campos, origem: o.origem, restrito: o.restrito, observadores: [E.eu.id] });
     } catch (e) { throw erroDoFunil(e, o.nomeFunil); }
     const avisos = [];
     for (const texto of o.comentarios || []) {
@@ -163,8 +163,29 @@
     if (o.responsavel && String(o.responsavel) !== String(E.eu.id)) {
       try { await E.repo.passarNegocio(neg.id, o.responsavel); } catch (e) { avisos.push("o card ficou com você como responsável, e não com " + dom.pessoa(E.ctx, o.responsavel).nome + " (" + E.repo.mensagemErro(e) + ")"); }
     }
-    return Object.assign({ avisos }, neg);
+    return Object.assign({ avisos, link: E.repo.linkNegocio ? E.repo.linkNegocio(neg.id) : "" }, neg);
   }
+  /** Depois de enviar: o link do card na pipe, para quem pediu acompanhar (pedido de 04/11/2026). O mesmo link vai no aviso do
+      Bitrix para quem pediu, para o RH e para a coordenação. o = { titulo, texto, neg, nomeFunil } */
+  function mostrarEnviado(o) {
+    const neg = o.neg;
+    ui.abrirPainel({
+      titulo: o.titulo, sub: esc(o.texto),
+      corpo: '<div id="enviado">' + (neg.avisos.length ? '<div class="aviso-atencao" style="margin-bottom:14px"><b>Atenção:</b> ' + esc(neg.avisos.join("; ")) + ".</div>" : "") +
+        '<div class="campo"><label for="link-card">Link do card na pipe ' + esc(o.nomeFunil) + '</label><input class="entrada" id="link-card" readonly value="' + esc(neg.link) + '"></div>' +
+        '<p class="muted" style="font-size:12.5px">Você entra entre os observadores do card e acompanha cada etapa por ele. O link também está nas suas notificações do Bitrix.</p></div>',
+      rodape: '<button class="btn" data-acao="abrir-negocio" data-id="' + esc(neg.id) + '">Abrir o card na pipe</button><button class="btn sec" data-acao="copiar-link-card">Copiar o link</button><button class="btn link" data-acao="fechar-painel">Fechar</button>',
+    });
+  }
+  ui.acoes["copiar-link-card"] = function () {
+    const campo = document.getElementById("link-card");
+    if (!campo) return;
+    const feito = () => ui.avisar("Link copiado.");
+    const reserva = () => { campo.select(); try { if (document.execCommand("copy")) { feito(); return; } } catch (e) { /* segue */ } ui.avisar("O link está selecionado: use Ctrl+C.", "erro"); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(campo.value).then(feito, reserva); else reserva();
+  };
+  /** O link no aviso do Bitrix (o aviso aceita BB code) */
+  const linkNoAviso = (neg) => (neg.link ? " [URL=" + neg.link + "]Abrir o card na pipe[/URL]" : "");
 
-  GP.ui.formulario = { html, ler, aplicar, validar, ligar, partesDaOpcao, responsavelDoFunil, enviarCard };
+  GP.ui.formulario = { html, ler, aplicar, validar, ligar, partesDaOpcao, responsavelDoFunil, enviarCard, mostrarEnviado, linkNoAviso };
 })(window);

@@ -36,19 +36,19 @@
     // Alerta vermelho do RH: solicitações que ainda estão em "Nova solicitação" (reunião de 29/10/2026)
     const novas = E().visao === "rh" ? vagas.filter((v) => v.nova) : [];
     if (novas.length) h += '<div class="card acao vermelho"><h3>' + icone("alerta", 16) + " " + plural(novas.length, "solicitação de vaga nova aguarda o RH", "solicitações de vaga novas aguardam o RH") + '</h3><div class="lista">' +
-      novas.map((v) => '<div class="item"><div class="principal-item"><div class="t">' + esc(v.titulo) + '</div><div class="d">' + (v.solicitante ? "pedida por " + esc(v.solicitante) : "") + (v.atualizadoEm ? " · em " + calc.fmtData(v.atualizadoEm) : "") + '</div></div><div class="lado">' + c.tag("Nova solicitação", "vermelho") + "</div></div>").join("") +
+      novas.map((v) => '<div class="item clicavel" data-acao="abrir-negocio" data-id="' + esc(v.id) + '" title="Abrir o card na pipe"><div class="principal-item"><div class="t">' + esc(v.titulo) + '</div><div class="d">' + (v.solicitante ? "pedida por " + esc(v.solicitante) : "") + (v.atualizadoEm ? " · em " + calc.fmtData(v.atualizadoEm) : "") + '</div></div><div class="lado">' + c.tag("Nova solicitação", "vermelho") + "</div></div>").join("") +
       '</div><p class="muted" style="font-size:12px;margin:10px 0 0">O alerta some quando o card sai de "Nova solicitação" no funil HR | Requisição de Vagas.</p></div>';
     if (finPend.length) {
       h += '<div class="card acao"><h3>Avaliar os finalistas<span class="extra muted">prazo de 5 dias úteis</span></h3><div class="lista">' + finPend.map((f) =>
         '<div class="item clicavel" data-rota="#/recrutamento/finalista/' + esc(f.id) + '"><div class="principal-item"><div class="t">' + esc(f.candidato || f.titulo) + '</div><div class="d">' + esc(f.titulo) + "</div></div><div class=\"lado\">" + c.prazo(f.prazo) + "</div></div>").join("") + "</div></div>";
     }
     h += '<div class="card"><h3>Vagas em andamento</h3>' + (abertas.length ? '<div class="lista">' + abertas.map((v) =>
-      '<div class="item"><div class="principal-item"><div class="t">' + esc(v.titulo) + '</div><div class="d">' + (v.solicitante ? "pedida por " + esc(v.solicitante) + " · " : "") + (v.atualizadoEm ? "última atualização do RH em " + calc.fmtData(v.atualizadoEm) : "") + "</div>" +
+      '<div class="item clicavel" data-acao="abrir-negocio" data-id="' + esc(v.id) + '" title="Abrir o card na pipe"><div class="principal-item"><div class="t">' + esc(v.titulo) + '</div><div class="d">' + (v.solicitante ? "pedida por " + esc(v.solicitante) + " · " : "") + (v.atualizadoEm ? "última atualização do RH em " + calc.fmtData(v.atualizadoEm) : "") + "</div>" +
       '<div class="barra" style="margin-top:8px;max-width:360px"><div class="preench" style="width:' + (v.posicao ? Math.round((v.posicao / v.totalEtapas) * 100) : 0) + '%"></div></div></div>' +
       '<div class="lado"><span class="tag azul">Etapa ' + (v.posicao || "?") + " de " + v.totalEtapas + " · " + esc(v.etapa) + "</span>" +
       (v.diasEmAberto !== null ? '<span class="prazo">' + plural(v.diasEmAberto, "dia", "dias") + " em aberto</span>" : '<span class="prazo">aguardando aprovação</span>') +
       (v.entradaDesejada ? '<span class="prazo">entrada desejada ' + calc.fmtData(v.entradaDesejada) + "</span>" : "") + "</div></div>").join("") + "</div>" : c.vazio("Nenhuma vaga em andamento.")) + "</div>";
-    if (fechadas.length) h += '<div class="card"><h3>Vagas preenchidas</h3><div class="lista">' + fechadas.map((v) => '<div class="item"><div class="principal-item"><div class="t">' + esc(v.titulo) + '</div><div class="d">fechada em ' + calc.fmtData(v.fechadaEm) + "</div></div><div class=\"lado\">" +
+    if (fechadas.length) h += '<div class="card"><h3>Vagas preenchidas</h3><div class="lista">' + fechadas.map((v) => '<div class="item clicavel" data-acao="abrir-negocio" data-id="' + esc(v.id) + '" title="Abrir o card na pipe"><div class="principal-item"><div class="t">' + esc(v.titulo) + '</div><div class="d">fechada em ' + calc.fmtData(v.fechadaEm) + "</div></div><div class=\"lado\">" +
       (v.tempoParaFechar !== null ? c.tag(v.tempoParaFechar + " dias para fechar", "verde") : "") + "</div></div>").join("") + "</div></div>";
     return h;
   };
@@ -116,11 +116,14 @@
       const vagas = ctx.vagas = ctx.vagas || { etapas: [], negocios: [], historico: [] };
       vagas.negocios = vagas.negocios || [];
       vagas.negocios.unshift(F.negocioLocal({ id: neg.id, titulo, estagio: neg.estagio || ((vagas.etapas || [])[0] || {}).id || "", agora: new Date().toISOString(), campos }));
-      await GP.app.avisarRH("Nova solicitação de vaga no funil HR | Requisição de Vagas: " + vaga + " (" + (r.UF_CRM_RV_SETOR || r.UF_CRM_RV_DEPTO).trim() + "), pedida por " + eu.nome + ".");
-      if (coord && !dom.papeis(ctx, coord).rh) await GP.app.avisar([coord], eu.nome + " enviou ao RH a solicitação de vaga \"" + vaga + "\". Ela está no funil HR | Requisição de Vagas.");
-      if (neg.avisos.length) ui.avisar("Vaga enviada ao RH (card " + neg.id + "), mas " + neg.avisos.join("; ") + ".", "erro");
-      else ui.avisar("Vaga enviada ao RH. Ela aparece em Vagas em andamento.");
+      const link = FU.linkNoAviso(neg);
+      await GP.app.avisarRH("Nova solicitação de vaga no funil HR | Requisição de Vagas: " + vaga + " (" + (r.UF_CRM_RV_SETOR || r.UF_CRM_RV_DEPTO).trim() + "), pedida por " + eu.nome + "." + link);
+      if (coord && !dom.papeis(ctx, coord).rh) await GP.app.avisar([coord], eu.nome + " enviou ao RH a solicitação de vaga \"" + vaga + "\". Ela está no funil HR | Requisição de Vagas." + link);
+      // quem pediu guarda o link nas notificações do Bitrix, para acompanhar
+      await GP.app.avisar([eu.id], "Você enviou ao RH a solicitação de vaga \"" + vaga + "\". Acompanhe pelo card." + link);
       return neg;
-    }, { rotuloOcupado: "Enviando..." });
+    }, { rotuloOcupado: "Enviando..." }).then((neg) => {
+      if (neg && neg.id) FU.mostrarEnviado({ neg, nomeFunil: "HR | Requisição de Vagas", titulo: "Vaga enviada ao RH", texto: "O card \"" + titulo + "\" está no funil HR | Requisição de Vagas, em \"Nova solicitação\". Ele também aparece em Vagas em andamento." });
+    });
   };
 })(window);

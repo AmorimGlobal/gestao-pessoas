@@ -398,13 +398,13 @@
     const ctx = E().ctx;
     const ci = ctx.idx.porId.ciclo[el.dataset.id];
     const m = dom.infoMembro(ctx, ctx.idx.membro[ci.membroId]);
-    const aus = (ctx.ausencias || []).filter((a) => a.pessoa === m.userId && a.fim >= ctx.hoje);
+    // ausências: os pedidos de férias e ausências aprovados (o calendário do Bitrix não é usado)
+    const aus = dom.ausenciasAprovadas(ctx).filter((a) => a.pessoa === m.userId && a.fim >= ctx.hoje);
     ui.abrirPainel({
       titulo: "Agendar o O2O de " + m.nome, sub: "Ao agendar, peça ao membro 2 ou 3 temas, uma semana antes.",
       corpo: '<div id="form-agenda">' + (aus.length ? '<div class="aviso-atencao" style="margin-bottom:14px">' + esc(primeiroNome(m.nome)) + " estará fora: " + aus.map((a) => calc.fmtData(a.inicio) + " a " + calc.fmtData(a.fim)).join(", ") + ".</div>" : "") +
         '<div class="linha-campos">' + c.campo({ nome: "data1a1", rotulo: "Data", tipo: "data", valor: ci.data1a1, min: ctx.hoje }) + c.campo({ nome: "hora", rotulo: "Horário", tipo: "hora", valor: "", opcional: true }) + "</div>" +
-        c.campo({ nome: "link1a1", rotulo: "Local ou link", valor: ci.link1a1, opcional: true, placeholder: "Ex.: Google Meet, sala 3" }) +
-        (E().repo.modo === "bitrix" ? c.campo({ nome: "naAgenda", rotulo: "Agenda do Bitrix", tipo: "simNao", valor: true, textoCheck: "Criar o compromisso na minha agenda, com lembrete 15 minutos antes" }) : "") + "</div>",
+        c.campo({ nome: "link1a1", rotulo: "Local ou link", valor: ci.link1a1, opcional: true, placeholder: "Ex.: Google Meet, sala 3" }) + "</div>",
       rodape: '<button class="btn" data-acao="salvar-agenda-1a1" data-id="' + esc(ci.id) + '">Agendar</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
     });
   };
@@ -418,16 +418,7 @@
     const t = calc.trimestrePorChave(ci.trimestre);
     if (t && d.data1a1 > t.fim && !window.confirm("A data fica depois do fim do trimestre (" + calc.fmtData(t.fim) + "). Agendar mesmo assim?")) return;
     const link = [d.hora, d.link1a1].filter(Boolean).join(" · ");
-    ui.salvar(el, async () => {
-      await ui.atualizar("ciclo", ci.id, { data1a1: d.data1a1, link1a1: link, estagio: "AGENDADO" });
-      if (d.naAgenda && d.hora) {
-        const ini = d.data1a1 + "T" + d.hora + ":00";
-        const fim = new Date(Date.parse(ini) + 60 * 60000);
-        const fimTxt = d.data1a1 + "T" + String(fim.getHours()).padStart(2, "0") + ":" + String(fim.getMinutes()).padStart(2, "0") + ":00";
-        try { await E().repo.agendarPendencia(E().eu, { titulo: "O2O com " + m.nome, inicio: ini, fim: fimTxt, descricao: "O2O do " + (t ? t.rotulo : "") + ". " + (d.link1a1 || "") }); }
-        catch (e) { ui.avisar("O2O agendado, mas o compromisso não entrou na agenda: " + E().repo.mensagemErro(e), "erro"); }
-      }
-    }, { mensagem: "O2O agendado para " + calc.fmtData(d.data1a1) + "." });
+    ui.salvar(el, () => ui.atualizar("ciclo", ci.id, { data1a1: d.data1a1, link1a1: link, estagio: "AGENDADO" }), { mensagem: "O2O agendado para " + calc.fmtData(d.data1a1) + "." });
   };
 
   /* ---------------- registrar o 1:1 ---------------- */
@@ -484,34 +475,6 @@
     if (!ci.registro1a1Em) dados.registro1a1Em = ui.agoraISO();
     if (!ci.data1a1) dados.data1a1 = d.realizadoEm;
     ui.salvar(el, () => ui.atualizar("ciclo", ci.id, dados), { mensagem: "O2O registrado." });
-  };
-
-  /* ---------------- agendar uma pendência na agenda do Bitrix (4.4) ---------------- */
-  ui.acoes["agendar-pendencia"] = function (el, ev) {
-    ev.stopPropagation();
-    const ctx = E().ctx;
-    const p = dom.pendenciasDe(ctx, ui.membrosDaVisao(), { uid: E().eu.id }).find((x) => x.id === el.dataset.id);
-    if (!p) return;
-    ui.abrirPainel({
-      titulo: "Agendar na agenda", sub: esc(p.titulo) + " · prazo " + calc.fmtData(p.prazo) + ". O prazo da pendência não muda.",
-      corpo: '<div id="form-agendar-pend"><div class="linha-campos">' + c.campo({ nome: "data", rotulo: "Dia", tipo: "data", valor: ctx.hoje, min: ctx.hoje }) + c.campo({ nome: "hora", rotulo: "Horário", tipo: "hora", valor: "09:00" }) + "</div>" +
-        '<p class="muted" style="font-size:12px">O compromisso entra só na sua agenda do Bitrix, com o link da pendência e lembrete 15 minutos antes. Agendar não suspende os lembretes de atraso.</p></div>',
-      rodape: '<button class="btn" data-acao="salvar-agendar-pend" data-id="' + esc(p.id) + '">Agendar</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
-    });
-  };
-  ui.acoes["salvar-agendar-pend"] = function (el) {
-    const f = document.getElementById("form-agendar-pend");
-    if (!ui.validar(f, ["data", "hora"])) return;
-    const d = ui.lerForm(f);
-    const ctx = E().ctx;
-    const p = dom.pendenciasDe(ctx, ui.membrosDaVisao(), { uid: E().eu.id }).find((x) => x.id === el.dataset.id);
-    if (p.prazo && d.data > p.prazo && !window.confirm("A data escolhida fica depois do prazo (" + calc.fmtData(p.prazo) + "). Agendar mesmo assim?")) return;
-    const ini = d.data + "T" + d.hora + ":00";
-    const fimD = new Date(Date.parse(ini) + 30 * 60000);
-    const fim = d.data + "T" + String(fimD.getHours()).padStart(2, "0") + ":" + String(fimD.getMinutes()).padStart(2, "0") + ":00";
-    const link = location.href.split("#")[0] + p.rota;
-    ui.salvar(el, () => E().repo.agendarPendencia(E().eu, { titulo: p.titulo, inicio: ini, fim, descricao: "Pendência do Gestão de Pessoas (prazo " + calc.fmtData(p.prazo) + "). " + link }),
-      { mensagem: "Agendado para " + calc.fmtData(d.data) + " às " + d.hora + "." });
   };
 
   GP.telas = GP.telas || {};

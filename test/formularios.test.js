@@ -12,7 +12,7 @@ function contexto(euId) {
   const d = dadosDemo();
   return dom.indexar({
     hoje: "2026-10-08", eu: { id: euId || "3", admin: false }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos,
-    registros: d.registros, ausencias: d.ausencias, vagas: d.vagas,
+    registros: d.registros, vagas: d.vagas,
     feriados: { nacionais: calc.feriadosNacionais(2026).concat(calc.feriadosNacionais(2027)) },
   });
 }
@@ -110,6 +110,10 @@ test("encerramento: no mínimo 2 registros de feedback para desempenho ou incomp
   c = F.conferirRegistros({ UF_CRM_OFF_MOTIVO: "Otimização de Custos", UF_CRM_OFF_FEEDBACKS: "Sim" }, 0, 0);
   assert.equal(c.minimo, 1);
   assert.equal(c.ok, false);
+  // o caso do Alexandre (04/11/2026): 2 feedbacks SCI, os 2 de reconhecimento. A mensagem diz por que não contam.
+  c = F.conferirRegistros({ UF_CRM_OFF_MOTIVO: "Desempenho abaixo da média", UF_CRM_OFF_FEEDBACKS: "Sim" }, 0, 0, { reconhecimento: 2 });
+  assert.equal(c.ok, false);
+  assert.match(c.mensagem, /Há 0 feedbacks SCI de desenvolvimento no app\. Os 2 feedbacks SCI de reconhecimento não contam: a regra pede registros com os pontos a melhorar\./);
   c = F.conferirRegistros({ UF_CRM_OFF_MOTIVO: "Otimização de Custos", UF_CRM_OFF_FEEDBACKS: "Não se aplica" }, 0, 0);
   assert.equal(c.minimo, 0);
   assert.ok(c.ok);

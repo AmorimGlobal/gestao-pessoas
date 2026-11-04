@@ -151,9 +151,10 @@
   const ROTINAS = [
     ["sincronizacao", "Sincronização diária com a estrutura", "Todo dia às 6h."],
     ["avisos", "Avisos da 4.4", "Resumo semanal, dia do atraso, 7 e 14 dias. Todo dia às 8h."],
-    ["trava", "Trava do encerramento no servidor", "Precisa também do webhook de saída no Bitrix, com o endereço abaixo."],
+    // opcional: só protege as solicitações do fluxo anterior do app; desde 04/11/2026 o encerramento vai pelo formulário para o funil 79
+    ["trava", "Trava do encerramento no servidor", "Só para as solicitações do fluxo anterior do app (antes de 04/11/2026). O encerramento agora vai pelo formulário para a esteira HR | Offboarding: não precisa ligar.", true],
     ["painelCEO", "Painel da CEO", "Números calculados no servidor; a CEO não precisa de leitura nos processos."],
-    ["email", "E-mail: Ficha do onboarding", "Manda a Ficha ao novo membro. Precisa de uma caixa de e-mail (SMTP_HOST, SMTP_USUARIO, SMTP_SENHA). Sem ela, o app mostra a Ficha para mandar à mão."],
+    ["email", "E-mail: Ficha do onboarding", "Opcional. Manda a Ficha ao novo membro por uma caixa de e-mail (SMTP_HOST, SMTP_USUARIO, SMTP_SENHA). Sem ela, o app mostra a Ficha para mandar à mão.", true],
   ];
   const idsDoPapel = (cfg, papel) => ((cfg.papeis || {})[papel] || []).map((p) => p.id).filter(Boolean);
   function carregarStatus() {
@@ -169,8 +170,11 @@
       if (st === undefined) return '<span class="muted">conferindo…</span>';
       if (st === null) return '<span class="muted">só no Bitrix</span>';
       if (st.erro || !st.rotinas) return c.tag("sem resposta", "vermelho");
-      const x = st.rotinas[r];
-      return x && x.ligada ? c.tag("ligada", "verde") : c.tag("falta " + ((x && x.falta) || []).join(", "), "ambar");
+      const x = st.rotinas[r[0]];
+      if (x && x.ligada) return c.tag("ligada", "verde");
+      // rotina opcional desligada não é pendência: cinza, com o que falta só no título
+      if (r[3]) return '<span class="tag cinza" title="' + esc("Para ligar: " + ((x && x.falta) || []).join(", ")) + '">opcional · desligada</span>';
+      return c.tag("falta " + ((x && x.falta) || []).join(", "), "ambar");
     };
     const rh = idsDoPapel(cfg, "rh");
     const ceo = idsDoPapel(cfg, "ceo");
@@ -186,7 +190,7 @@
     ];
     return '<div class="card"><h3>Rotinas no servidor (Vercel)</h3>' +
       '<p class="muted" style="margin-top:0">O que precisa rodar fora da tela. Cada rotina liga quando as variáveis dela estão gravadas na Vercel (Settings → Environment Variables, seguido de Redeploy). O webhook de entrada (BITRIX_WEBHOOK_URL), o CRON_SECRET e o BITRIX_EVENTO_TOKEN são segredos: grave direto na Vercel e não mande para ninguém.</p>' +
-      '<div class="tabela-wrap"><table class="tabela"><tbody>' + ROTINAS.map((r) => "<tr><td><b>" + esc(r[1]) + '</b><div class="muted" style="font-size:12px">' + esc(r[2]) + "</div></td><td>" + linhaStatus(r[0]) + "</td></tr>").join("") + "</tbody></table></div>" +
+      '<div class="tabela-wrap"><table class="tabela"><tbody>' + ROTINAS.map((r) => "<tr><td><b>" + esc(r[1]) + '</b><div class="muted" style="font-size:12px">' + esc(r[2]) + "</div></td><td>" + linhaStatus(r) + "</td></tr>").join("") + "</tbody></table></div>" +
       '<div class="grupo-form"><div class="rotulo-grupo">Valores para copiar na Vercel</div><div class="tabela-wrap"><table class="tabela"><tbody>' +
       valores.map((v) => '<tr><td class="num"><b>' + esc(v[0]) + '</b></td><td class="num">' + (v[1] ? esc(v[1]) : '<span class="muted">—</span>') + '</td><td class="muted" style="font-size:12px">' + esc(v[2]) + "</td></tr>").join("") +
       "</tbody></table></div>" +

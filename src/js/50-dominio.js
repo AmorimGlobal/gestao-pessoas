@@ -6,7 +6,9 @@
 
    ctx = { hoje, eu, config, usuarios, departamentos, registros: {membros, feedbacks, ciclo,
            planos, encerramentos, onboarding, leituras, planejamento, finalistas},
-           feriados: {nacionais, SP, BA}, ausencias, vagas }
+           vagas, offboarding }
+   Os feriados vêm da lei e do calendário do RH (processo Feriados); as ausências, dos pedidos de férias e
+   ausências aprovados. O calendário do Bitrix não é usado: a empresa não usa (04/11/2026).
    indexar(ctx) monta os mapas usados por todas as outras funções.
    ===================================================================================== */
 (function (raiz, fabrica) {
@@ -186,14 +188,11 @@
   // substitui, naquele ano, a lista oficial (nacionais) e os locais de SP e Salvador da Configuração.
   const SIGLA_ABRANGENCIA = { "Todos": "", "São Paulo (SP)": "SP", "Salvador (BA)": "BA" };
   const porData = (a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0);
-  /** Feriados oficiais de um ano: os nacionais da lei (calculados), mais as datas a mais do calendário do Bitrix, mais os
-      locais da Configuração. O calendário do portal sozinho não basta: em 11/2026 ele tinha só 01/01 e 25/12. */
+  /** Feriados oficiais de um ano: os nacionais da lei (calculados) e os locais de SP e Salvador da Configuração.
+      O calendário do Bitrix não entra: a empresa não usa (04/11/2026). */
   function feriadosOficiais(ctx, ano) {
     const a = String(ano);
     const lista = calc.feriadosNacionais(Number(ano)).map((f) => ({ data: f.data, nome: f.nome, sigla: "", considera: true, fonte: "oficial" }));
-    const datas = new Set(lista.map((f) => f.data));
-    ((ctx.feriados && ctx.feriados.nacionais) || []).filter((f) => String(f.data).slice(0, 4) === a && !datas.has(f.data))
-      .forEach((f) => { datas.add(f.data); lista.push({ data: f.data, nome: f.nome && f.nome !== "Feriado" ? f.nome : "Feriado (calendário do Bitrix)", sigla: "", considera: true, fonte: "oficial" }); });
     const locais = (ctx.config && ctx.config.feriadosLocais) || {};
     ["SP", "BA"].forEach((s) => (locais[s] || []).filter((f) => String(f.data).slice(0, 4) === a).forEach((f) => lista.push({ data: f.data, nome: f.nome, sigla: s, considera: true, fonte: "configuracao" })));
     return lista.sort(porData);
@@ -755,7 +754,7 @@
   }
 
   /* ================================================================ agenda da equipe (3.6) */
-  /** Férias, day off e pausas aprovados pelo RH e confirmados pela liderança: entram na agenda como ausência */
+  /** As ausências do app: férias, day off e pausas aprovados pelo RH e confirmados pela liderança (o calendário do Bitrix não é lido) */
   function ausenciasAprovadas(ctx) {
     return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => p.estagio === "SUCCESS" && p.inicio)
       .map((p) => ({ pessoa: String(p.responsavel), inicio: p.inicio, fim: p.fim || p.inicio, origem: "app", tipo: p.tipo }));
@@ -772,7 +771,7 @@
     const linhas = pessoas.map((p) => {
       const sigla = p.cidadeSigla || "SP";
       const fer = feriadosDe(ctx, sigla);
-      const aus = (ctx.ausencias || []).concat(doApp).filter((a) => a.pessoa === p.userId && a.fim >= inicio && a.inicio <= fim)
+      const aus = doApp.filter((a) => a.pessoa === p.userId && a.fim >= inicio && a.inicio <= fim)
         .map((a) => Object.assign({}, a, { volta: calc.voltaEm(a.fim, fer) }));
       let aniv = "";
       if (p.aniversario) {
@@ -838,7 +837,7 @@
       if (c && m.estagio === "ATIVO") {
         const s = statusCiclo(ctx, c);
         const lim = calc.addDias(ctx.hoje, 14);
-        const aus = (ctx.ausencias || []).find((a) => a.pessoa === m.userId && a.inicio <= lim && a.fim >= ctx.hoje);
+        const aus = ausenciasAprovadas(ctx).find((a) => a.pessoa === m.userId && a.inicio <= lim && a.fim >= ctx.hoje);
         if (s.chave === "sem-agenda" && aus) lista.push({
           id: "1a1-aus-" + c.id, titulo: "Agende o O2O de " + nome + " fora da ausência",
           texto: nome + " estará fora de " + calc.fmtData(aus.inicio) + " a " + calc.fmtData(aus.fim) + ". Vale marcar o O2O antes ou a partir de " + calc.fmtData(calc.voltaEm(aus.fim, feriadosDoMembro(ctx, m))) + ".",
@@ -877,7 +876,7 @@
     // 5. Indicar substituto
     if (o.uid) {
       const lim = calc.addDias(ctx.hoje, 90);
-      const aus = (ctx.ausencias || []).find((a) => a.pessoa === String(o.uid) && a.inicio <= lim && a.fim >= ctx.hoje);
+      const aus = ausenciasAprovadas(ctx).find((a) => a.pessoa === String(o.uid) && a.inicio <= lim && a.fim >= ctx.hoje);
       if (aus) lista.push({
         id: "substituto-" + aus.inicio, titulo: "Indique quem acompanha a equipe na sua ausência",
         texto: "Você estará fora de " + calc.fmtData(aus.inicio) + " a " + calc.fmtData(aus.fim) + ". Uma liderança do mesmo setor pode receber as pendências e os avisos no período.",

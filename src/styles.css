@@ -430,3 +430,18 @@ details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy)
 .regras .li-regras { margin-top: 12px; background: var(--campo); font-weight: 600; }
 .email-corpo { white-space: pre-wrap; background: var(--sutil); border-radius: 10px; padding: 12px 14px; font-family: inherit; font-size: 12.5px; margin-top: 12px; max-height: 320px; overflow: auto; }
 .lista .item.nao-vale .principal-item > div:first-child { text-decoration: line-through; color: var(--muted); }
+
+/* ---------------- dentro do Bitrix (60-ui-base.js, modoBitrix e ajustarAltura; queixa de 04/11/2026) ----------------
+   O app é um iframe que cresce até a altura do conteúdo, e quem rola é a página do Bitrix. Nada mede 100vh aqui:
+   o menu fica na altura dele (o rodapé logo abaixo dos itens), o painel lateral ocupa a área visível estimada e o
+   aviso rápido aparece perto do último clique. Fora do Bitrix (demonstração), vale o layout de tela cheia. */
+:root[data-bitrix] .gp { min-height: 0; }
+:root[data-bitrix] .lateral { position: static; height: auto; overflow: visible; }
+:root[data-bitrix] .lateral .rodape { margin-top: 18px; }
+:root[data-bitrix] .painel-lateral { bottom: auto; height: var(--altura-visivel, 100vh); }
+:root[data-bitrix] .toast { position: absolute; bottom: auto; top: var(--toast-top, 16px); }
+:root[data-bitrix] .tour { align-items: flex-start; padding-top: 48px; }
+:root[data-bitrix] .carregando { min-height: 320px; }
+
+.checagem .neutro { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); }
+.checagem .neutro .s { font-weight: 800; }

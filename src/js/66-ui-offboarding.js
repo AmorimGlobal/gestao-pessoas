@@ -219,16 +219,22 @@
     return (E().visao === "rh" ? dom.membrosAtivos(ctx.registros.membros || []) : ui.membrosDaVisao()).filter((m) => String(m.responsavel) !== uid)
       .map((m) => dom.infoMembro(ctx, m)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).map((m) => ({ valor: m.id, rotulo: m.nome }));
   }
-  /** Os feedbacks SCI de desenvolvimento do membro (vão para a timeline do card) e a conta da regra dos 2 registros */
+  /** Todos os feedbacks SCI do membro (vão para a timeline do card), com os que contam para a regra dos 2 registros: os de
+      desenvolvimento. Os de reconhecimento aparecem marcados como "não conta", para ninguém achar que o app não os viu. */
   function blocoRegistros(r, anexos) {
     const ctx = E().ctx;
     if (!r.membroId || !ctx.idx.membro[r.membroId]) return "";
-    const conf = F.conferirRegistros(r, F.feedbacksDeDesenvolvimento(ctx, r.membroId).length, anexos);
+    const todos = dom.feedbacksDo(ctx, r.membroId);
+    const dev = F.feedbacksDeDesenvolvimento(ctx, r.membroId);
+    const conf = F.conferirRegistros(r, dev.length, anexos, { reconhecimento: todos.length - dev.length });
     if (!conf.minimo && r.UF_CRM_OFF_FEEDBACKS !== "Sim") return "";
     const m = dom.infoMembro(ctx, ctx.idx.membro[r.membroId]);
-    const dev = F.feedbacksDeDesenvolvimento(ctx, r.membroId);
-    return '<div class="rotulo">Feedbacks SCI de desenvolvimento de ' + esc(primeiroNome(m.nome)) + " no app</div>" +
-      (dev.length ? '<div class="checagem">' + dev.map((f) => '<div class="ok"><span class="s">✓</span><span>' + calc.fmtDataAno(f.data) + " · Feedback de " + esc(String(f.tipo || "").toLowerCase()) + " · por " + esc(dom.pessoa(ctx, f.autor || f.criadoPor).nome) + "</span></div>").join("") + "</div>"
+    return '<div class="rotulo">Feedbacks SCI de ' + esc(primeiroNome(m.nome)) + " no app (" + todos.length + ")</div>" +
+      (todos.length ? '<div class="checagem">' + todos.map((f) => {
+        const conta = calc.ehFeedbackDesenvolvimento(f.tipo);
+        return '<div class="' + (conta ? "ok" : "neutro") + '"><span class="s">' + (conta ? "✓" : "·") + "</span><span>" + calc.fmtDataAno(f.data) + " · Feedback de " + esc(String(f.tipo || "").toLowerCase()) +
+          " · por " + esc(dom.pessoa(ctx, f.autor || f.criadoPor).nome) + (conta ? "" : ' <span class="muted">(reconhecimento: não conta para a regra)</span>') + "</span></div>";
+      }).join("") + "</div>"
         : '<div class="muted">Nenhum registrado.</div>') +
       '<div class="ajuda" style="margin-top:8px">Todos os feedbacks SCI e os 1:1 mensais de ' + esc(primeiroNome(m.nome)) + " vão para a timeline do card, para o RH. Anexe só o que foi registrado fora do app.</div>" +
       (conf.minimo ? (conf.ok ? '<div class="aviso-info" style="margin-top:8px">✓ ' + esc(plural(conf.total, "registro", "registros") + " de " + conf.minimo + " pedidos.") + "</div>"
@@ -278,7 +284,8 @@
     const ctx = E().ctx, eu = E().eu;
     const m = dom.infoMembro(ctx, ctx.idx.membro[r.membroId]);
     const arquivos = r.UF_CRM_OFF_FEEDBACKS === "Sim" ? (r.UF_CRM_OFF_ANEXOS || []) : [];
-    const conf = F.conferirRegistros(r, F.feedbacksDeDesenvolvimento(ctx, m.id).length, arquivos.length);
+    const dev = F.feedbacksDeDesenvolvimento(ctx, m.id).length;
+    const conf = F.conferirRegistros(r, dev, arquivos.length, { reconhecimento: dom.feedbacksDo(ctx, m.id).length - dev });
     if (!conf.ok) {
       // a regra é do RH: a liderança não envia sem os registros; o próprio RH decide se segue
       if (E().visao !== "rh") { ui.erroNoPainel(conf.mensagem); const b = f.querySelector('[data-campo="registros"]'); if (b) b.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
@@ -303,12 +310,15 @@
         off.negocios = off.negocios || [];
         off.negocios.unshift(F.negocioLocal({ id: neg.id, titulo, estagio: neg.estagio || off.etapas[0].id, agora: new Date().toISOString(), campos: local, origem: { sistema: dom.ORIGEM_APP, id: m.id } }));
       }
-      await GP.app.avisarRH("Nova solicitação de encerramento de contrato na esteira HR | Offboarding (" + m.nome + "), enviada por " + eu.nome + ". O histórico de feedbacks SCI e 1:1 está na timeline do card.");
-      if (coord) await GP.app.avisar([coord], eu.nome + " enviou ao RH uma solicitação de encerramento de contrato (" + m.nome + "). O RH conduz pela esteira HR | Offboarding.");
-      if (neg.avisos.length) ui.avisar("Solicitação enviada ao RH (card " + neg.id + "), mas " + neg.avisos.join("; ") + ".", "erro");
-      else ui.avisar("Solicitação enviada ao RH, com o histórico do membro na timeline do card.");
+      const link = FU.linkNoAviso(neg);
+      await GP.app.avisarRH("Nova solicitação de encerramento de contrato na esteira HR | Offboarding (" + m.nome + "), enviada por " + eu.nome + ". O histórico de feedbacks SCI e 1:1 está na timeline do card." + link);
+      if (coord) await GP.app.avisar([coord], eu.nome + " enviou ao RH uma solicitação de encerramento de contrato (" + m.nome + "). O RH conduz pela esteira HR | Offboarding." + link);
+      // quem pediu guarda o link nas notificações do Bitrix, para acompanhar
+      await GP.app.avisar([eu.id], "Você enviou ao RH a solicitação de encerramento de contrato de " + m.nome + ". Acompanhe pelo card." + link);
       return neg;
-    }, { rotuloOcupado: "Enviando..." });
+    }, { rotuloOcupado: "Enviando..." }).then((neg) => {
+      if (neg && neg.id) FU.mostrarEnviado({ neg, nomeFunil: "HR | Offboarding", titulo: "Solicitação enviada ao RH", texto: "O card de " + m.nome + " está na esteira HR | Offboarding, com o histórico do membro na timeline. O RH conduz a partir daqui." });
+    });
   };
 
   /* ---------------- fluxo anterior do app: editar uma solicitação que ainda estava em rascunho ---------------- */

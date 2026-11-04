@@ -193,18 +193,21 @@
   }
   /** Regra do formulário da Luciele: desempenho abaixo da média e incompatibilidade com a função pedem no mínimo
       2 registros de feedback estruturado; "recebeu feedbacks formais = Sim" pede ao menos 1. Contam os feedbacks
-      SCI de desenvolvimento do app (vão para a timeline do card) e os arquivos anexados. */
-  function conferirRegistros(r, sci, anexos) {
+      SCI de desenvolvimento do app (vão para a timeline do card) e os arquivos anexados. Os de reconhecimento não
+      contam: a regra pede registros com os pontos a melhorar. o.reconhecimento: quantos o membro tem (para a mensagem). */
+  function conferirRegistros(r, sci, anexos, o) {
+    const rec = (o && o.reconhecimento) || 0;
     const motivo = r.UF_CRM_OFF_MOTIVO || "";
     const minimo = PEDE_DOIS.indexOf(motivo) >= 0 ? 2 : r.UF_CRM_OFF_FEEDBACKS === "Sim" ? 1 : 0;
     const total = (sci || 0) + (anexos || 0);
     const conta = (sci === 1 ? "1 feedback SCI de desenvolvimento" : (sci || 0) + " feedbacks SCI de desenvolvimento") + " no app" +
       (anexos ? " e " + (anexos === 1 ? "1 registro anexado" : anexos + " registros anexados") : "");
+    const naoContam = rec ? " " + (rec === 1 ? "O feedback SCI de reconhecimento não conta" : "Os " + rec + " feedbacks SCI de reconhecimento não contam") + ": a regra pede registros com os pontos a melhorar." : "";
     let mensagem = "";
     if (total < minimo) {
       mensagem = minimo === 2
-        ? "Para \"" + motivo + "\", o RH pede no mínimo 2 registros de feedback estruturado. Há " + conta + ". Registre os feedbacks SCI no app (Feedbacks → Feedback SCI) ou anexe os registros feitos fora dele."
-        : "Você marcou que o membro recebeu feedbacks formais. Há " + conta + ": anexe os registros ou registre os feedbacks SCI no app.";
+        ? "Para \"" + motivo + "\", o RH pede no mínimo 2 registros de feedback estruturado. Há " + conta + "." + naoContam + " Registre os feedbacks SCI de desenvolvimento no app (Feedbacks → Feedback SCI) ou anexe os registros feitos fora dele."
+        : "Você marcou que o membro recebeu feedbacks formais. Há " + conta + "." + naoContam + " Anexe os registros ou registre os feedbacks SCI de desenvolvimento no app.";
     }
     return { minimo, total, sci: sci || 0, anexos: anexos || 0, ok: total >= minimo, mensagem };
   }

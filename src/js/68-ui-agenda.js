@@ -30,8 +30,7 @@
     const dias = calc.diffDias(ag.inicio, ag.fim) + 1;
     const pos = (d) => Math.max(0, Math.min(100, (calc.diffDias(ag.inicio, d) / dias) * 100));
     const larg = (a, b) => Math.max(0.8, ((calc.diffDias(a < ag.inicio ? ag.inicio : a, b > ag.fim ? ag.fim : b) + 1) / dias) * 100);
-    let h = c.cabecalho("agenda", "Agenda da equipe", "<span>próximas 13 semanas · " + calc.fmtData(ag.inicio) + " a " + calc.fmtData(ag.fim) + "</span>",
-      E().repo.modo === "bitrix" ? '<button class="btn sec" data-acao="abrir-calendario">' + icone("externo", 14) + " Ver no calendário do Bitrix</button>" : "");
+    let h = c.cabecalho("agenda", "Agenda da equipe", "<span>próximas 13 semanas · " + calc.fmtData(ag.inicio) + " a " + calc.fmtData(ag.fim) + "</span>");
     // Próximos 14 dias e próximo aniversário
     const prox = ag.aniversarios[0];
     h += '<div class="grade c3"><div class="card"><h3>Próximos 14 dias</h3>' +
@@ -73,10 +72,9 @@
       (ag.feriados.length ? '<div class="lista">' + ag.feriados.map((f) => '<div class="item' + (f.considera ? "" : " nao-vale") + '"><span class="num" style="width:44px;font-weight:700;color:var(--navy)">' + calc.fmtData(f.data) + '</span><div class="principal-item"><div>' + esc(f.nome || "Feriado") + '</div><div class="d">' +
         (f.considera ? "vale para " + esc(para(f)) : "não vale na Amorim: dia útil") + "</div></div></div>").join("") + "</div>" : c.vazio("Nenhum feriado no período.")) +
       '<p class="muted" style="font-size:12px">' + (doRH ? "Calendário de feriados cadastrado pelo RH." : "Lista oficial (feriados nacionais e os locais de SP e Salvador). O RH cadastra o calendário da empresa em Editar feriados.") + "</p></div></div>";
-    if (E().repo.modo === "bitrix") h += '<p class="muted" style="font-size:12px">As ausências vêm dos eventos marcados como "Ausente" na agenda de cada pessoa. A leitura do gráfico de ausências nativo e do futuro app de ausências do RH é validação pendente do TI (6.2).</p>';
+    h += '<p class="muted" style="font-size:12px">As ausências são os pedidos de férias, day off e pausa contratual aprovados pelo RH e confirmados pela liderança (Férias e ausências).</p>';
     return h;
   };
-  ui.acoes["abrir-calendario"] = function () { try { BX24.openPath("/calendar/"); } catch (e) { ui.avisar("Abra o calendário pelo menu do Bitrix."); } };
 
   /* ---------------- feriados da empresa: o RH cadastra (Políticas de Férias e Ausências, parte IV) ---------------- */
   // Um ano com itens no processo Feriados substitui, naquele ano, a lista oficial do app (dom.feriadosDoAno). Por isso

@@ -22,7 +22,7 @@ Configure o app em Bitrix24 → Recursos para desenvolvedores → Outros → Apl
 | Caminho do manipulador | `https://<projeto>.vercel.app/` |
 | Caminho de instalação | o mesmo |
 | Nome no menu | Gestão de Pessoas |
-| Escopos | `crm`, `user`, `department`, `userfieldconfig`, `im`, `calendar`. O `task` entra quando as entregas forem lidas direto das tarefas. |
+| Escopos | `crm`, `user`, `department`, `userfieldconfig`, `im`. O `calendar` não é mais usado (04/11/2026: a empresa não usa o calendário do Bitrix). O `task` entra quando as entregas forem lidas direto das tarefas. |
 
 O app chama `BX24.installFinish()` na primeira abertura.
 
@@ -242,8 +242,7 @@ A aprovação da coordenação pode ser feita de duas formas:
 
 - **Avisos ao membro (4.1):** como o Responsável de todo registro é o membro, desligue para ele as notificações de CRM desses processos. Esta é uma validação pendente (veja a tabela 2.7).
 - **Modelo de tarefa "Entrega" (3.4):** a liderança é a criadora, o "controle após a conclusão" fica ligado e há o campo "Complexidade".
-- **Ausências (3.6):** a Agenda lê os eventos "Ausente" da agenda de cada pessoa (`calendar.accessibility.get`). Se o gráfico de ausências nativo não aparecer ali, combine com o RH como lançar.
-- **Feriados:** os nacionais vêm de `calendar.settings.get` ("year_holidays"). Se o portal não tiver essa lista, o app usa os feriados federais calculados. Os de SP e Salvador ficam em Configuração.
+- **Calendário do Bitrix: não é usado** (04/11/2026, a empresa não usa). As ausências da Agenda são os pedidos de férias, day off e pausa contratual aprovados pelo RH e confirmados pela liderança. Os feriados são os nacionais da lei, os de SP e Salvador da Configuração e o calendário que o RH cadastra (seção 11). O atalho "Agendar na agenda" das pendências e o compromisso do O2O na agenda saíram.
 - **Painéis do BI Builder (RH e CEO):** o app já tem uma versão própria. O BI Builder entra se o RH quiser os gráficos nativos.
 - **Base de Conhecimento:** guias, modelos SCI e o guia de offboarding. Cadastre os links em Configuração.
 
@@ -303,15 +302,18 @@ Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Aus�
 1. **Estrutura:** dois processos novos, "Gestão de Pessoas · Férias e ausências" e "Gestão de Pessoas · Feriados". Um administrador cria pelo app: Configuração → "Criar ou completar a estrutura". Até lá, o app mostra o aviso no topo e a tela de férias diz o que falta. Depois, dê as permissões da seção 4, inclusive a função "Membros" para todos os funcionários.
 2. **Férias e ausências:** cada pessoa pede férias, day off ou pausa contratual no próprio app.
    - Antes do formulário, ela lê as regras do tipo escolhido e marca que leu (fica registrado no pedido).
-   - O app confere o pedido com a política: antecedência, segunda-feira, partes de 15 e 8 dias, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. O que não bate não trava: vira "ponto fora da política", a pessoa justifica, e o RH decide.
+   - O app confere cada pedido com a política: antecedência, segunda-feira, partes de 23, 15 ou 8 dias, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. O que não bate não trava: vira "ponto fora da política", a pessoa justifica, e o RH decide.
+   - Não há saldo de dias por pessoa (pedido do usuário, 04/11/2026: o direito muda por contrato e seria difícil configurar). O app não soma os pedidos do ano; quem confere o direito é o RH.
    - O e-mail que a política pede (para hr@amorimlawfirm.com, com cópia para a liderança direta) sai pronto: Gmail, e-mail do computador ou copiar. A pessoa marca "Já enviei".
    - O RH aprova ou recusa (prazo de 3 dias úteis, 5 na pausa). Depois a liderança direta confirma ou recusa (2 dias úteis, 5 na pausa). A resposta por e-mail também sai pronta.
    - Só o pedido aprovado pelo RH e confirmado pela liderança entra na Agenda da equipe.
-3. **Feriados:** o RH cadastra o calendário de cada ano em Agenda da equipe → Editar feriados. O cadastro começa pela lista oficial (nacionais da lei, mais as datas a mais do calendário do Bitrix, mais os locais de SP e Salvador da Configuração). Depois o RH marca o que não vale ("não considerar", vira dia útil), exclui ou acrescenta (recesso, por exemplo), para todos ou só para quem segue SP ou Salvador. Um ano cadastrado substitui a lista oficial naquele ano, nos prazos do app, nos pedidos de day off e na agenda. Atenção: em 11/2026, o calendário do portal (Configurações do calendário) tinha só 01/01 e 25/12. Por isso a lista oficial do app passou a somar os feriados nacionais da lei.
+3. **Feriados:** o RH cadastra o calendário de cada ano em Agenda da equipe → Editar feriados. O cadastro começa pela lista oficial (nacionais da lei, mais os locais de SP e Salvador da Configuração). Depois o RH marca o que não vale ("não considerar", vira dia útil), exclui ou acrescenta (recesso, por exemplo), para todos ou só para quem segue SP ou Salvador. Um ano cadastrado substitui a lista oficial naquele ano, nos prazos do app, nos pedidos de day off e na agenda. O calendário do Bitrix não é lido.
 4. **Notificações:** o sino no topo do menu mostra os pedidos e as decisões dos últimos 30 dias para quem vê:
    - pedidos de férias e ausências (RH e liderança direta), decisões (liderança e quem pediu);
    - solicitações de vaga (RH e coordenação do setor) e de encerramento de contrato (RH);
    - finalistas para avaliar e o calendário de feriados atualizado.
 
    As notificações saem dos próprios registros, sem nada guardado à parte, e o "lido" é de cada pessoa (`gp_notif_visto` no BX24.userOption). Cada evento também sai como aviso do Bitrix (im.notify).
-5. **Aniversário:** cada pessoa cadastra o seu em Perfil, na Agenda ou na tela de férias. A data vem preenchida quando o perfil do Bitrix já tem. Ela é gravada no próprio perfil do Bitrix (`user.update`, escopo `user`), de onde a agenda já lia. O app mostra só o dia e o mês.
+5. **Link do card depois de enviar (vaga e encerramento):** quem pede entra como observador do card. Ao enviar, o app mostra o link do card na pipe (abrir ou copiar), e o mesmo link vai no aviso do Bitrix para quem pediu, para o RH e para a coordenação. Na aba Recrutamento, cada vaga da lista abre o card. Com "Ler: Próprios" no funil, o observador abre o card mesmo depois que ele passa ao RH (a ajuda do Bitrix diz que o observador vê o card quando a função tem leitura); confira no primeiro envio real.
+6. **Altura do app dentro do Bitrix:** o app cresce até a altura do conteúdo e encolhe quando a página é menor. O menu termina logo depois dos itens, o painel lateral ocupa a área visível da tela, com os botões à vista, e o aviso rápido aparece perto do clique (`modoBitrix` e `ajustarAltura` em `60-ui-base.js`).
+7. **Aniversário:** cada pessoa cadastra o seu em Perfil, na Agenda ou na tela de férias. A data vem preenchida quando o perfil do Bitrix já tem. Ela é gravada no próprio perfil do Bitrix (`user.update`, escopo `user`), de onde a agenda já lia. O app mostra só o dia e o mês.

@@ -52,8 +52,6 @@
     const paraRH = rh ? F.paraRH(ctx) : [];
     const paraMim = F.paraLideranca(ctx, eu.id);
     const equipe = E().visao === "membro" ? [] : rh ? recentes(todos.filter((p) => String(p.responsavel) !== String(eu.id))) : F.daEquipe(ctx, eu.id);
-    const ano = Number(ctx.hoje.slice(0, 4));
-    const saldo = F.saldoFerias(ctx, eu.id, ano), saldoProx = F.saldoFerias(ctx, eu.id, ano + 1);
     const u = dom.pessoa(ctx, eu.id);
     const esperam = paraRH.length + paraMim.length;
     let h = c.cabecalho("ferias", "Férias e ausências",
@@ -65,15 +63,14 @@
     }
     h += '<div class="aviso-info" style="margin-bottom:16px">Férias, day off e pausa contratual seguem a política do RH: você pede aqui, depois de ler as regras, e envia o e-mail que o app escreve para ' + esc(F.EMAIL_RH) +
       ", com cópia para a sua liderança. O RH analisa, a liderança confirma, e o período entra na agenda da equipe.</div>";
-    if (rh) h += '<div class="card' + (paraRH.length ? " acao" : "") + '"><h3>Aguardando o RH<span class="extra muted">resposta em até 3 dias úteis (5 na pausa contratual)</span></h3>' + lista(paraRH, true, "Nenhum pedido aguardando o RH.") + "</div>";
-    if (paraMim.length || E().visao !== "membro") h += '<div class="card' + (paraMim.length ? " acao" : "") + '"><h3>Aguardando a sua confirmação<span class="extra muted">em até 2 dias úteis depois do RH (5 na pausa)</span></h3>' + lista(paraMim, true, "Nenhum pedido aguardando a sua confirmação.") + "</div>";
-    h += '<div class="card"><h3>Seus pedidos</h3>' + lista(meus, false, "Você ainda não fez nenhum pedido.") + "</div>";
-    h += '<div class="grade c2"><div class="card"><h3>Seu saldo de férias</h3>' +
-      c.dados([[String(ano), saldo.restam + " de " + F.FERIAS_ANO + " dias para pedir"], [String(ano + 1), saldoProx.restam + " de " + F.FERIAS_ANO + " dias para pedir"]]) +
-      '<p class="muted" style="font-size:12px;margin-bottom:0">Contratos PJ e de associação: 30 dias por ano, menos a semana coletiva entre o Natal e o Ano Novo. Contam os pedidos aprovados e os em andamento. Quem confirma o direito é o RH.</p></div>' +
-      '<div class="card"><h3>Seu aniversário</h3>' + (u.aniversario ? "<div><b>" + calc.fmtData("2000-" + u.aniversario) + "</b> · day off no mês de " + calc.MESES_LONGOS[Number(u.aniversario.slice(0, 2)) - 1] + "</div>" : '<div class="muted">Não cadastrado. O day off de aniversário usa o mês dele.</div>') +
-      (E().verComo ? "" : '<button class="btn sec peq" style="margin-top:10px" data-acao="meu-aniversario">' + (u.aniversario ? "Atualizar" : "Cadastrar") + " o meu aniversário</button>") + "</div></div>";
-    if (E().visao !== "membro") h += '<div class="card"><h3>Pedidos da equipe' + (rh ? "" : "") + '<span class="extra muted">' + plural(equipe.length, "pedido", "pedidos") + "</span></h3>" + lista(equipe.slice(0, 40), true, "Nenhum pedido da equipe.") + "</div>";
+    if (paraRH.length) h += '<div class="card acao"><h3>Aguardando o RH<span class="extra muted">resposta em até 3 dias úteis (5 na pausa contratual)</span></h3>' + lista(paraRH, true, "") + "</div>";
+    if (paraMim.length) h += '<div class="card acao"><h3>Aguardando a sua confirmação<span class="extra muted">em até 2 dias úteis depois do RH (5 na pausa)</span></h3>' + lista(paraMim, true, "") + "</div>";
+    // o aniversário fica no topo dos seus pedidos, numa linha: o day off de aniversário usa o mês dele
+    const aniv = (u.aniversario ? "Seu aniversário: <b>" + calc.fmtData("2000-" + u.aniversario) + "</b> · day off no mês de " + calc.MESES_LONGOS[Number(u.aniversario.slice(0, 2)) - 1] + "."
+      : "Seu aniversário não está cadastrado: o day off de aniversário usa o mês dele.") +
+      (E().verComo ? "" : ' <a href="#" data-acao="meu-aniversario">' + (u.aniversario ? "Atualizar" : "Cadastrar") + "</a>");
+    h += '<div class="card"><h3>Seus pedidos</h3><p class="muted" style="margin-top:0;font-size:12.5px">' + aniv + "</p>" + lista(meus, false, "Você ainda não fez nenhum pedido.") + "</div>";
+    if (E().visao !== "membro" && equipe.length) h += '<div class="card"><h3>Pedidos da equipe<span class="extra muted">' + (equipe.length > 15 ? "os 15 mais recentes de " + equipe.length : plural(equipe.length, "pedido", "pedidos")) + "</span></h3>" + lista(equipe.slice(0, 15), true, "") + "</div>";
     h += politicaHtml(false);
     return h;
   };

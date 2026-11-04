@@ -143,7 +143,7 @@
     return '<div class="item clicavel" data-rota="' + esc(p.rota) + '">' +
       (comMembro !== false && p.membro ? c.avatar(p.membro, 30) : '<span class="av" style="width:30px;height:30px;background:var(--sutil);color:var(--navy)">' + icone("calendario", 15) + "</span>") +
       '<div class="principal-item"><div class="t">' + esc(p.titulo) + '</div><div class="d">' + esc(p.tipo) + (p.destaque ? " · ligada a plano de melhoria" : "") + "</div></div>" +
-      '<div class="lado">' + c.prazo(p.prazo) + (p.prazo ? '<button class="btn peq sec nao-imprimir" data-acao="agendar-pendencia" data-id="' + esc(p.id) + '" title="Agendar na agenda">' + icone("calendario", 14) + "</button>" : "") + "</div></div>";
+      '<div class="lado">' + c.prazo(p.prazo) + "</div></div>";
   };
 
   /* ---------------- campos de formulário ---------------- */
@@ -205,8 +205,9 @@
       '<div class="corpo" id="painel-corpo">' + o.corpo + "</div>" +
       (o.rodape ? '<div class="rodape" id="painel-rodape">' + o.rodape + '<div class="erro-envio"></div></div>' : "") + "</aside>";
     const primeiro = el.querySelector(".corpo input:not([type=hidden]):not([disabled]), .corpo textarea, .corpo select");
-    if (primeiro) setTimeout(() => primeiro.focus(), 50);
+    if (primeiro) setTimeout(() => primeiro.focus({ preventScroll: true }), 50);
     if (o.aoAbrir) o.aoAbrir(el);
+    if (noBitrix()) { try { BX24.scrollParentWindow(0); } catch (e) { /* sem SDK */ } ajustarAltura(); }
   }
   function fecharPainel(forcar) {
     const el = document.getElementById("painel");
@@ -215,6 +216,7 @@
       if (!window.confirm("Fechar sem salvar o que você digitou?")) return false;
     }
     el.innerHTML = "";
+    ajustarAltura();
     return true;
   }
   function painelSujo() {
@@ -232,6 +234,7 @@
   /* ---------------- aviso rápido ---------------- */
   let timerToast = null;
   function avisar(texto, tipo) {
+    if (noBitrix()) document.documentElement.style.setProperty("--toast-top", Math.max(16, ultimoClique - 70) + "px");
     const el = document.getElementById("toast");
     el.innerHTML = '<div class="toast ' + (tipo === "erro" ? "erro" : "") + '" role="status">' + esc(texto) + "</div>";
     clearTimeout(timerToast);
@@ -515,11 +518,41 @@
     if (estado.manterRolagem) window.scrollTo(0, rolagem);
     estado.manterRolagem = false;
     if (estado.tourPasso !== null && GP.ui.renderTour) GP.ui.renderTour();
-    try { if (estado.repo.modo === "bitrix" && window.BX24 && BX24.fitWindow) BX24.fitWindow(); } catch (e) { /* fora do Bitrix */ }
+    ajustarAltura();
+  }
+
+  /* ---------------- dentro do Bitrix: a altura do app (queixa de 04/11/2026: "o app está muito comprido") ---------------- */
+  // O Bitrix mostra o app num iframe que cresce até a altura do conteúdo, e quem rola é a página do Bitrix. Nada aqui
+  // pode medir 100vh: a janela nunca encolheria (o BX24.fitWindow só cresce), e o rodapé do menu iria para o fim da
+  // página mais longa já aberta. Com data-bitrix no <html>, o CSS deixa o menu na altura dele, e ajustarAltura() mede o
+  // conteúdo. O painel lateral ocupa a área visível estimada pela tela, e o aviso rápido aparece perto do último clique.
+  let ultimoClique = 0, agendada = false;
+  const noBitrix = () => !!(estado.repo && estado.repo.modo === "bitrix" && window.BX24);
+  /** Área visível do app dentro do Bitrix: a tela menos o navegador e o topo do Bitrix (estimativa) */
+  function alturaVisivel() { return Math.max(520, ((window.screen && window.screen.availHeight) || 900) - 250); }
+  function ajustarAltura() {
+    if (!noBitrix() || agendada) return;
+    agendada = true;
+    requestAnimationFrame(function () {
+      agendada = false;
+      try {
+        const app = document.getElementById("app");
+        const sobreposto = !!(document.getElementById("painel").innerHTML || document.getElementById("tour").innerHTML);
+        const altura = Math.max(app ? app.offsetHeight : 0, sobreposto ? alturaVisivel() : 0, 480);
+        BX24.resizeWindow((BX24.getScrollSize && BX24.getScrollSize().scrollWidth) || document.documentElement.scrollWidth, altura);
+      } catch (e) { /* SDK sem resizeWindow */ }
+    });
+  }
+  function modoBitrix() {
+    document.documentElement.setAttribute("data-bitrix", "1");
+    document.documentElement.style.setProperty("--altura-visivel", alturaVisivel() + "px");
+    // mudou o tamanho do conteúdo (tela nova, pergunta que aparece, detalhe aberto): mede de novo
+    if (window.ResizeObserver) new ResizeObserver(ajustarAltura).observe(document.getElementById("app"));
   }
 
   /* ---------------- eventos ---------------- */
   document.addEventListener("click", function (ev) {
+    ultimoClique = ev.pageY || ultimoClique;
     const el = ev.target.closest("[data-acao], [data-rota]");
     if (!el) return;
     if (el.dataset.acao) {
@@ -562,6 +595,6 @@
   GP.ui = {
     estado, rotas, acoes, c, render, podeVerComo, navegar, abrirPainel, fecharPainel, erroNoPainel, avisar, lerForm, validar,
     salvar, criar, atualizar, excluir, aplicarNoContexto, novoAdendo, agoraISO, visoesDisponiveis, membrosDaVisao, minhaEquipe, podeVerConteudo, VISOES,
-    notificacoes,
+    notificacoes, modoBitrix, ajustarAltura,
   };
 })(window);

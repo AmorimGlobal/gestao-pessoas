@@ -86,7 +86,7 @@ test("navegador: o formulário cria o card de negócio com as listas pelo texto,
   const GP = carregarApp(bx.chamar);
   const repo = GP.bitrix.criarRepositorio();
   const n = await repo.criarNegocio({
-    categoria: 79, titulo: "Encerramento · Igor Santos", responsavel: "4", restrito: true, origem: { sistema: "gestao-pessoas", id: "7" },
+    categoria: 79, titulo: "Encerramento · Igor Santos", responsavel: "4", restrito: true, origem: { sistema: "gestao-pessoas", id: "7" }, observadores: ["4"],
     campos: { UF_CRM_OFF_MEMBRO: "Igor Santos", UF_CRM_OFF_MOTIVO: "Desempenho abaixo da média", UF_CRM_OFF_RISCOS: ["Projetos críticos"], UF_CRM_OFF_ANEXOS: [["registro.pdf", "QUJD"]], UF_CRM_OFF_DATA_DES: "2026-10-30" },
   });
   assert.equal(n.estagio, "C79:NEW"); // sem estágio no pedido: a primeira etapa do funil
@@ -97,6 +97,7 @@ test("navegador: o formulário cria o card de negócio com as listas pelo texto,
   assert.equal(card.opened, "N");
   assert.equal(card.originatorId, "gestao-pessoas");
   assert.equal(card.originId, "7");
+  assert.deepEqual(card.observers, [4]); // quem pede segue vendo o card depois que ele passa ao RH
   assert.equal(card.ufCrmOffMembro, "Igor Santos");
   assert.equal(card.ufCrmOffMotivo, 226203); // o texto vira o ID da opção
   assert.deepEqual(card.ufCrmOffRiscos, [226225]);

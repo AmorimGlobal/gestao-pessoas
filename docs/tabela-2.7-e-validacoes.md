@@ -28,7 +28,7 @@ Com o app, a liderança vê o que o protótipo mostra, e as regras de cálculo d
 |---|---|---|
 | Início e Painel geral | Não dá no nativo | Feito no app. Faixa navy com os 3 números do dia, os 9 destinos, os próximos 14 dias e os painéis por visão (liderança, coordenação, RH e CEO). O BI Builder fica opcional para o RH. |
 | Minha equipe e card do membro | Nativo com ajuste | Os dados são nativos (Membros com abas de itens ligados). No app: lista com "Precisa de atenção" em cima, card com histórico, abas e dossiê em PDF. |
-| O que fazer agora (todas as abas) | Não dá no nativo | O app calcula as pendências a partir das datas, com os atrasados primeiro e o atalho "Agendar na agenda". As tarefas de robô continuam valendo para os avisos. |
+| O que fazer agora (todas as abas) | Não dá no nativo | O app calcula as pendências a partir das datas, com os atrasados primeiro. O atalho "Agendar na agenda" saiu em 04/11/2026 (a empresa não usa o calendário do Bitrix). As tarefas de robô continuam valendo para os avisos. |
 | Recrutamento | Nativo com ajuste | Lê o funil 77 já existente: etapa X de N, dias em aberto e tempo para fechar. O parecer do finalista fica no processo "Avaliações de finalistas". |
 | Onboarding Embarcação | Nativo com ajuste | Processo com as 4 fases. No app: Dia N, Ficha a partir do Planejamento da função, nota da fase contra o patamar e Dia 90 movendo o membro para Ativo. |
 | Rotinas (1:1 e SCI) | Nativo com ajuste | Processos nativos. No app: pauta automática, combinados anteriores, 4 modelos SCI, revisão do texto e bloqueio de 48 h com adendo. |
@@ -59,9 +59,9 @@ Com o app, a liderança vê o que o protótipo mostra, e as regras de cálculo d
 | Robô "Não entregue" quando o prazo vence sem conclusão | Depende do modelo "Entrega". |
 | Resumo semanal e e-mails de 7 e 14 dias | **Feito** na rotina das 8h (`api/avisos.js`). Sai como notificação do Bitrix; confirmar se o envio por e-mail das notificações não lidas atende ao "e-mail" da 4.4. |
 | Dossiê em PDF | **Feito** ("Salvar em PDF" no card do membro, com o registro de quem baixou). |
-| Agendar pendência na agenda do Bitrix | **Feito.** Compromisso na agenda da pessoa, com lembrete de 15 minutos. O prazo não muda. |
-| Ausências e aniversários na Agenda | **Feito**, com ocultar o aniversário por pessoa. A leitura do gráfico de ausências nativo ainda precisa ser validada. |
-| Feriados nacionais do Bitrix e locais de SP e Salvador | **Feito.** Os nacionais vêm do calendário do Bitrix, com reserva calculada; os locais ficam em Configuração. |
+| Agendar pendência na agenda do Bitrix | **Saiu em 04/11/2026:** a empresa não usa o calendário do Bitrix. |
+| Ausências e aniversários na Agenda | **Feito**, com ocultar o aniversário por pessoa. Desde 04/11/2026 as ausências são os pedidos de férias e ausências aprovados no app, e cada pessoa cadastra o aniversário no próprio perfil. |
+| Feriados nacionais e locais de SP e Salvador | **Feito.** Desde 04/11/2026: os nacionais da lei, os locais da Configuração e o calendário que o RH cadastra no app. O calendário do Bitrix não é usado. |
 | Tarefa ao membro pedindo temas, e a pauta | **Pauta feita.** A tarefa ao membro é um robô (configuração manual). |
 | Calendário do ano no Painel | **Feito**: marcos fixos do ciclo e datas da equipe dos próximos 3 meses. |
 
@@ -78,9 +78,7 @@ Com o app, a liderança vê o que o protótipo mostra, e as regras de cálculo d
    - a criação de campos (`userfieldconfig.add`);
    - os estágios novos (`crm.status.add`);
    - a gravação de listas, sim/não e anexos;
-   - os avisos (`im.notify.system.add`);
-   - as ausências (`calendar.accessibility.get`);
-   - o compromisso na agenda (`calendar.event.add`).
+   - os avisos (`im.notify.system.add`).
 5. **Componentes da revisão de 13/10 que ainda não estão no app:** autoavaliação anual, calibração, pulso trimestral e motivos de saída em gráfico. Todos dependem da aprovação da CEO (4.8). O campo "Motivo de saída" já existe.
 6. **A Amora (4.7).** As "dicas da semana" de hoje são as dicas-modelo da primeira fase, calculadas por regra: usam só datas, tipos e situações, nunca o texto dos registros. Também há uma revisão do feedback SCI por regras (julgamentos, generalizações e temas pessoais). A integração com a Amora por API entra quando o RH aprovar.
 

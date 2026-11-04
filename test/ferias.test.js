@@ -12,18 +12,19 @@ function contexto(euId, extra) {
   const d = dadosDemo();
   return dom.indexar(Object.assign({
     hoje: "2026-10-08", eu: { id: euId || "3", admin: false }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos,
-    registros: d.registros, ausencias: d.ausencias, vagas: d.vagas, offboarding: d.offboarding,
-    feriados: { nacionais: [{ data: "2026-12-25", nome: "Feriado" }, { data: "2027-01-01", nome: "Feriado" }, { data: "2026-12-24", nome: "Feriado" }] }, // como o calendário do portal
+    registros: d.registros, vagas: d.vagas, offboarding: d.offboarding,
+    // o calendário do Bitrix não é lido (a empresa não usa): mesmo que o contexto traga datas dele, elas não entram
+    feriados: { nacionais: [{ data: "2026-12-24", nome: "Feriado" }] },
   }, extra || {}));
 }
 const pessoa = (ctx, uid, extra) => Object.assign(F.dadosDaPessoa(ctx, uid), extra || {});
 const feriado = (id, data, nome, abrangencia, considera, extra) => Object.assign({ id, titulo: nome, data, abrangencia, considera, estagio: "NEW", criadoEm: "2026-10-07T10:00:00-03:00" }, extra || {});
 
-test("feriados: sem cadastro do RH, vale a lista oficial completa (lei + datas a mais do portal + locais da Configuração)", () => {
+test("feriados: sem cadastro do RH, vale a lista oficial (lei + locais da Configuração), sem o calendário do Bitrix", () => {
   const ctx = contexto("3");
   const of = dom.feriadosDoAno(ctx, 2026);
-  assert.ok(of.some((f) => f.data === "2026-11-20" && /Consciência Negra/.test(f.nome)), "o portal não tinha o 20/11, a lei tem");
-  assert.ok(of.some((f) => f.data === "2026-12-24" && f.nome === "Feriado (calendário do Bitrix)"), "data a mais do portal entra");
+  assert.ok(of.some((f) => f.data === "2026-11-20" && /Consciência Negra/.test(f.nome)), "o 20/11 é feriado nacional pela lei");
+  assert.ok(!of.some((f) => f.data === "2026-12-24"), "data do calendário do Bitrix não entra");
   assert.ok(of.some((f) => f.data === "2026-06-24" && f.sigla === "BA"), "São João de Salvador, da Configuração");
   assert.ok(dom.feriadosDe(ctx, "SP").has("2026-11-20"));
   assert.ok(!dom.feriadosDe(ctx, "SP").has("2026-06-24") && dom.feriadosDe(ctx, "BA").has("2026-06-24"));
@@ -76,19 +77,15 @@ test("férias: o que foge da política vira ponto a justificar, sem travar", () 
   assert.match(F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-01-11", fim: "2027-01-25" }, pessoa(ctx, "101")).erros[0], /cobertas/);
 });
 
-test("férias: as duas partes de 15 e 8 dias; estágio segue a lei; a semana coletiva do fim de ano", () => {
+test("férias: cada pedido nas partes de 23, 15 ou 8 dias, sem saldo do ano; estágio segue a lei; a semana coletiva do fim de ano", () => {
   const ctx = contexto("100"); // Ana já pediu 15 dias em dezembro de 2026
-  assert.deepEqual(F.saldoFerias(ctx, "100", 2026), { ano: 2026, direito: 23, usados: 15, restam: 8, parcelas: 1 });
+  assert.equal(F.saldoFerias, undefined, "sem saldo por pessoa (04/11/2026): o RH confere o direito");
   let r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-12-07", fim: "2026-12-14", cobertura: "x" }, pessoa(ctx, "100"));
   assert.ok(r.fora.some((x) => /já há um pedido seu/i.test(x)), "sobrepõe o pedido de dezembro");
   r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-12-28", fim: "2027-01-11", cobertura: "x", justificativa: "x" }, pessoa(ctx, "100"));
   assert.ok(r.fora.some((x) => /férias coletivas entre o Natal de 2026/.test(x)));
-  const ctx2 = contexto("100");
-  r = F.conferirPedido(ctx2, { tipo: "Férias", inicio: "2026-12-28", fim: "2027-01-04", cobertura: "x", justificativa: "x" }, pessoa(ctx2, "100"));
-  // 15 (dezembro) + 15 em 2026? este começa em 28/12/2026: 15 + 8 = 23, a divisão permitida
-  assert.ok(r.ok.some((x) => /15 e 8 dias/.test(x)), r.ok.join(" | "));
-  r = F.conferirPedido(ctx2, { tipo: "Férias", inicio: "2026-12-28", fim: "2027-01-11", cobertura: "x", justificativa: "x" }, pessoa(ctx2, "100"));
-  assert.ok(r.fora.some((x) => /15 \+ 15 dias/.test(x)), r.fora.join(" | "));
+  assert.ok(r.ok.some((x) => /15 dias corridos: uma das duas partes/.test(x)), "cada pedido é conferido sozinho, sem somar o ano");
+  assert.ok(!r.fora.some((x) => /Somando/.test(x)));
   // estágio: sem a regra da segunda-feira e das partes
   const fer = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-02-03", fim: "2027-02-12", cobertura: "x" }, pessoa(ctx, "104"));
   assert.deepEqual(fer.fora, []);

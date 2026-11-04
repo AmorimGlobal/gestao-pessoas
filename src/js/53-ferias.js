@@ -8,7 +8,9 @@
    fica no processo "Férias e ausências", o e-mail sai pronto para enviar, e o período só
    entra na Agenda da equipe depois do RH e da liderança.
    Regra não atendida não trava o pedido: vira "ponto fora da política", quem pede
-   justifica, e o RH decide. Funções puras (Node + navegador): test/ferias.test.js.
+   justifica, e o RH decide. Sem saldo de dias por pessoa (pedido do usuário, 04/11/2026: o
+   direito muda por contrato e o RH confere): o app confere cada pedido, não a soma do ano.
+   Funções puras (Node + navegador): test/ferias.test.js.
    ===================================================================================== */
 (function (raiz, fabrica) {
   const m = fabrica(raiz.GP && raiz.GP.calc ? raiz.GP.calc : require("./10-calc.js"),
@@ -72,7 +74,6 @@
   const primeiroNome = (n) => String(n || "").trim().split(/\s+/)[0] || "";
   const diasCorridos = (inicio, fim) => calc.diffDias(inicio, fim) + 1;
   const fimDe = (p) => (p.tipo === "Day off" ? p.inicio : p.fim || p.inicio);
-  const diasDe = (p) => Number(p.dias) || (p.inicio ? diasCorridos(p.inicio, fimDe(p)) : 0);
   const fimDeSemana = (d) => calc.diaSemana(d) === 0 || calc.diaSemana(d) === 6;
   function diaUtilAnterior(d) { let x = calc.addDias(d, -1); while (fimDeSemana(x)) x = calc.addDias(x, -1); return x; }
   function diaUtilSeguinte(d) { let x = calc.addDias(d, 1); while (fimDeSemana(x)) x = calc.addDias(x, 1); return x; }
@@ -102,13 +103,6 @@
       id, nome: u.nome, email: u.email || "", contrato: (m && m.contrato) || "", ingresso: (m && m.ingresso) || "", registro: u.registro || "",
       sigla, aniversario: u.aniversario || "", lideranca: lid && lid !== id ? String(lid) : "",
     };
-  }
-
-  /** Férias do ano (PJ e associação): 23 dias depois da semana coletiva. Contam os pedidos aprovados e os aguardando. */
-  function saldoFerias(ctx, uid, ano) {
-    const doAno = pedidosDe(ctx, uid).filter((x) => x.tipo === "Férias" && String(x.inicio || "").slice(0, 4) === String(ano));
-    const usados = doAno.reduce((a, x) => a + diasDe(x), 0);
-    return { ano: Number(ano), direito: FERIAS_ANO, usados, restam: Math.max(0, FERIAS_ANO - usados), parcelas: doAno.length };
   }
 
   /** Confere o pedido com a política. p = {tipo, motivoDayOff, inicio, fim, cobertura, justificativa}; pessoa = dadosDaPessoa().
@@ -146,14 +140,6 @@
         else fora.push("As férias começam sempre às segundas-feiras, e " + calc.fmtDataAno(inicio) + " é " + calc.fmtDiaSemana(inicio) + ".");
         if (PARCELAS.indexOf(dias) >= 0) ok.push(dias + " dias corridos: " + (dias === FERIAS_ANO ? "os 23 dias de uma vez." : "uma das duas partes (15 e 8 dias)."));
         else fora.push(dias + " dias corridos: a política aceita os 23 dias de uma vez ou duas partes, de 15 e de 8 dias.");
-        const doAno = outros.filter((x) => x.tipo === "Férias" && String(x.inicio || "").slice(0, 4) === ano);
-        if (doAno.length) {
-          const partes = doAno.map(diasDe).concat([dias]);
-          const soma = partes.reduce((a, b) => a + b, 0);
-          const combina = partes.length === 2 && partes.slice().sort((a, b) => a - b).join("+") === "8+15";
-          if (combina && soma <= FERIAS_ANO) ok.push("Com o outro pedido de " + ano + ", ficam as duas partes de 15 e 8 dias.");
-          else fora.push("Somando os pedidos de férias de " + ano + " (" + partes.join(" + ") + " dias), passa da divisão permitida: 23 dias de uma vez ou 15 + 8.");
-        }
         const ref = pessoa.ingresso || pessoa.registro;
         if (ref) {
           if (calc.diffDias(ref, inicio) >= 365) ok.push("Mais de 12 meses de contrato no início das férias.");
@@ -264,7 +250,7 @@
 
   return {
     EMAIL_RH, TIPOS, PRAZOS, FERIAS_ANO, PARCELAS, PAUSA_MAX, POLITICA, NOME_TIPO,
-    diasCorridos, periodo, periodoCurto, pedidosDe, dadosDaPessoa, saldoFerias, conferirPedido,
+    diasCorridos, periodo, periodoCurto, pedidosDe, dadosDaPessoa, conferirPedido,
     prazoRH, prazoLideranca, situacao, paraRH, paraLideranca, daEquipe,
     emailDoPedido, emailDaDecisao, linkMailto, linkGmail, textoDoEmail,
   };
