@@ -1,7 +1,7 @@
 /* =====================================================================================
    TELAS — Agenda da equipe (3.6): ausências, aniversários e feriados das próximas 13 semanas
    -------------------------------------------------------------------------------------
-   Regras: só ausências confirmadas; o motivo nunca aparece; aniversário só com dia e mês;
+   Regras: só as ausências que o RH registrou; o motivo nunca aparece; aniversário só com dia e mês;
    feriado local só na linha de quem o tem (SP ou BA pela cidade de referência).
    ===================================================================================== */
 (function (raiz) {
@@ -72,7 +72,7 @@
       (ag.feriados.length ? '<div class="lista">' + ag.feriados.map((f) => '<div class="item' + (f.considera ? "" : " nao-vale") + '"><span class="num" style="width:44px;font-weight:700;color:var(--navy)">' + calc.fmtData(f.data) + '</span><div class="principal-item"><div>' + esc(f.nome || "Feriado") + '</div><div class="d">' +
         (f.considera ? "vale para " + esc(para(f)) : "não vale na Amorim: dia útil") + "</div></div></div>").join("") + "</div>" : c.vazio("Nenhum feriado no período.")) +
       '<p class="muted" style="font-size:12px">' + (doRH ? "Calendário de feriados cadastrado pelo RH." : "Lista oficial (feriados nacionais e os locais de SP e Salvador). O RH cadastra o calendário da empresa em Editar feriados.") + "</p></div></div>";
-    h += '<p class="muted" style="font-size:12px">As ausências são os pedidos de férias, day off e pausa contratual aprovados pelo RH e confirmados pela liderança (Férias e ausências).</p>';
+    h += '<p class="muted" style="font-size:12px">As ausências são as férias, os day offs e as pausas contratuais que o RH registra em Férias e ausências, depois da aprovação por e-mail.</p>';
     return h;
   };
 

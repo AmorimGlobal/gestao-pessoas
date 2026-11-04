@@ -7,8 +7,8 @@
    ctx = { hoje, eu, config, usuarios, departamentos, registros: {membros, feedbacks, ciclo,
            planos, encerramentos, onboarding, leituras, planejamento, finalistas},
            vagas, offboarding }
-   Os feriados vêm da lei e do calendário do RH (processo Feriados); as ausências, dos pedidos de férias e
-   ausências aprovados. O calendário do Bitrix não é usado: a empresa não usa (04/11/2026).
+   Os feriados vêm da lei e do calendário do RH (processo Feriados); as ausências, das que o RH registra em
+   Férias e ausências. O calendário do Bitrix não é usado: a empresa não usa (04/11/2026).
    indexar(ctx) monta os mapas usados por todas as outras funções.
    ===================================================================================== */
 (function (raiz, fabrica) {
@@ -754,10 +754,11 @@
   }
 
   /* ================================================================ agenda da equipe (3.6) */
-  /** As ausências do app: férias, day off e pausas aprovados pelo RH e confirmados pela liderança (o calendário do Bitrix não é lido) */
+  /** As ausências do app: férias, day off e pausas que o RH registrou depois da aprovação por e-mail (o calendário do Bitrix não é lido), por data */
   function ausenciasAprovadas(ctx) {
     return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => p.estagio === "SUCCESS" && p.inicio)
-      .map((p) => ({ pessoa: String(p.responsavel), inicio: p.inicio, fim: p.fim || p.inicio, origem: "app", tipo: p.tipo }));
+      .map((p) => ({ pessoa: String(p.responsavel), inicio: p.inicio, fim: p.fim || p.inicio, origem: "app", tipo: p.tipo }))
+      .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
   }
   function agendaEquipe(ctx, pessoas, opcoes) {
     const o = opcoes || {};

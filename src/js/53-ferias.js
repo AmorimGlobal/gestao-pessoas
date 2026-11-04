@@ -1,15 +1,15 @@
 /* =====================================================================================
    FÉRIAS E AUSÊNCIAS — "Políticas de Férias e Ausências Programadas" do RH (04/11/2026):
-   o texto que a pessoa lê antes de pedir, a conferência do pedido com as regras, os
-   prazos de resposta e o e-mail para o RH com cópia à liderança
+   o texto que a pessoa lê antes de pedir, a conferência do pedido com as regras, o e-mail
+   para o RH com cópia à liderança e as ausências que o RH registra
    -------------------------------------------------------------------------------------
    Fluxo da política: e-mail para hr@amorimlawfirm.com com cópia para a liderança direta
-   → o RH analisa → a liderança confirma → os dois respondem por e-mail. No app, o pedido
-   fica no processo "Férias e ausências", o e-mail sai pronto para enviar, e o período só
-   entra na Agenda da equipe depois do RH e da liderança.
-   Regra não atendida não trava o pedido: vira "ponto fora da política", quem pede
-   justifica, e o RH decide. Sem saldo de dias por pessoa (pedido do usuário, 04/11/2026: o
-   direito muda por contrato e o RH confere): o app confere cada pedido, não a soma do ano.
+   → o RH analisa → a liderança confirma → os dois respondem por e-mail. Decisão do usuário
+   (04/11/2026): o pedido e a decisão ficam no e-mail. O app escreve o e-mail, e o RH
+   registra no processo "Férias e ausências" a ausência aprovada, que aparece na Agenda.
+   Regra não atendida não trava o e-mail: vira "ponto fora da política", quem pede
+   justifica, e o RH decide. Sem saldo de dias por pessoa (o direito muda por contrato e o
+   RH confere): o app confere cada pedido, não a soma do ano.
    Funções puras (Node + navegador): test/ferias.test.js.
    ===================================================================================== */
 (function (raiz, fabrica) {
@@ -87,9 +87,9 @@
   function periodoCurto(p) { const fim = fimDe(p); return fim === p.inicio ? calc.fmtData(p.inicio) : calc.fmtData(p.inicio) + " a " + calc.fmtData(fim); }
   const NOME_TIPO = { "Férias": "férias", "Day off": "day off", "Pausa contratual": "pausa contratual" };
 
-  /** Os pedidos que contam (aguardando ou aprovados) de uma pessoa, menos o que está sendo conferido */
+  /** As ausências registradas de uma pessoa, menos a que está sendo conferida ou editada */
   function pedidosDe(ctx, uid, excetoId) {
-    return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => String(p.responsavel) === String(uid) && p.estagio !== "FAIL" && p.id !== excetoId);
+    return registradas(ctx).filter((p) => String(p.responsavel) === String(uid) && p.id !== excetoId);
   }
 
   /** Quem pede: contrato, ingresso e cidade pelo Membros (quando o login lê), e o resto pelo perfil e pela estrutura do Bitrix */
@@ -178,36 +178,30 @@
     }
 
     const junto = outros.find((x) => x.inicio && x.inicio <= fim && fimDe(x) >= inicio);
-    if (junto) fora.push("Já há um pedido seu nesse período (" + NOME_TIPO[junto.tipo] + ", " + periodoCurto(junto) + ").");
+    if (junto) fora.push("Já há uma ausência sua registrada nesse período (" + NOME_TIPO[junto.tipo] + ", " + periodoCurto(junto) + ").");
     if (fora.length && !texto(p.justificativa)) erros.push("Explique na justificativa os pontos fora da política.");
     return { erros, fora, ok, dias };
   }
 
-  /* ---------------- prazos e situação ---------------- */
-  const dataDe = (v) => String(v || "").slice(0, 10);
-  /** O RH responde em até 3 dias úteis (5 na pausa contratual), contados do pedido */
-  function prazoRH(ctx, p) { return calc.addDiasUteis(dataDe(p.criadoEm) || ctx.hoje, (PRAZOS[p.tipo] || PRAZOS["Férias"]).rh, dom.feriadosDe(ctx, "SP")); }
-  /** A liderança confirma em até 2 dias úteis (5 na pausa) depois da aprovação do RH */
-  function prazoLideranca(ctx, p) { return p.rhEm ? calc.addDiasUteis(dataDe(p.rhEm), (PRAZOS[p.tipo] || PRAZOS["Férias"]).lideranca, dom.feriadosDe(ctx, "SP")) : ""; }
-  function situacao(ctx, p) {
-    if (p.estagio === "SUCCESS") return { texto: "Aprovado", cor: "verde" };
-    if (p.estagio === "FAIL") return p.canceladaEm ? { texto: "Cancelado", cor: "cinza" } : { texto: p.liderancaDecisao === "Recusada" ? "Recusado pela liderança" : "Recusado pelo RH", cor: "cinza" };
-    if (p.estagio === "AG_LIDERANCA") { const pz = prazoLideranca(ctx, p); return { texto: "Aguardando a liderança", cor: pz && calc.atrasado(pz, ctx.hoje) ? "vermelho" : "ambar", prazo: pz }; }
-    const pz = prazoRH(ctx, p);
-    return { texto: "Aguardando o RH", cor: calc.atrasado(pz, ctx.hoje) ? "vermelho" : "azul", prazo: pz };
+  /* ---------------- ausências registradas pelo RH ---------------- */
+  // Decisão do usuário (04/11/2026): o pedido e a resposta seguem por e-mail, como na política. No app, o RH registra
+  // a ausência aprovada (direto em "Aprovada"), e a Agenda da equipe mostra quem está fora em cada dia.
+  /** As ausências registradas, da mais próxima à mais distante: só as da etapa "Aprovada", as mesmas da agenda
+      (dom.ausenciasAprovadas). Um item em outra etapa, como os pedidos do fluxo de aprovação anterior, não conta. */
+  function registradas(ctx) {
+    return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => p.estagio === "SUCCESS" && p.inicio)
+      .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
   }
-  const recentes = (lista) => lista.slice().sort((a, b) => (String(a.criadoEm) < String(b.criadoEm) ? 1 : -1));
-  /** Aguardando o RH, do mais antigo (o prazo vence antes) ao mais novo */
-  function paraRH(ctx) { return recentes((ctx.registros.ferias || []).filter((p) => p.estagio === "NEW")).reverse(); }
-  /** Aguardando a confirmação desta liderança */
-  function paraLideranca(ctx, uid) { return recentes((ctx.registros.ferias || []).filter((p) => p.estagio === "AG_LIDERANCA" && String(p.lideranca) === String(uid))).reverse(); }
-  /** Pedidos da equipe que a pessoa enxerga (liderança direta ou membros visíveis), sem os dela */
-  function daEquipe(ctx, uid) {
+  /** As que a pessoa enxerga: o RH, todas; a liderança e a coordenação, as da equipe e as suas; o membro, as suas */
+  function visiveisPara(ctx, uid, visao) {
     const id = String(uid);
-    const visiveis = {};
-    dom.membrosVisiveis(ctx, id).forEach((m) => { visiveis[String(m.responsavel)] = true; });
-    return recentes((ctx.registros.ferias || []).filter((p) => String(p.responsavel) !== id && (String(p.lideranca) === id || visiveis[String(p.responsavel)])));
+    if (visao === "rh") return registradas(ctx);
+    const equipe = {};
+    if (visao !== "membro") dom.membrosVisiveis(ctx, id).forEach((m) => { equipe[String(m.responsavel)] = true; });
+    return registradas(ctx).filter((p) => String(p.responsavel) === id || String(p.lideranca) === id || equipe[String(p.responsavel)]);
   }
+  /** Ainda por vir ou em curso */
+  function proximas(lista, hoje) { return lista.filter((p) => fimDe(p) >= hoje); }
 
   /* ---------------- e-mails ---------------- */
   /** O e-mail que abre a solicitação: para o RH, com cópia para a liderança direta (fluxo da política) */
@@ -223,22 +217,8 @@
     if (String(p.justificativa || "").trim()) corpo.push("Justificativa: " + String(p.justificativa).trim());
     const fora = String(p.foraDaPolitica || "").split("\n").filter(Boolean);
     if (fora.length) corpo.push("", "Pontos fora da política, apontados pelo app:", ...fora.map((f) => "- " + f));
-    corpo.push("", "O pedido também está registrado no app Gestão de Pessoas.", "", "Obrigado(a),", pessoa.nome);
+    corpo.push("", "Obrigado(a),", pessoa.nome);
     return { para: EMAIL_RH, cc: lid && lid.email ? [lid.email] : [], assunto: "Solicitação de " + NOME_TIPO[p.tipo] + " · " + pessoa.nome + " · " + periodoCurto(p), corpo: corpo.join("\n") };
-  }
-  /** A resposta por e-mail (a política pede que RH e liderança respondam por e-mail): quem = "rh" | "lideranca" */
-  function emailDaDecisao(ctx, p, quem) {
-    const pessoa = dom.pessoa(ctx, p.responsavel);
-    const lid = p.lideranca ? dom.pessoa(ctx, p.lideranca) : null;
-    const rh = quem === "rh";
-    const aprovada = (rh ? p.rhDecisao : p.liderancaDecisao) === "Aprovada";
-    const comentario = String((rh ? p.rhComentario : p.liderancaComentario) || "").trim();
-    const oque = NOME_TIPO[p.tipo] + " (" + periodo(p) + ")";
-    const frase = rh
-      ? (aprovada ? "O RH aprovou o seu pedido de " + oque + ". Agora a sua liderança confirma, em até " + (PRAZOS[p.tipo] || PRAZOS["Férias"]).lideranca + " dias úteis." : "O RH não aprovou o seu pedido de " + oque + ".")
-      : (aprovada ? "Confirmo o seu pedido de " + oque + ", já aprovado pelo RH. O período entra na agenda da equipe." : "Não posso confirmar o seu pedido de " + oque + ".");
-    const corpo = ["Olá, " + primeiroNome(pessoa.nome) + ",", "", frase].concat(comentario ? ["", comentario] : []).concat(["", "Abraço,", rh ? "RH · Gestão de Pessoas" : (lid ? lid.nome : "")]);
-    return { para: pessoa.email || "", cc: rh ? (lid && lid.email ? [lid.email] : []) : [EMAIL_RH], assunto: "Re: Solicitação de " + NOME_TIPO[p.tipo] + " · " + pessoa.nome + " · " + periodoCurto(p), corpo: corpo.join("\n") };
   }
   function linkMailto(e) {
     return "mailto:" + encodeURIComponent(e.para).replace(/%40/g, "@") + "?" + [e.cc.length ? "cc=" + encodeURIComponent(e.cc.join(",")).replace(/%40/g, "@") : "", "subject=" + encodeURIComponent(e.assunto), "body=" + encodeURIComponent(e.corpo)].filter(Boolean).join("&");
@@ -251,7 +231,7 @@
   return {
     EMAIL_RH, TIPOS, PRAZOS, FERIAS_ANO, PARCELAS, PAUSA_MAX, POLITICA, NOME_TIPO,
     diasCorridos, periodo, periodoCurto, pedidosDe, dadosDaPessoa, conferirPedido,
-    prazoRH, prazoLideranca, situacao, paraRH, paraLideranca, daEquipe,
-    emailDoPedido, emailDaDecisao, linkMailto, linkGmail, textoDoEmail,
+    registradas, visiveisPara, proximas,
+    emailDoPedido, linkMailto, linkGmail, textoDoEmail,
   };
 });

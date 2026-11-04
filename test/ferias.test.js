@@ -69,7 +69,7 @@ test("férias: o que foge da política vira ponto a justificar, sem travar", () 
   assert.equal(r.fora.length, 3, r.fora.join(" | "));
   assert.ok(r.fora.some((x) => /segundas-feiras/.test(x)) && r.fora.some((x) => /20 dias de antecedência/.test(x)) && r.fora.some((x) => /10 dias corridos/.test(x)));
   // o day off do Bruno em 13/11 cruza um período que o inclua
-  assert.ok(F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-11-09", fim: "2026-11-23", cobertura: "x" }, pessoa(ctx, "101")).fora.some((x) => /Já há um pedido seu nesse período \(day off, 13\/11\)/.test(x)));
+  assert.ok(F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-11-09", fim: "2026-11-23", cobertura: "x" }, pessoa(ctx, "101")).fora.some((x) => /Já há uma ausência sua registrada nesse período \(day off, 13\/11\)/.test(x)));
   assert.deepEqual(r.erros, ["Explique na justificativa os pontos fora da política."]);
   r = F.conferirPedido(ctx, Object.assign({ justificativa: "Viagem de família marcada." }, p), pessoa(ctx, "101"));
   assert.deepEqual(r.erros, []);
@@ -78,10 +78,10 @@ test("férias: o que foge da política vira ponto a justificar, sem travar", () 
 });
 
 test("férias: cada pedido nas partes de 23, 15 ou 8 dias, sem saldo do ano; estágio segue a lei; a semana coletiva do fim de ano", () => {
-  const ctx = contexto("100"); // Ana já pediu 15 dias em dezembro de 2026
+  const ctx = contexto("100"); // Ana tem 15 dias de férias registrados em dezembro de 2026
   assert.equal(F.saldoFerias, undefined, "sem saldo por pessoa (04/11/2026): o RH confere o direito");
   let r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-12-07", fim: "2026-12-14", cobertura: "x" }, pessoa(ctx, "100"));
-  assert.ok(r.fora.some((x) => /já há um pedido seu/i.test(x)), "sobrepõe o pedido de dezembro");
+  assert.ok(r.fora.some((x) => /já há uma ausência sua registrada/i.test(x)), "sobrepõe as férias de dezembro");
   r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-12-28", fim: "2027-01-11", cobertura: "x", justificativa: "x" }, pessoa(ctx, "100"));
   assert.ok(r.fora.some((x) => /férias coletivas entre o Natal de 2026/.test(x)));
   assert.ok(r.ok.some((x) => /15 dias corridos: uma das duas partes/.test(x)), "cada pedido é conferido sozinho, sem somar o ano");
@@ -121,32 +121,41 @@ test("pausa contratual: até 7 dias, só PJ e associação, sempre com justifica
   assert.ok(r.fora.some((x) => /só para contratos PJ e de associação \(o seu: Estágio\)/.test(x)));
 });
 
-test("prazos, situação e lista de cada um", () => {
+test("ausências registradas pelo RH: só as da etapa Aprovada, por data; cada visão vê as suas", () => {
   const ctx = contexto("6");
-  const ana = ctx.idx.porId.ferias["300"], bruno = ctx.idx.porId.ferias["301"];
-  assert.equal(F.prazoRH(ctx, ana), "2026-10-13"); // 07/10 (quarta) + 3 dias úteis; 12/10 é feriado
-  assert.equal(F.prazoLideranca(ctx, bruno), "2026-10-09"); // RH em 07/10 + 2 dias úteis
-  assert.deepEqual(F.situacao(ctx, ana), { texto: "Aguardando o RH", cor: "azul", prazo: "2026-10-13" });
-  assert.equal(F.situacao(ctx, ctx.idx.porId.ferias["303"]).texto, "Cancelado");
-  assert.deepEqual(F.paraRH(ctx).map((p) => p.id), ["300"]);
-  assert.deepEqual(F.paraLideranca(ctx, "3").map((p) => p.id), ["301"]);
-  assert.deepEqual(F.daEquipe(ctx, "4").map((p) => p.id).sort(), ["302", "303"]);
+  assert.equal(F.prazoRH, undefined, "sem prazos nem aprovação no app (04/11/2026): a decisão fica no e-mail");
+  assert.equal(F.paraRH, undefined);
+  const todas = F.registradas(ctx).map((p) => p.id);
+  assert.deepEqual(todas, ["310", "302", "311", "301", "300", "312", "313", "314"]);
+  assert.ok(!todas.includes("303"), "o pedido do fluxo anterior, em outra etapa, fica fora");
+  assert.deepEqual(F.visiveisPara(ctx, "6", "rh").map((p) => p.id), todas);
+  // a Carla: a equipe dela e a própria ausência, sem a equipe do Marcos (o Igor)
+  assert.deepEqual(F.visiveisPara(ctx, "3", "lideranca").map((p) => p.id), ["310", "311", "301", "300", "312", "313", "314"]);
+  // o membro: só as suas
+  assert.deepEqual(F.visiveisPara(ctx, "101", "membro").map((p) => p.id), ["310", "301"]);
+  assert.deepEqual(F.visiveisPara(ctx, "101", "lideranca").map((p) => p.id), ["310", "301"], "sem equipe: só as suas");
+  // daqui em diante: o que já terminou sai da lista
+  assert.deepEqual(F.proximas(F.registradas(ctx), "2026-11-03").map((p) => p.id), ["311", "301", "300", "312", "313", "314"]);
+  assert.deepEqual(F.pedidosDe(ctx, "111"), [], "o item fora da etapa Aprovada não conta na conferência");
+  assert.deepEqual(F.pedidosDe(ctx, "101", "301").map((p) => p.id), ["310"], "a ausência em edição fica fora da conferência dela mesma");
 });
 
-test("aprovado pelo RH e confirmado pela liderança: só então entra na agenda da equipe", () => {
+test("a ausência registrada entra na agenda da equipe; a de outra etapa, não", () => {
   const ctx = contexto("4");
   const pessoas = dom.equipeDe(ctx, "4").map((m) => dom.infoMembro(ctx, m));
   const ag = dom.agendaEquipe(ctx, pessoas, { inicio: ctx.hoje, semanas: 13 });
   const igor = ag.linhas.find((l) => l.pessoa.userId === "110");
   assert.deepEqual(igor.ausencias.map((a) => [a.inicio, a.fim, a.volta]), [["2026-10-19", "2026-11-02", "2026-11-03"]]); // 02/11 é Finados: volta na terça
+  assert.ok(!ag.linhas.some((l) => l.ausencias.some((a) => a.inicio === "2026-11-23")), "a pausa recusada no fluxo anterior não aparece");
   const ctxCarla = contexto("3");
   const ag2 = dom.agendaEquipe(ctxCarla, dom.equipeDe(ctxCarla, "3").map((m) => dom.infoMembro(ctxCarla, m)), { inicio: ctxCarla.hoje, semanas: 13 });
-  assert.ok(!ag2.linhas.find((l) => l.pessoa.userId === "100").ausencias.some((a) => a.origem === "app"), "o pedido da Ana ainda espera o RH");
+  assert.deepEqual(ag2.linhas.find((l) => l.pessoa.userId === "100").ausencias.map((a) => [a.inicio, a.fim]), [["2026-12-07", "2026-12-21"]], "as férias da Ana, registradas pelo RH");
+  assert.deepEqual(ag2.linhas.find((l) => l.pessoa.userId === "101").ausencias.map((a) => a.inicio), ["2026-10-13", "2026-11-13"], "em ordem de data");
 });
 
 test("e-mail do pedido: para o RH, com cópia para a liderança, pronto no Gmail e no e-mail do computador", () => {
   const ctx = contexto("100");
-  const ana = ctx.idx.porId.ferias["300"];
+  const ana = { tipo: "Férias", inicio: "2026-12-07", fim: "2026-12-21", cobertura: "Bruno acompanha os protocolos da carteira." };
   const e = F.emailDoPedido(ctx, Object.assign({}, ana, { foraDaPolitica: "Pedido com 30 dias de antecedência: a política pede pelo menos 60." }), pessoa(ctx, "100"));
   assert.equal(e.para, "hr@amorimlawfirm.com");
   assert.deepEqual(e.cc, ["carla.mendes@amorimglobal.com"]);
@@ -157,34 +166,31 @@ test("e-mail do pedido: para o RH, com cópia para a liderança, pronto no Gmail
   assert.match(e.corpo, /- Pedido com 30 dias de antecedência/);
   assert.ok(F.linkMailto(e).startsWith("mailto:hr@amorimlawfirm.com?cc=carla.mendes@amorimglobal.com&subject=Solicita%C3%A7%C3%A3o"));
   assert.match(F.linkGmail(e), /^https:\/\/mail\.google\.com\/mail\/\?view=cm&fs=1&to=hr%40amorimlawfirm\.com&cc=carla\.mendes%40amorimglobal\.com&su=/);
-  // a resposta do RH vai para quem pediu, com cópia para a liderança
-  const r = F.emailDaDecisao(ctx, Object.assign({}, ana, { rhDecisao: "Aprovada", rhComentario: "Boas férias!" }), "rh");
-  assert.equal(r.para, "ana.ribeiro@amorimglobal.com");
-  assert.deepEqual(r.cc, ["carla.mendes@amorimglobal.com"]);
-  assert.match(r.corpo, /O RH aprovou o seu pedido de férias .*Agora a sua liderança confirma, em até 2 dias úteis\.\n\nBoas férias!/s);
-  const l = F.emailDaDecisao(ctx, Object.assign({}, ana, { liderancaDecisao: "Aprovada" }), "lideranca");
-  assert.deepEqual(l.cc, ["hr@amorimlawfirm.com"]);
+  assert.doesNotMatch(e.corpo, /registrad/i, "o e-mail é o pedido, como na política: nada é gravado no app");
+  assert.equal(F.emailDaDecisao, undefined, "a resposta é do RH e da liderança, no próprio e-mail");
 });
 
-test("notificações: o pedido avisa o RH e a liderança; a decisão avisa quem pediu", () => {
+test("notificações: a ausência registrada pelo RH avisa a liderança direta e quem sai; o resto, como antes", () => {
   const rh = N.notificacoesDe(contexto("6"), "6");
   const t = rh.map((n) => n.titulo);
-  assert.ok(t.includes("Ana Ribeiro pediu férias (07/12 a 21/12)"), t.join(" | "));
-  assert.ok(rh.find((n) => n.id === "ferias-pedido-300").acao, "aguarda o RH");
+  assert.ok(!rh.some((n) => n.area === "Férias e ausências"), "quem registrou não é avisado do próprio registro: " + t.join(" | "));
   assert.ok(t.includes("Nova solicitação de vaga: Analista Tributário Júnior"), "vaga de 02/10");
   assert.ok(!t.some((x) => /Assistente de Imigração/.test(x)), "vaga de agosto: fora dos 30 dias");
   assert.ok(t.includes("Nova solicitação de encerramento de contrato: Igor Santos"), "esteira de offboarding");
   assert.ok(t.some((x) => /Solicitação de encerramento enviada ao RH: Fernanda Alves/.test(x)), "fluxo anterior do app");
   const carla = N.notificacoesDe(contexto("3"), "3");
   const tc = carla.map((n) => n.titulo);
-  assert.ok(tc.includes("Ana Ribeiro pediu férias (07/12 a 21/12)"));
-  assert.ok(tc.includes("O RH aprovou o pedido de Bruno Teixeira: falta a sua confirmação"));
-  assert.ok(carla.find((n) => n.id === "ferias-rh-301").acao);
+  assert.ok(tc.includes("O RH registrou a ausência de Ana Ribeiro: férias (07/12 a 21/12)"), tc.join(" | "));
+  assert.ok(tc.includes("O RH registrou a ausência de Bruno Teixeira: day off (13/11)"));
+  assert.equal(carla.find((n) => n.id === "ferias-300").rota, "#/ferias/300");
+  assert.ok(!carla.some((n) => n.area === "Férias e ausências" && n.acao), "nada a decidir no app");
   assert.ok(tc.includes("Avalie a finalista Paula Nunes"));
   assert.ok(!tc.some((x) => /vaga/i.test(x)), "a liderança não é avisada das vagas que não pediu");
   const bruno = N.notificacoesDe(contexto("101"), "101");
-  assert.deepEqual(bruno.map((n) => n.titulo), ["O RH aprovou o seu pedido de day off (13/11)"]);
-  assert.deepEqual(N.notificacoesDe(contexto("100"), "100"), [], "o próprio pedido não notifica quem pediu");
+  assert.deepEqual(bruno.map((n) => n.titulo), ["O RH registrou a sua ausência: day off (13/11)"]);
+  assert.deepEqual(N.notificacoesDe(contexto("100"), "100").map((n) => n.titulo), ["O RH registrou a sua ausência: férias (07/12 a 21/12)"]);
+  assert.deepEqual(N.notificacoesDe(contexto("110"), "110"), [], "registrada há mais de 30 dias: fora do sino");
+  assert.deepEqual(N.notificacoesDe(contexto("111"), "111"), [], "item fora da etapa Aprovada não notifica");
   // a coordenação é avisada das vagas das lideranças do setor
   assert.ok(N.notificacoesDe(contexto("2"), "2").some((n) => n.titulo === "Nova solicitação de vaga: Analista Tributário Júnior"));
 });
@@ -193,7 +199,7 @@ test("notificações: o lido é de cada pessoa, e o calendário mudado pelo RH a
   const ctx = contexto("3");
   assert.equal(N.novas(ctx, "3", { visto: "" }), N.notificacoesDe(ctx, "3").length);
   assert.equal(N.novas(ctx, "3", { visto: "2026-10-07T23:00:00-03:00" }), 0);
-  assert.equal(N.novas(ctx, "3", { visto: "2026-10-07T12:00:00-03:00" }), 1); // só o RH aprovar o day off do Bruno (15h) veio depois
+  assert.equal(N.novas(ctx, "3", { visto: "2026-10-07T09:00:00-03:00" }), 1); // só o registro das férias da Ana (09h30) veio depois
   ctx.registros.feriados = [feriado("1", "2026-11-20", "Consciência Negra", "Todos", true, { atualizadoEm: "2026-10-08T09:00:00-03:00" })];
   dom.indexar(ctx);
   assert.ok(N.notificacoesDe(ctx, "100").some((n) => n.titulo === "O RH atualizou o calendário de feriados"));

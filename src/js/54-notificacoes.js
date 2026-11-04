@@ -1,10 +1,10 @@
 /* =====================================================================================
    NOTIFICAÇÕES DO APP (04/11/2026) — o sino do menu, para o RH, as lideranças e quem pede
    -------------------------------------------------------------------------------------
-   Calculadas dos próprios registros, sem guardar nada à parte: cada pedido e cada decisão
+   Calculadas dos próprios registros, sem guardar nada à parte: cada pedido e cada registro
    vira uma notificação para quem precisa saber.
-   - Férias e ausências: o pedido avisa o RH e a liderança direta; a decisão do RH avisa a
-     liderança (que confirma) e quem pediu; a confirmação da liderança avisa o RH e quem pediu.
+   - Férias e ausências: a ausência que o RH registra avisa a liderança direta e a própria
+     pessoa. O pedido e a decisão ficam no e-mail (decisão do usuário, 04/11/2026).
    - Vagas (funil 77): a solicitação avisa o RH e a coordenação do setor.
    - Encerramento (funil 79 e fluxo anterior do app): a solicitação avisa o RH; a do fluxo
      anterior que espera aprovação avisa a coordenação.
@@ -38,32 +38,15 @@
     const lista = [];
     const add = (n) => { if (n.quando) lista.push(n); };
 
-    /* Férias e ausências */
-    ((ctx.registros && ctx.registros.ferias) || []).forEach((f) => {
-      const quem = nome(f.responsavel), meu = String(f.responsavel) === id, souLid = String(f.lideranca) === id;
+    /* Férias e ausências: a ausência que o RH registrou avisa a liderança direta e a própria pessoa
+       (o pedido e a decisão ficam no e-mail, 04/11/2026) */
+    ferias.registradas(ctx).forEach((f) => {
+      const meu = String(f.responsavel) === id, souLid = String(f.lideranca) === id;
+      if (String(f.autor || f.criadoPor || "") === id || !(meu || souLid)) return;
       const oque = ferias.NOME_TIPO[f.tipo] + " (" + ferias.periodoCurto(f) + ")";
-      const rota = "#/ferias/" + f.id;
-      if (!meu && (p.rh || souLid)) {
-        add({ id: "ferias-pedido-" + f.id, quando: f.criadoEm, area: "Férias e ausências", rota,
-          titulo: quem + " pediu " + oque, texto: p.rh ? "O RH analisa primeiro, até " + calc.fmtData(ferias.prazoRH(ctx, f)) + "." : "O RH analisa primeiro; depois é a sua vez de confirmar.",
-          acao: p.rh && f.estagio === "NEW" });
-      }
-      if (f.rhEm && f.rhDecisao) {
-        const aprovou = f.rhDecisao === "Aprovada";
-        if (souLid && !meu) add({ id: "ferias-rh-" + f.id, quando: f.rhEm, area: "Férias e ausências", rota, acao: f.estagio === "AG_LIDERANCA",
-          titulo: aprovou ? "O RH aprovou o pedido de " + quem + ": falta a sua confirmação" : "O RH recusou o pedido de " + quem,
-          texto: aprovou ? oque + ". Confirme até " + calc.fmtData(ferias.prazoLideranca(ctx, f)) + "." : oque + "." });
-        if (meu) add({ id: "ferias-rh-" + f.id, quando: f.rhEm, area: "Férias e ausências", rota,
-          titulo: aprovou ? "O RH aprovou o seu pedido de " + oque : "O RH não aprovou o seu pedido de " + oque, texto: aprovou ? "Agora a sua liderança confirma." : (f.rhComentario || "") });
-      }
-      if (f.liderancaEm && f.liderancaDecisao) {
-        const confirmou = f.liderancaDecisao === "Aprovada";
-        if (p.rh && !meu) add({ id: "ferias-lid-" + f.id, quando: f.liderancaEm, area: "Férias e ausências", rota,
-          titulo: nome(f.lideranca) + (confirmou ? " confirmou" : " recusou") + " o pedido de " + quem, texto: confirmou ? oque + ": aprovado, e já está na agenda da equipe." : oque + "." });
-        if (meu) add({ id: "ferias-lid-" + f.id, quando: f.liderancaEm, area: "Férias e ausências", rota,
-          titulo: confirmou ? "Aprovado: " + oque : "A sua liderança não confirmou o pedido de " + oque, texto: confirmou ? "O RH e a sua liderança aprovaram. O período está na agenda da equipe." : (f.liderancaComentario || "") });
-      }
-      if (f.canceladaEm && !meu && (p.rh || souLid)) add({ id: "ferias-cancelado-" + f.id, quando: f.canceladaEm, area: "Férias e ausências", rota, titulo: quem + " cancelou o pedido de " + oque, texto: "" });
+      add({ id: "ferias-" + f.id, quando: f.criadoEm, area: "Férias e ausências", rota: "#/ferias/" + f.id,
+        titulo: meu ? "O RH registrou a sua ausência: " + oque : "O RH registrou a ausência de " + nome(f.responsavel) + ": " + oque,
+        texto: "Já aparece na Agenda da equipe." });
     });
 
     /* Vagas: o RH vê todas; a coordenação, as das lideranças do setor */

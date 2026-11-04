@@ -398,7 +398,7 @@
     const ctx = E().ctx;
     const ci = ctx.idx.porId.ciclo[el.dataset.id];
     const m = dom.infoMembro(ctx, ctx.idx.membro[ci.membroId]);
-    // ausências: os pedidos de férias e ausências aprovados (o calendário do Bitrix não é usado)
+    // ausências: as que o RH registrou em Férias e ausências (o calendário do Bitrix não é usado)
     const aus = dom.ausenciasAprovadas(ctx).filter((a) => a.pessoa === m.userId && a.fim >= ctx.hoje);
     ui.abrirPainel({
       titulo: "Agendar o O2O de " + m.nome, sub: "Ao agendar, peça ao membro 2 ou 3 temas, uma semana antes.",

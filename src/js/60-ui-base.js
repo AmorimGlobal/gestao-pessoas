@@ -337,10 +337,8 @@
     const item = (rota, ic, rotulo, contador, dica) => '<a href="#/' + rota + '" class="' + (r === rota ? "ativo" : "") + '">' + icone(ic, 17) + "<span>" + rotulo + "</span>" +
       (contador ? '<span class="contador' + (dica ? " novo" : "") + '" title="' + esc(dica || "Pendências atrasadas") + '">' + contador + "</span>" : "") + "</a>";
     if (estado.visao === "ceo") return item("inicio", "inicio", "Início") + item("painel", "painel", "Painel geral");
-    // Férias e ausências: o número é o que espera esta pessoa (o RH analisa; a liderança confirma)
-    const F = GP.ferias;
-    const naFila = F ? (estado.visao === "rh" ? F.paraRH(estado.ctx).length : 0) + F.paraLideranca(estado.ctx, estado.eu.id).length : 0;
-    const itemFerias = item("ferias", "ferias", "Férias e ausências", naFila, "Pedidos aguardando você");
+    // Férias e ausências: sem contador, porque o pedido e a decisão ficam no e-mail (04/11/2026)
+    const itemFerias = item("ferias", "ferias", "Férias e ausências");
     if (estado.visao === "membro") return itemFerias + item("perfil", "perfil", "Perfil") + (estado.eu.admin ? item("config", "config", "Configuração") : "");
     const atrasadas = dom.pendenciasDe(estado.ctx, minhaEquipe(), { uid: estado.eu.id }).filter((p) => p.atrasado).length;
     const links = (estado.config && estado.config.links) || {};
@@ -409,7 +407,7 @@
   acoes["abrir-notificacoes"] = function () {
     const lista = notificacoes();
     abrirPainel({
-      titulo: "Notificações", sub: "Pedidos e decisões dos últimos 30 dias para você. Cada um também chega como aviso no Bitrix.",
+      titulo: "Notificações", sub: "Pedidos e registros dos últimos 30 dias para você. Cada um também chega como aviso no Bitrix.",
       corpo: lista.length ? '<div class="lista notificacoes">' + lista.map((n) => '<a class="item notif' + (n.nova ? " nova" : "") + '" href="' + esc(n.rota) + '" data-acao="ir-notificacao">' +
         '<div class="principal-item"><div class="t">' + esc(n.titulo) + '</div><div class="d">' + esc([n.area, quandoFoi(n.quando), n.texto].filter(Boolean).join(" · ")) + "</div></div>" +
         '<div class="lado">' + (n.acao ? c.tag("Pede ação", "ambar") : "") + "</div></a>").join("") + "</div>" : c.vazio("Nada nos últimos 30 dias."),

@@ -60,7 +60,7 @@ Com o app, a liderança vê o que o protótipo mostra, e as regras de cálculo d
 | Resumo semanal e e-mails de 7 e 14 dias | **Feito** na rotina das 8h (`api/avisos.js`). Sai como notificação do Bitrix; confirmar se o envio por e-mail das notificações não lidas atende ao "e-mail" da 4.4. |
 | Dossiê em PDF | **Feito** ("Salvar em PDF" no card do membro, com o registro de quem baixou). |
 | Agendar pendência na agenda do Bitrix | **Saiu em 04/11/2026:** a empresa não usa o calendário do Bitrix. |
-| Ausências e aniversários na Agenda | **Feito**, com ocultar o aniversário por pessoa. Desde 04/11/2026 as ausências são os pedidos de férias e ausências aprovados no app, e cada pessoa cadastra o aniversário no próprio perfil. |
+| Ausências e aniversários na Agenda | **Feito**, com ocultar o aniversário por pessoa. Desde 04/11/2026 as ausências são as que o RH registra em Férias e ausências depois da aprovação por e-mail, e cada pessoa cadastra o aniversário no próprio perfil. |
 | Feriados nacionais e locais de SP e Salvador | **Feito.** Desde 04/11/2026: os nacionais da lei, os locais da Configuração e o calendário que o RH cadastra no app. O calendário do Bitrix não é usado. |
 | Tarefa ao membro pedindo temas, e a pauta | **Pauta feita.** A tarefa ao membro é um robô (configuração manual). |
 | Calendário do ano no Painel | **Feito**: marcos fixos do ciclo e datas da equipe dos próximos 3 meses. |

@@ -372,7 +372,10 @@
     /* ---------------- Férias e ausências (Políticas de Férias e Ausências, 04/11/2026) ---------------- */
     {
       chave: "ferias", nome: "Férias e ausências", modulo: "Férias e ausências", pai: null,
-      descricao: "Pedidos de férias, day off e pausa contratual, feitos pela própria pessoa no app. Responsável = quem pede. O RH analisa e depois a liderança direta confirma; só então o período entra na Agenda da equipe.",
+      descricao: "Férias, day offs e pausas contratuais já aprovados por e-mail, que o RH registra no app. Responsável = quem fica ausente. Cada item da etapa Aprovada aparece na Agenda da equipe.",
+      // Desde 04/11/2026 o RH registra direto em "Aprovada" (com a decisão do RH e a data do registro). As etapas
+      // "Aguardando" e os campos de cobertura, regras lidas, e-mail, decisão da liderança e cancelamento ficaram do fluxo de
+      // aprovação anterior (o pedido e a decisão agora ficam no e-mail): o app não grava mais neles.
       estagios: [
         { codigo: "NEW", nome: "Aguardando o RH", cor: COR.azul },
         { codigo: "AG_LIDERANCA", nome: "Aguardando a liderança", cor: COR.amarelo },

@@ -131,14 +131,14 @@ Configure em CRM → Configurações → Permissões. Para cada um dos 10 proces
 | RH | Todos | Todos | Administra estágios |
 | Membros e demais usuários | Nenhum | Nenhum | O membro não vê os próprios registros |
 
-**Férias e ausências e Feriados (04/11/2026).** Desde essa data todo funcionário entra no app: quem não lidera ninguém vê só "Férias e ausências" e o Perfil. Para isso, crie uma função do CRM para todos os funcionários (por exemplo "Membros", ligada ao departamento raiz) com acesso só a estes dois processos:
+**Férias e ausências e Feriados (04/11/2026).** Desde essa data todo funcionário entra no app: quem não lidera ninguém vê só "Férias e ausências" e o Perfil. Só o RH grava nessas duas tabelas do CRM: registra as ausências aprovadas por e-mail e cadastra os feriados (seção 11). Os outros só leem:
 
-| Processo | Membros (todos) | Liderança | Coordenação | RH |
+| Tabela do CRM | Membros (todos, opcional) | Liderança | Coordenação | RH |
 |---|---|---|---|---|
-| Férias e ausências | Ler, Adicionar e Editar: Próprios | Ler e Editar: Do departamento | Ler e Editar: Departamento e subdepartamentos | Todos |
+| Férias e ausências | Ler: Próprios | Ler: Do departamento | Ler: Departamento e subdepartamentos | Todos |
 | Feriados | Ler: Todos | Ler: Todos | Ler: Todos | Todos (o RH cadastra) |
 
-Quem tem mais de uma função soma as permissões, então a liderança continua com as dela nos outros processos. Sem a função "Membros", quem não lidera ninguém abre o app mas não consegue registrar o pedido. Sem leitura em "Feriados", a pessoa vê a lista oficial de feriados, e não o calendário do RH.
+Quem tem mais de uma função soma as permissões, então a liderança continua com as dela nas outras tabelas. A função "Membros" (para todos os funcionários, ligada ao departamento raiz) é opcional: pedir férias não grava nada, então quem não tem a função pede normalmente. Ela só deixa cada pessoa ver as próprias ausências registradas e o calendário de feriados do RH. Sem leitura em "Feriados", a pessoa vê a lista oficial de feriados. "Próprios" funciona porque o RH registra a ausência com a própria pessoa como responsável.
 
 **O RH precisa de "Todos" mesmo.** O app lê os registros com o login de quem usa. Com "Do departamento", a pessoa do RH só enxerga o próprio setor, e em "Ver como outra pessoa" a equipe da liderança escolhida aparece vazia. Foi o que aconteceu em 28/10/2026. Desde 29/10/2026 o app avisa o RH e o administrador no topo da tela quando a permissão esconde registros: ele compara o que o login leu com o total do processo, contado no servidor por `api/contagem.js`, com o mesmo `BITRIX_WEBHOOK_URL` e `GP_AVISAR_IDS`.
 
@@ -242,7 +242,7 @@ A aprovação da coordenação pode ser feita de duas formas:
 
 - **Avisos ao membro (4.1):** como o Responsável de todo registro é o membro, desligue para ele as notificações de CRM desses processos. Esta é uma validação pendente (veja a tabela 2.7).
 - **Modelo de tarefa "Entrega" (3.4):** a liderança é a criadora, o "controle após a conclusão" fica ligado e há o campo "Complexidade".
-- **Calendário do Bitrix: não é usado** (04/11/2026, a empresa não usa). As ausências da Agenda são os pedidos de férias, day off e pausa contratual aprovados pelo RH e confirmados pela liderança. Os feriados são os nacionais da lei, os de SP e Salvador da Configuração e o calendário que o RH cadastra (seção 11). O atalho "Agendar na agenda" das pendências e o compromisso do O2O na agenda saíram.
+- **Calendário do Bitrix: não é usado** (04/11/2026, a empresa não usa). As ausências da Agenda são as férias, os day offs e as pausas contratuais que o RH registra em Férias e ausências (seção 11). Os feriados são os nacionais da lei, os de SP e Salvador da Configuração e o calendário que o RH cadastra (seção 11). O atalho "Agendar na agenda" das pendências e o compromisso do O2O na agenda saíram.
 - **Painéis do BI Builder (RH e CEO):** o app já tem uma versão própria. O BI Builder entra se o RH quiser os gráficos nativos.
 - **Base de Conhecimento:** guias, modelos SCI e o guia de offboarding. Cadastre os links em Configuração.
 
@@ -299,17 +299,17 @@ O relatório da reunião (`Relatório.docx`) mudou o escopo do app. O que precis
 
 Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Ausências Programadas" do RH. As regras ficam em `src/js/53-ferias.js`.
 
-1. **Estrutura:** dois processos novos, "Gestão de Pessoas · Férias e ausências" e "Gestão de Pessoas · Feriados". Um administrador cria pelo app: Configuração → "Criar ou completar a estrutura". Até lá, o app mostra o aviso no topo e a tela de férias diz o que falta. Depois, dê as permissões da seção 4, inclusive a função "Membros" para todos os funcionários.
-2. **Férias e ausências:** cada pessoa pede férias, day off ou pausa contratual no próprio app.
-   - Antes do formulário, ela lê as regras do tipo escolhido e marca que leu (fica registrado no pedido).
-   - O app confere cada pedido com a política: antecedência, segunda-feira, partes de 23, 15 ou 8 dias, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. O que não bate não trava: vira "ponto fora da política", a pessoa justifica, e o RH decide.
-   - Não há saldo de dias por pessoa (pedido do usuário, 04/11/2026: o direito muda por contrato e seria difícil configurar). O app não soma os pedidos do ano; quem confere o direito é o RH.
-   - O e-mail que a política pede (para hr@amorimlawfirm.com, com cópia para a liderança direta) sai pronto: Gmail, e-mail do computador ou copiar. A pessoa marca "Já enviei".
-   - O RH aprova ou recusa (prazo de 3 dias úteis, 5 na pausa). Depois a liderança direta confirma ou recusa (2 dias úteis, 5 na pausa). A resposta por e-mail também sai pronta.
-   - Só o pedido aprovado pelo RH e confirmado pela liderança entra na Agenda da equipe.
+1. **Estrutura:** dois processos novos, "Gestão de Pessoas · Férias e ausências" e "Gestão de Pessoas · Feriados". Um administrador cria pelo app: Configuração → "Criar ou completar a estrutura". Até lá, o app mostra o aviso no topo e a tela de férias diz o que falta. Depois, dê as permissões da seção 4. A função "Membros" para todos os funcionários é opcional.
+2. **Férias e ausências:** decisão do usuário de 04/11/2026: a comunicação é feita por e-mail, e o app serve para acompanhar quem está fora em cada dia.
+   - **Pedir (qualquer pessoa):** em "Pedir férias ou ausência", a pessoa escolhe o tipo, lê as regras e marca que leu. O app confere o pedido com a política: antecedência, segunda-feira, partes de 23, 15 ou 8 dias, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. O que não bate não trava: vira "ponto fora da política", e a pessoa justifica.
+   - O app escreve o e-mail que a política pede (para hr@amorimlawfirm.com, com cópia para a liderança direta): Gmail, e-mail do computador ou copiar. Nada é gravado: o pedido e a resposta do RH e da liderança ficam no e-mail.
+   - **Registrar (o RH):** aprovado o pedido, o RH usa "Registrar ausência" (pessoa, tipo, primeiro e último dia, observação). O item nasce direto na etapa "Aprovada", com a pessoa como responsável. A pessoa e a liderança direta recebem o aviso. O RH também edita e exclui, e a exclusão avisa as duas.
+   - **Acompanhar:** o RH vê todas as ausências; a liderança e a coordenação, as da equipe; o membro, as suas. A Agenda da equipe mostra quem está fora em cada dia.
+   - Não há saldo de dias por pessoa: o direito muda por contrato, e quem confere é o RH.
+   - Saíram do app em 04/11/2026: as aprovações do RH e da liderança, os prazos de resposta, o "Já enviei" e o contador do menu. As etapas "Aguardando o RH" e "Aguardando a liderança" e os campos da decisão da liderança ficaram na tabela do CRM, sem uso. Um item fora da etapa "Aprovada" não aparece no app.
 3. **Feriados:** o RH cadastra o calendário de cada ano em Agenda da equipe → Editar feriados. O cadastro começa pela lista oficial (nacionais da lei, mais os locais de SP e Salvador da Configuração). Depois o RH marca o que não vale ("não considerar", vira dia útil), exclui ou acrescenta (recesso, por exemplo), para todos ou só para quem segue SP ou Salvador. Um ano cadastrado substitui a lista oficial naquele ano, nos prazos do app, nos pedidos de day off e na agenda. O calendário do Bitrix não é lido.
-4. **Notificações:** o sino no topo do menu mostra os pedidos e as decisões dos últimos 30 dias para quem vê:
-   - pedidos de férias e ausências (RH e liderança direta), decisões (liderança e quem pediu);
+4. **Notificações:** o sino no topo do menu mostra os pedidos e os registros dos últimos 30 dias para quem vê:
+   - as ausências registradas pelo RH (a própria pessoa e a liderança direta);
    - solicitações de vaga (RH e coordenação do setor) e de encerramento de contrato (RH);
    - finalistas para avaliar e o calendário de feriados atualizado.
 

@@ -5,7 +5,7 @@
    Fora (aberto direto no navegador) ou com ?demo=1: usa a demonstração em memória.
    Ordem: SDK -> usuário -> configuração/estrutura -> pessoas, departamentos e registros
    (em paralelo) -> vagas e esteira -> contexto -> render. O calendário do Bitrix não é lido (a empresa
-   não usa): feriados pela lei e pelo processo Feriados, ausências pelos pedidos aprovados (04/11/2026).
+   não usa): feriados pela lei e pelo processo Feriados, ausências pelas que o RH registra (04/11/2026).
    ===================================================================================== */
 (function (raiz) {
   "use strict";
@@ -187,8 +187,8 @@
   GP.app = {
     iniciar, verComo,
     marcarTourVisto: function () { if (E.repo) E.repo.gravarPreferencia("gp_tour_visto", "1"); },
-    /** Aviso a pessoas específicas (nunca ao membro: quem chama passa lideranças, coordenações ou RH).
-        Falha no aviso nunca impede a gravação. */
+    /** Aviso a pessoas específicas: lideranças, coordenações ou RH. Ao membro, só sobre o que é dele (a própria
+        ausência registrada pelo RH), nunca sobre os registros de acompanhamento. Falha no aviso nunca impede a gravação. */
     avisar: async function (ids, mensagem) {
       try { await E.repo.notificar((ids || []).filter(Boolean), mensagem); } catch (e) { console.warn("Aviso não enviado:", e); }
     },

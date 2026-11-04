@@ -244,25 +244,25 @@
       dataDesejada: "2026-10-23", reposicao: "Sem reposição", apoioRH: "Sim", primeiraVerificacao: "Aceita na 1ª verificação", enviadaRHEm: "2026-10-05",
     });
 
-    /* Férias e ausências (Políticas de Férias e Ausências): um de cada situação */
-    const pedido = (resp, lid, base) => add("ferias", Object.assign({ titulo: base.tipo + " · " + nomeDe(resp), responsavel: resp, lideranca: lid, autor: resp,
-      regrasLidasEm: base.criadoEm, emailEnviadoEm: base.criadoEm }, base));
-    pedido("100", "3", { id: "300", tipo: "Férias", inicio: "2026-12-07", fim: "2026-12-21", dias: 15, estagio: "NEW", criadoEm: "2026-10-07T09:30:00-03:00",
-      cobertura: "Bruno acompanha os protocolos da carteira; os casos novos esperam a volta." });
-    pedido("101", "3", { id: "301", tipo: "Day off", motivoDayOff: "Aniversário", inicio: "2026-11-13", fim: "2026-11-13", dias: 1, estagio: "AG_LIDERANCA", criadoEm: "2026-10-05T16:00:00-03:00",
-      rhDecisao: "Aprovada", rhEm: "2026-10-07T15:00:00-03:00", rhComentario: "Dentro do mês do aniversário." });
-    pedido("110", "4", { id: "302", tipo: "Férias", inicio: "2026-10-19", fim: "2026-11-02", dias: 15, estagio: "SUCCESS", criadoEm: "2026-08-10T10:00:00-03:00",
-      cobertura: "Júlia assume a carteira tributária.", rhDecisao: "Aprovada", rhEm: "2026-08-11T11:00:00-03:00", liderancaDecisao: "Aprovada", liderancaEm: "2026-08-12T09:00:00-03:00" });
-    // aprovados há mais de 30 dias (fora do sino): são as ausências da agenda da equipe da Carla
-    const aprovado = (resp, lid, id, tipo, inicio, fim) => pedido(resp, lid, { id, tipo, inicio, fim, dias: calc.diffDias(inicio, fim) + 1, estagio: "SUCCESS", criadoEm: "2026-08-03T10:00:00-03:00",
-      cobertura: "Combinado com a equipe.", justificativa: "Período combinado com a liderança.", rhDecisao: "Aprovada", rhEm: "2026-08-04T10:00:00-03:00", liderancaDecisao: "Aprovada", liderancaEm: "2026-08-05T10:00:00-03:00" });
-    aprovado("101", "3", "310", "Pausa contratual", "2026-10-13", "2026-10-16");
-    aprovado("102", "3", "311", "Pausa contratual", "2026-11-09", "2026-11-13");
-    aprovado("3", "2", "312", "Férias", "2026-12-26", "2027-01-02");
-    aprovado("105", "3", "313", "Férias", "2026-12-28", "2027-01-05");
-    aprovado("103", "3", "314", "Pausa contratual", "2026-12-30", "2027-01-01");
-    pedido("111", "4", { id: "303", tipo: "Pausa contratual", inicio: "2026-11-23", fim: "2026-11-27", dias: 5, estagio: "FAIL", criadoEm: "2026-09-20T10:00:00-03:00",
-      justificativa: "Mudança de cidade.", cobertura: "Kátia cobre os pareceres.", canceladaEm: "2026-09-22T10:00:00-03:00" });
+    /* Férias e ausências: o pedido e a decisão vão por e-mail, e o RH (Helena) registra a ausência aprovada */
+    const ausencia = (resp, lid, base) => add("ferias", Object.assign({ titulo: base.tipo + " · " + nomeDe(resp), responsavel: resp, lideranca: lid, autor: "6",
+      estagio: "SUCCESS", rhDecisao: "Aprovada", rhEm: base.criadoEm }, base));
+    // registradas nos últimos 30 dias: entram no sino da Carla (a liderança) e de quem sai
+    ausencia("100", "3", { id: "300", tipo: "Férias", inicio: "2026-12-07", fim: "2026-12-21", dias: 15, criadoEm: "2026-10-07T09:30:00-03:00",
+      justificativa: "Bruno acompanha os protocolos da carteira; os casos novos esperam a volta." });
+    ausencia("101", "3", { id: "301", tipo: "Day off", motivoDayOff: "Aniversário", inicio: "2026-11-13", fim: "2026-11-13", dias: 1, criadoEm: "2026-10-05T16:00:00-03:00" });
+    ausencia("110", "4", { id: "302", tipo: "Férias", inicio: "2026-10-19", fim: "2026-11-02", dias: 15, criadoEm: "2026-08-12T09:00:00-03:00",
+      justificativa: "Júlia assume a carteira tributária." });
+    // registradas há mais de 30 dias (fora do sino): são as ausências da agenda da equipe da Carla
+    const antiga = (resp, lid, id, tipo, inicio, fim) => ausencia(resp, lid, { id, tipo, inicio, fim, dias: calc.diffDias(inicio, fim) + 1, criadoEm: "2026-08-05T10:00:00-03:00" });
+    antiga("101", "3", "310", "Pausa contratual", "2026-10-13", "2026-10-16");
+    antiga("102", "3", "311", "Pausa contratual", "2026-11-09", "2026-11-13");
+    antiga("3", "2", "312", "Férias", "2026-12-26", "2027-01-02");
+    antiga("105", "3", "313", "Férias", "2026-12-28", "2027-01-05");
+    antiga("103", "3", "314", "Pausa contratual", "2026-12-30", "2027-01-01");
+    // um pedido do fluxo de aprovação anterior, em outra etapa: fica fora da agenda e das telas
+    ausencia("111", "4", { id: "303", tipo: "Pausa contratual", inicio: "2026-11-23", fim: "2026-11-27", dias: 5, estagio: "FAIL", autor: "111", criadoEm: "2026-09-20T10:00:00-03:00",
+      justificativa: "Mudança de cidade.", rhDecisao: "", rhEm: "", canceladaEm: "2026-09-22T10:00:00-03:00" });
 
     /* Onboarding */
     add("onboarding", {
