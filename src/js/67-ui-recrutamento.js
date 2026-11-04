@@ -2,15 +2,18 @@
    TELAS — Recrutamento (3.1): solicitar vaga, acompanhar e avaliar finalistas
    -------------------------------------------------------------------------------------
    As vagas vêm do funil de negócios "HR | Requisição de Vagas" (categoria 77), criado em
-   07/10/2026 com o formulário CRM 259. A liderança vê as vagas que pediu (pelo e-mail do
-   solicitante), a coordenação as do setor e o RH todas. O funil de R&S está em criação:
-   quando existir, só a categoria muda em Configuração.
+   07/10/2026. Desde 04/11/2026 a Solicitação de Contratação é feita aqui no app (antes era
+   o formulário CRM 259): as mesmas perguntas, e o card nasce em "Nova solicitação". A
+   liderança vê as vagas que pediu (pelo e-mail do solicitante), a coordenação as do setor
+   e o RH todas. O funil de R&S está em criação: quando existir, só a categoria muda em
+   Configuração.
    ===================================================================================== */
 (function (raiz) {
   "use strict";
   const GP = raiz.GP;
   const { esc, icone, plural } = GP.util;
   const calc = GP.calc, dom = GP.dominio, ui = GP.ui, c = GP.ui.c;
+  const F = GP.formularios;
   const E = () => ui.estado;
   const op = GP.schema.OPCOES;
 
@@ -23,13 +26,12 @@
     const fechadas = vagas.filter((v) => v.fechada);
     const fin = (ctx.registros.finalistas || []).filter((f) => E().visao === "rh" || f.lideranca === E().eu.id);
     const finPend = fin.filter((f) => ["NEW", "ATRASADO"].indexOf(f.estagio) >= 0);
-    const links = (E().config && E().config.links) || {};
     const formal = dom.papeis(ctx, E().eu.id).enviaFormal;
     const erroVagas = ctx.vagas && ctx.vagas.erro;
     let h = c.cabecalho("recrutamento", "Recrutamento", "<span><b>" + abertas.length + "</b> vaga(s) em aberto</span><span><b>" + finPend.length + "</b> finalista(s) para avaliar</span>",
-      links.formVaga ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(links.formVaga) + '">' + icone("mais", 15) + " Solicitar vaga</a>" : "");
-    h += '<div class="aviso-info" style="margin-bottom:16px">' + (E().visao === "rh" ? "Pedidos do RH entram direto no funil de vagas." : formal ? "Como coordenação, a sua solicitação vai direto ao RH." : "A solicitação de uma liderança direta vai primeiro para a coordenação, que aprova e envia ao RH.") +
-      " O formulário abre dentro do Bitrix, com você identificada pelo login.</div>";
+      '<button class="btn" data-acao="solicitar-vaga">' + icone("mais", 15) + " Solicitar vaga</button>");
+    h += '<div class="aviso-info" style="margin-bottom:16px">A solicitação cria o card no funil HR | Requisição de Vagas, em "Nova solicitação", e avisa o RH. ' +
+      (E().visao === "rh" ? "O RH também pode registrar um pedido por aqui." : formal ? "Como coordenação, a sua solicitação vai direto ao RH." : "Antes de enviar, alinhe com a sua coordenação a necessidade, o escopo, a senioridade, o perfil e a prioridade da vaga. Ela recebe um aviso quando você envia.") + "</div>";
     if (erroVagas) h += '<div class="aviso-atencao" style="margin-bottom:16px">Não foi possível ler o funil de vagas: ' + esc(erroVagas) + ". O TI precisa dar à função Liderança acesso de leitura ao funil \"HR | Requisição de Vagas\".</div>";
     // Alerta vermelho do RH: solicitações que ainda estão em "Nova solicitação" (reunião de 29/10/2026)
     const novas = E().visao === "rh" ? vagas.filter((v) => v.nova) : [];
@@ -74,5 +76,51 @@
       if (d.parecer === "Quero conversar com o RH antes") await GP.app.avisarRH("A liderança quer conversar antes de seguir com a finalista " + (item.candidato || "") + ". Agende a conversa.");
       else await GP.app.avisarRH("Parecer da liderança registrado para a finalista " + (item.candidato || "") + ".");
     }, { mensagem: "Parecer registrado. O RH segue com a próxima etapa." });
+  };
+
+  /* ---------------- Solicitação de Contratação (o antigo formulário CRM 259, agora no app) ---------------- */
+  let inicial = {}; // respostas iniciais do formulário aberto: o aviso à coordenação só sai se ela não foi trocada
+  ui.acoes["solicitar-vaga"] = function () {
+    const ctx = E().ctx, eu = E().eu;
+    inicial = F.inicialVaga(ctx, eu.id);
+    // já lê os campos do funil enquanto a pessoa preenche (a leitura é grande: todos os campos de negócio do portal)
+    if (E().repo.camposNegocio) E().repo.camposNegocio().catch((e) => console.warn("Campos do funil não lidos:", e));
+    ui.abrirPainel({
+      titulo: "Solicitar vaga", largo: true,
+      sub: "Solicitação de Contratação. O card nasce no funil HR | Requisição de Vagas, em \"Nova solicitação\", e o RH recebe o aviso.",
+      corpo: '<div id="form-vaga"><p class="desc-form">' + esc(F.VAGA.descricao) + "</p>" +
+        '<div class="aviso-info" style="margin-bottom:14px">Enviada em nome de <b>' + esc(eu.nome) + "</b>" + (eu.email ? " (" + esc(eu.email) + ")" : "") + ". É por esse e-mail que a vaga aparece para você aqui no Recrutamento.</div>" +
+        GP.ui.formulario.html(F.VAGA, inicial, { min: { UF_CRM_RV_DATA_ENT: ctx.hoje } }) + "</div>",
+      rodape: '<button class="btn" data-acao="enviar-vaga">Enviar ao RH</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+      aoAbrir: (el) => GP.ui.formulario.ligar(el.querySelector("#form-vaga"), F.VAGA),
+    });
+  };
+  ui.acoes["enviar-vaga"] = function (el) {
+    const FU = GP.ui.formulario;
+    const f = document.getElementById("form-vaga");
+    const r = FU.aplicar(f, F.VAGA);
+    if (!FU.validar(f, F.VAGA, r)) return;
+    const ctx = E().ctx, eu = E().eu;
+    if (r.UF_CRM_RV_DATA_ENT < ctx.hoje) { ui.erroNoPainel("A data desejada de entrada não pode ficar no passado."); return; }
+    const cfg = E().config || {};
+    const categoria = Number((cfg.recrutamento || {}).categoria) || 77;
+    const responsavel = FU.responsavelDoFunil("recrutamento");
+    const campos = Object.assign(F.camposDoNegocio(F.VAGA, r), { UF_CRM_RV_EMAIL: eu.email || "" });
+    const vaga = r.UF_CRM_RV_VAGA.trim();
+    const titulo = vaga + " · " + (r.UF_CRM_RV_DEPTO || r.UF_CRM_RV_SETOR).trim();
+    // a coordenação recebe o aviso se continua a da estrutura (se a pessoa trocou o nome, o app não sabe quem é)
+    const coord = inicial.coordenacaoId && inicial.coordenacaoId !== String(eu.id) && r.UF_CRM_RV_COORD.trim() === inicial.UF_CRM_RV_COORD ? inicial.coordenacaoId : "";
+    ui.salvar(el, async () => {
+      const neg = await FU.enviarCard({ categoria, titulo, campos, responsavel, nomeFunil: "HR | Requisição de Vagas" });
+      // a vaga entra em "Vagas em andamento" sem recarregar
+      const vagas = ctx.vagas = ctx.vagas || { etapas: [], negocios: [], historico: [] };
+      vagas.negocios = vagas.negocios || [];
+      vagas.negocios.unshift(F.negocioLocal({ id: neg.id, titulo, estagio: neg.estagio || ((vagas.etapas || [])[0] || {}).id || "", agora: new Date().toISOString(), campos }));
+      await GP.app.avisarRH("Nova solicitação de vaga no funil HR | Requisição de Vagas: " + vaga + " (" + (r.UF_CRM_RV_SETOR || r.UF_CRM_RV_DEPTO).trim() + "), pedida por " + eu.nome + ".");
+      if (coord && !dom.papeis(ctx, coord).rh) await GP.app.avisar([coord], eu.nome + " enviou ao RH a solicitação de vaga \"" + vaga + "\". Ela está no funil HR | Requisição de Vagas.");
+      if (neg.avisos.length) ui.avisar("Vaga enviada ao RH (card " + neg.id + "), mas " + neg.avisos.join("; ") + ".", "erro");
+      else ui.avisar("Vaga enviada ao RH. Ela aparece em Vagas em andamento.");
+      return neg;
+    }, { rotuloOcupado: "Enviando..." });
   };
 })(window);

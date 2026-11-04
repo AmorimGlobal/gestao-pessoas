@@ -614,13 +614,15 @@
   }
 
   /* ================================================================ offboarding pelo funil de negócios (29/10/2026) */
-  // Formulário da Luciele (03/11/2026): estas justificativas pedem no mínimo 2 registros de feedback anexados
+  // Formulário da Luciele (03/11/2026): estas justificativas pedem no mínimo 2 registros de feedback estruturado
   const PEDE_FEEDBACKS = /desempenho|incompatibilidade/i;
+  // Card criado pelo formulário do app (04/11/2026): ORIGINATOR_ID = isto, ORIGIN_ID = o item do Membros
+  const ORIGEM_APP = "gestao-pessoas";
   const emLista = (v) => (Array.isArray(v) ? v : v === undefined || v === null || v === "" || v === false ? [] : [v]);
   const comOutro = (v, outro) => (v === "Outro" && outro ? "Outro: " + outro : v);
-  /** Solicitações do funil "HR | Offboarding", que nascem do formulário CRM "Solicitação de Encerramento
-      de Contrato". ctx.offboarding vem no mesmo formato das vagas ({etapas, negocios}); as listas já
-      chegam com o texto da opção. */
+  /** Solicitações do funil "HR | Offboarding". Desde 04/11/2026 nascem do formulário do app, que copia os
+      feedbacks SCI do membro para a timeline do card; as antigas vieram do formulário CRM, só com anexos.
+      ctx.offboarding vem no mesmo formato das vagas ({etapas, negocios}); as listas já chegam com o texto da opção. */
   function solicitacoesOffboarding(ctx) {
     const v = ctx.offboarding || { etapas: [], negocios: [] };
     const abertas = (v.etapas || []).filter((e) => !e.semantica);
@@ -630,14 +632,17 @@
       const concluida = etapa.semantica === "S";
       const motivo = n.UF_CRM_OFF_MOTIVO || "";
       const anexos = emLista(n.UF_CRM_OFF_ANEXOS).length;
+      const membroId = n.ORIGINATOR_ID === ORIGEM_APP && n.ORIGIN_ID ? String(n.ORIGIN_ID) : "";
+      // feedbacks SCI de desenvolvimento do membro: estão na timeline do card (o app copiou na criação)
+      const sci = membroId && ctx.idx.membro[membroId] ? feedbacksDo(ctx, membroId).filter((f) => calc.ehFeedbackDesenvolvimento(f.tipo)).length : 0;
       return {
-        id: String(n.ID), titulo: n.TITLE || "", membro: n.UF_CRM_OFF_MEMBRO || n.TITLE || "",
+        id: String(n.ID), titulo: n.TITLE || "", membro: n.UF_CRM_OFF_MEMBRO || n.TITLE || "", membroId, doApp: !!membroId,
         // "Coordenação e Liderança" no formulário: quem pede
         solicitante: n.UF_CRM_OFF_SOLICIT || "",
         email: String(n.UF_CRM_OFF_EMAIL || "").toLowerCase(), setor: n.UF_CRM_OFF_SETOR || "",
         // motivo: a opção marcada, para contar no histórico; motivoTexto: com o "Outro" escrito
         motivo, motivoTexto: comOutro(motivo, n.UF_CRM_OFF_MOT_OUT),
-        feedbacksFormais: n.UF_CRM_OFF_FEEDBACKS || "", anexos, faltamFeedbacks: PEDE_FEEDBACKS.test(motivo) && anexos < 2,
+        feedbacksFormais: n.UF_CRM_OFF_FEEDBACKS || "", anexos, sci, faltamFeedbacks: PEDE_FEEDBACKS.test(motivo) && anexos + sci < 2,
         sucessor: n.UF_CRM_OFF_SUCESSOR || "", novaContratacao: n.UF_CRM_OFF_REPOSICAO || "",
         riscos: emLista(n.UF_CRM_OFF_RISCOS).map((r) => comOutro(r, n.UF_CRM_OFF_RISCO_OUT)),
         etapa: etapa.nome, etapaId: etapa.id, semantica: etapa.semantica || "", posicao: pos >= 0 ? pos + 1 : null, totalEtapas: abertas.length,
@@ -1007,7 +1012,7 @@
   }
 
   return {
-    MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE, DESEMPENHO_ATIVO, TIPOS_FEEDBACK_REGISTRO,
+    MOTIVOS_COM_TRAVA, MOTIVOS_ABREVIADOS, MOTIVO_GRAVE, MSG_TRAVA, MSG_JUSTIFICATIVA, ESTAGIO_FASE, DESEMPENHO_ATIVO, TIPOS_FEEDBACK_REGISTRO, ORIGEM_APP,
     indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, deptoPrincipal, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancaNaEstrutura, coordenacaoNaEstrutura, liderancaEfetiva, coordenacaoEfetiva, liderancasDoSetor, membrosVisiveis,
     feriadosDe, feriadosDoMembro, feedbackValido, feedbacksDo, editavel, ultimoFeedback,
     cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,

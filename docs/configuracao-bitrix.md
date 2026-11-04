@@ -135,8 +135,9 @@ Configure em CRM → Configurações → Permissões. Para cada um dos 10 proces
 
 Mais três permissões:
 
-- **Funil 77 (HR \| Requisição de Vagas):** a Liderança precisa de **leitura** para a aba Recrutamento mostrar as vagas que ela pediu. O app filtra pelo e-mail do solicitante (`UF_CRM_RV_EMAIL`).
-- **Funil 79 (HR \| Offboarding):** o RH precisa de leitura e edição. A Liderança e a Coordenação **não** recebem acesso: as solicitações são sensíveis, e quem pede usa só o formulário.
+- **Funil 77 (HR \| Requisição de Vagas):** a Liderança e a Coordenação precisam de **Ler** para a aba Recrutamento mostrar as vagas que pediram (o app filtra pelo e-mail do solicitante, `UF_CRM_RV_EMAIL`), e de **Adicionar** e **Editar** com "Próprios" para o formulário de vaga do app criar o card (04/11/2026).
+- **Funil 79 (HR \| Offboarding):** o RH precisa de leitura e edição ("Todos"). A Liderança e a Coordenação recebem só **Ler, Adicionar e Editar com "Próprios"**: é o que o formulário de encerramento do app precisa para criar o card, gravar o histórico na timeline e passar o card ao RH. Depois disso o card não é mais "próprio" de quem pediu, e ela deixa de vê-lo. As solicitações são sensíveis: não dê "Todos" nem "Do departamento" às lideranças neste funil.
+- **Como o formulário do app grava (04/11/2026):** o card nasce com quem pede como responsável (por isso o "Próprios" basta), recebe os comentários do histórico e passa para o responsável do funil (Configuração → Parâmetros; vazio, a primeira pessoa do RH em Papéis). Sem a permissão, o app mostra o que liberar e não perde o que foi digitado.
 - **CEO:** **nenhuma** permissão nos 9 processos. O painel dela é calculado no servidor (`api/painel.js`), que devolve só números. Para ligar, grave na Vercel:
   - `GP_CEO_IDS` com o ID de usuário da CEO;
   - `GP_CATEGORIA_VAGAS`, opcional (padrão 77), para o tempo de preenchimento de vaga.
@@ -258,7 +259,7 @@ Decisão da reunião de 29/10/2026: o novo membro recebe por e-mail a Ficha da f
 
 Depois de gravar, faça um Redeploy e confira a linha "E-mail: Ficha do onboarding" em Configuração → Rotinas no servidor.
 
-**E-mails dos funis de vagas (77) e de offboarding (79):** saíram do app em 30/10/2026. O usuário configura nas regras de automação de cada funil, no próprio Bitrix: um robô "Enviar e-mail" para o e-mail de quem pediu (`UF_CRM_RV_EMAIL` / `UF_CRM_OFF_EMAIL`) na etapa de entrada e em cada etapa que deve avisar, e um robô "Notificação" para o RH na entrada. Os campos `UF_CRM_RV_ULT_AVISO` e `UF_CRM_OFF_ULT_AVISO`, que serviam de controle aos e-mails do app, não são mais usados: podem ficar ou ser apagados. Em 03/11/2026 as listas "Justificativa" (`UF_CRM_OFF_MOTIVO`) e "Será necessária nova contratação?" (`UF_CRM_OFF_REPOSICAO`) trocaram de opções: robô com condição numa opção antiga precisa ser refeito. O webhook de saída da seção 7 não precisa dos eventos de negócio (ONCRMDEAL*): se chegarem, são ignorados.
+**E-mails dos funis de vagas (77) e de offboarding (79):** saíram do app em 30/10/2026. O usuário configura nas regras de automação de cada funil, no próprio Bitrix: um robô "Enviar e-mail" para o e-mail de quem pediu (`UF_CRM_RV_EMAIL` / `UF_CRM_OFF_EMAIL`) na etapa de entrada e em cada etapa que deve avisar, e um robô "Notificação" para o RH na entrada. Desde 04/11/2026 o formulário do app já avisa o RH e a coordenação quando cria o card, e o próprio Bitrix avisa o RH quando o card passa para ele: o robô de notificação na entrada ficou opcional. Os campos `UF_CRM_RV_ULT_AVISO` e `UF_CRM_OFF_ULT_AVISO`, que serviam de controle aos e-mails do app, não são mais usados: podem ficar ou ser apagados. Em 03/11/2026 as listas "Justificativa" (`UF_CRM_OFF_MOTIVO`) e "Será necessária nova contratação?" (`UF_CRM_OFF_REPOSICAO`) trocaram de opções: robô com condição numa opção antiga precisa ser refeito. O webhook de saída da seção 7 não precisa dos eventos de negócio (ONCRMDEAL*): se chegarem, são ignorados.
 
 ## 10. Reunião de 29/10/2026: o que muda no Bitrix
 
@@ -269,14 +270,16 @@ O relatório da reunião (`Relatório.docx`) mudou o escopo do app. O que precis
    - etapas: Nova solicitação, Aguardando coordenação, Em análise (RH), Aprovada, Conversa realizada, Pós-encerramento, Concluída (ganho) e Cancelada (perda);
    - os campos `UF_CRM_OFF_*` seguem, desde 03/11/2026, o formulário "Solicitação de Encerramento de Contrato" da Luciele. São as perguntas dela, um campo por pergunta (justificativa, feedbacks formais e anexos, sucessor, nova contratação, riscos), mais a data efetiva e o motivo de saída, que só o RH preenche. Os campos da primeira versão sem pergunta no formulário (`OFF_PAPEL`, `OFF_CONTRATO`, `OFF_PLANO`, `OFF_APOIO_RH`, `OFF_ULT_AVISO`) ficaram no portal, fora do formulário e do card;
    - os negócios novos ficam com o RH como responsável.
-3. **Formulário de offboarding:** o script está pronto em `amorim-api/offboarding-bitrix/form-console.txt` (a ordem completa está no README de lá):
-   - um administrador cola o script no console do Bitrix (F12), e o formulário nasce desativado;
-   - ative em CRM → Formulários e faça um envio de teste;
-   - cole o link `/pub/form.php?...` em Configuração → Links → "Formulário de solicitação de encerramento".
+3. **Formulários de vaga e de encerramento no próprio app (04/11/2026).** Pedido do usuário: os dois formulários saíram do Bitrix e são feitos dentro do app, com as mesmas perguntas (`src/js/52-formularios.js`):
+   - **Recrutamento → "Solicitar vaga"**: a Solicitação de Contratação (o antigo formulário CRM 259). O card nasce no funil 77, em "Nova solicitação". O app preenche quem pede pelo login (e-mail, nome, departamento, setor e coordenação).
+   - **Offboarding → "Solicitar encerramento"**: a Solicitação de Encerramento de Contrato da Luciele. O card nasce na esteira (funil 79), e o app copia para a **timeline do card** o histórico do membro: os feedbacks SCI, os 1:1 mensais e os planos de melhoria (quando há). O membro é escolhido na equipe, e a área, a coordenação, a liderança e o cargo vêm preenchidos.
+   - **A regra dos 2 registros** (desempenho abaixo da média ou incompatibilidade com a função) conta os feedbacks SCI de desenvolvimento do app mais os arquivos anexados. A liderança não envia sem os registros; o RH pode enviar mesmo assim, com confirmação. Na esteira, os cards criados pelo app (origem `gestao-pessoas`, com o item do Membros em `ORIGIN_ID`) contam os feedbacks SCI do membro.
+   - **Diferenças em relação aos formulários do Bitrix:** a pergunta "sem sucessor nem previsão de nova contratação" aparece com as duas condições (o Bitrix só aceitava uma); "Riscos" ganhou a opção "Nenhum desses pontos", que deixa o campo vazio no card (a pergunta da Luciele é obrigatória e não tinha essa saída).
+   - **Não precisa mais:** o script do console (`amorim-api/offboarding-bitrix/form-console.txt`) e os links em Configuração → Links. O formulário CRM 259 pode ser desativado em CRM → Formulários, para não haver duas entradas.
+   - **Permissões:** seção 4 (funis 77 e 79).
 
-   Sem o link, a aba Offboarding continua com a solicitação pelo app. Com ele, o botão abre o formulário.
-   Na esteira, o app avisa o RH quando a justificativa é "Desempenho abaixo da média" ou "Incompatibilidade com a função" e vieram menos de 2 registros de feedback anexados. Também mostra os pontos marcados em "Riscos".
-4. **Alerta vermelho do RH:** o menu mostra quantas solicitações novas aguardam o RH no Recrutamento (vagas em "Nova solicitação" no funil 77) e no Offboarding (cards em "Nova solicitação" no funil 79 e solicitações do app em "Enviada ao RH"). O alerta some quando o card sai da primeira etapa.
+   As solicitações do fluxo anterior do app (processo "Encerramentos de contrato") ficam na aba Offboarding só para consulta; um rascunho antigo é enviado pelo formulário novo.
+4. **Alerta vermelho do RH:** o menu mostra quantas solicitações novas aguardam o RH no Recrutamento (vagas em "Nova solicitação" no funil 77) e no Offboarding (cards em "Nova solicitação" no funil 79 e solicitações do fluxo anterior do app em "Enviada ao RH"). O alerta some quando o card sai da primeira etapa.
 5. **Robôs da seção 6 que deixaram de valer:**
    - "Planejar as 2 entregas" (Dia 15 do onboarding): o onboarding não cria mais tarefas;
    - os de "Evidências" do Ciclo: a avaliação de desempenho saiu do app até 2027;

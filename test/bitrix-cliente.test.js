@@ -74,3 +74,44 @@ test("navegador: descobre os processos, grava e lê um item com lista, pessoa, d
   assert.equal(c.anterior1, "Cumprido");
   assert.ok(repo.estrutura().ciclo.campos.data1a1.indexOf("ufCrm_") === 0, repo.estrutura().ciclo.campos.data1a1);
 });
+
+test("navegador: o formulário cria o card de negócio com as listas pelo texto, os anexos e a origem", async () => {
+  const bx = criarBitrixFalso({ camposNegocio: [
+    { fieldName: "UF_CRM_OFF_MEMBRO", type: "string" },
+    { fieldName: "UF_CRM_OFF_MOTIVO", type: "enumeration", items: [{ ID: "226203", VALUE: "Desempenho abaixo da média" }, { ID: "226183", VALUE: "Outro" }] },
+    { fieldName: "UF_CRM_OFF_RISCOS", type: "enumeration", multiple: true, items: [{ ID: "226223", VALUE: "Clientes estratégicos" }, { ID: "226225", VALUE: "Projetos críticos" }] },
+    { fieldName: "UF_CRM_OFF_ANEXOS", type: "file", multiple: true },
+    { fieldName: "UF_CRM_OFF_DATA_DES", type: "date" },
+  ] });
+  const GP = carregarApp(bx.chamar);
+  const repo = GP.bitrix.criarRepositorio();
+  const n = await repo.criarNegocio({
+    categoria: 79, titulo: "Encerramento · Igor Santos", responsavel: "4", restrito: true, origem: { sistema: "gestao-pessoas", id: "7" },
+    campos: { UF_CRM_OFF_MEMBRO: "Igor Santos", UF_CRM_OFF_MOTIVO: "Desempenho abaixo da média", UF_CRM_OFF_RISCOS: ["Projetos críticos"], UF_CRM_OFF_ANEXOS: [["registro.pdf", "QUJD"]], UF_CRM_OFF_DATA_DES: "2026-10-30" },
+  });
+  assert.equal(n.estagio, "C79:NEW"); // sem estágio no pedido: a primeira etapa do funil
+  const card = JSON.parse(JSON.stringify(bx.estado.negocios[0])); // (objeto de outro contexto do vm)
+  assert.equal(card.title, "Encerramento · Igor Santos");
+  assert.equal(card.categoryId, 79);
+  assert.equal(card.assignedById, 4);
+  assert.equal(card.opened, "N");
+  assert.equal(card.originatorId, "gestao-pessoas");
+  assert.equal(card.originId, "7");
+  assert.equal(card.ufCrmOffMembro, "Igor Santos");
+  assert.equal(card.ufCrmOffMotivo, 226203); // o texto vira o ID da opção
+  assert.deepEqual(card.ufCrmOffRiscos, [226225]);
+  assert.deepEqual(card.ufCrmOffAnexos, [["registro.pdf", "QUJD"]]);
+  assert.equal(card.ufCrmOffDataDes, "2026-10-30");
+  // o histórico entra na timeline e depois o card passa para o RH
+  await repo.comentarNegocio(n.id, "[B]Feedbacks SCI de Igor Santos[/B]");
+  await repo.passarNegocio(n.id, "16117");
+  assert.equal(bx.estado.negocios[0].assignedById, 16117);
+  assert.equal(bx.estado.comentarios[0].ENTITY_TYPE, "deal");
+  assert.equal(bx.estado.comentarios[0].ENTITY_ID, Number(n.id));
+  // a leitura dos campos do negócio é uma só (é grande no portal: 800 campos)
+  assert.equal(bx.estado.chamadas.filter((c) => c.metodo === "crm.item.fields").length, 1);
+  // opção ou campo que o Bitrix não tem: nada é criado, e a mensagem diz o quê
+  await assert.rejects(repo.criarNegocio({ categoria: 79, titulo: "x", responsavel: "4", campos: { UF_CRM_OFF_MOTIVO: "Motivo novo", UF_CRM_OFF_XYZ: "a" } }),
+    (e) => /opção "Motivo novo" em UF_CRM_OFF_MOTIVO/.test(e.descricao) && /campo UF_CRM_OFF_XYZ/.test(e.descricao));
+  assert.equal(bx.estado.negocios.length, 1);
+});

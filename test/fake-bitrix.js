@@ -1,5 +1,7 @@
 // Bitrix24 em memória: os métodos do provisionamento e, por cima da estrutura criada por ele,
 // itens (crm.item.*), comentários, avisos, usuários e departamentos.
+// Negócios (entityTypeId 2): os campos vêm de o.camposNegocio [{fieldName, type, multiple, items}],
+// e os cards criados ficam em estado.negocios.
 // Responde no mesmo formato da API (result/next), via chamar(metodo, params) -> {dados, proximo}.
 const { camelDoCampo } = require("../src/js/20-schema.js");
 
@@ -13,6 +15,7 @@ function criarBitrixFalso(opcoes) {
     solucoes: [],
     chamadas: [],
     itens: {},       // eti -> [item no formato do crm.item.get]
+    negocios: [],    // cards de negócio (entityTypeId 2) no formato do crm.item.get
     comentarios: [], // {ENTITY_TYPE, ENTITY_ID, COMMENT}
     avisos: [],      // {USER_ID, MESSAGE}
     usuarios: o.usuarios || [],         // formato do user.get
@@ -118,6 +121,11 @@ function criarBitrixFalso(opcoes) {
       }
       /* ---------- itens ---------- */
       case "crm.item.fields": {
+        if (Number(params.entityTypeId) === 2) {
+          const fields = { title: { type: "string", upperName: "TITLE" }, categoryId: { type: "crm_category", upperName: "CATEGORY_ID" }, assignedById: { type: "user", upperName: "ASSIGNED_BY_ID" } };
+          (o.camposNegocio || []).forEach((f) => { fields[camelDoCampo(f.fieldName)] = { type: f.type, isMultiple: !!f.multiple, upperName: f.fieldName, items: f.items }; });
+          return { dados: { fields }, proximo: null };
+        }
         const t = tipoPorEti(params.entityTypeId);
         const fields = {};
         estado.campos.filter((f) => t && f.entityId === "CRM_" + t.id).forEach((f) => {
@@ -137,6 +145,12 @@ function criarBitrixFalso(opcoes) {
         return { dados: { item: Object.assign({}, it) }, proximo: null };
       }
       case "crm.item.add": {
+        if (Number(params.entityTypeId) === 2) {
+          // como no portal: sem stageId, o card nasce na primeira etapa do funil
+          const n = Object.assign({ id: proxItem++, stageId: "C" + params.fields.categoryId + ":NEW", createdTime: estado.agora }, params.fields);
+          estado.negocios.push(n);
+          return { dados: { item: Object.assign({}, n) }, proximo: null };
+        }
         const t = tipoPorEti(params.entityTypeId);
         const cat = estado.categorias[params.entityTypeId][0];
         const primeiro = estado.status.filter((x) => x.ENTITY_ID === "DYNAMIC_" + t.entityTypeId + "_STAGE_" + cat.id).sort((a, b) => a.SORT - b.SORT)[0];
@@ -145,6 +159,12 @@ function criarBitrixFalso(opcoes) {
         return { dados: { item: Object.assign({}, it) }, proximo: null };
       }
       case "crm.item.update": {
+        if (Number(params.entityTypeId) === 2) {
+          const n = estado.negocios.find((x) => String(x.id) === String(params.id));
+          if (!n) throw new Error("crm.item.update: NOT_FOUND");
+          Object.assign(n, params.fields);
+          return { dados: { item: Object.assign({}, n) }, proximo: null };
+        }
         const it = (estado.itens[params.entityTypeId] || []).find((x) => String(x.id) === String(params.id));
         if (!it) throw new Error("crm.item.update: NOT_FOUND");
         if (params.fields.stageId && params.fields.stageId !== it.stageId) it.movedTime = estado.agora;

@@ -10,7 +10,7 @@
 (function (raiz) {
   "use strict";
   const GP = raiz.GP;
-  const { esc } = GP.util;
+  const { esc, primeiroNome } = GP.util;
   const calc = GP.calc, dom = GP.dominio, ui = GP.ui, c = GP.ui.c;
   const E = () => ui.estado;
   const op = GP.schema.OPCOES;
@@ -49,12 +49,12 @@
     let h = c.voltar(VOLTA, "Feedbacks") + c.cabecalho("rotinas", "Plano de melhoria de " + m.nome, "<span>" + (s.dia ? "Dia <b>" + s.dia + "</b> de 60" : "") + "</span><span>check-in no Dia 30 (" + calc.fmtData(s.prazoCheckin) + ")</span><span>término " + calc.fmtData(s.termino) + "</span>", acoes);
     h += '<div class="card" style="padding:16px 22px"><div class="barra"><div class="preench ' + (s.cor === "vermelho" ? "vermelho" : "") + '" style="width:' + Math.round(((s.dia || 0) / 60) * 100) + '%"></div><div class="meta" style="left:50%" title="Check-in no Dia 30"></div></div><div class="barra-nota">Dia ' + (s.dia || 0) + " de 60 · " + esc(s.texto) + "</div></div>";
     if (p.estagio === "FAIL") {
+      // solicitação do fluxo anterior do app, se houver; as novas vão pelo formulário de encerramento (04/11/2026)
       const jaTem = (ctx.idx.porMembro.encerramentos[p.membroId] || []).find((e) => e.estagio !== "FAIL");
-      const form = ((E().config || {}).links || {}).formOffboarding;
-      h += '<div class="card acao vermelho"><h3>O plano terminou sem os resultados</h3><p class="muted" style="margin-top:0">O app sugere avaliar o encerramento de contrato. A decisão é da liderança direta, alinhada com a coordenação' +
-        (form ? ", e a solicitação vai pelo formulário de offboarding do Bitrix." : ": se seguir, a solicitação nasce em Rascunho, já com o plano e os feedbacks vinculados, e depois passa pela coordenação.") + "</p>" +
+      h += '<div class="card acao vermelho"><h3>O plano terminou sem os resultados</h3><p class="muted" style="margin-top:0">O app sugere avaliar o encerramento de contrato. A decisão é da liderança direta, alinhada com a coordenação. ' +
+        "Se seguir, o formulário de encerramento abre com " + esc(primeiroNome(m.nome)) + " e a justificativa \"Desempenho abaixo da média\", e o plano, os feedbacks SCI e os 1:1 vão para a timeline do card do RH.</p>" +
         (jaTem ? '<a class="btn sec" href="#/offboarding/encerramento/' + esc(jaTem.id) + '">Abrir a solicitação existente</a>'
-          : form ? '<a class="btn" href="#/offboarding">Ir para o Offboarding</a>' : '<button class="btn" data-acao="encerramento-de-plano" data-id="' + esc(p.id) + '">Avaliar o encerramento</button>') + "</div>";
+          : '<button class="btn" data-acao="solicitar-encerramento" data-membro="' + esc(p.membroId) + '" data-motivo="Desempenho abaixo da média">Solicitar o encerramento</button>') + "</div>";
     }
     return h + planoResumoHtml(p, true);
   }

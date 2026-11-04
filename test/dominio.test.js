@@ -320,3 +320,20 @@ test("offboarding: solicitações da esteira, alerta do RH e histórico por per�
   assert.deepEqual(carla.map((l) => l.desligamentos.map((x) => x.nome)), [["Clara Neves"]]);
   assert.equal(carla[0].solicitacoes, 1); // a da Fernanda, feita pelo app; as da esteira só o RH vê
 });
+
+test("offboarding: card criado pelo formulário do app conta os feedbacks SCI do membro, que estão na timeline", () => {
+  const ctx = comFunil(contexto("6"));
+  const base = { STAGE_ID: "C79:NEW", DATE_CREATE: "2026-10-08T10:00:00-03:00", DATE_MODIFY: "2026-10-08T10:00:00-03:00", UF_CRM_OFF_MOTIVO: "Desempenho abaixo da média" };
+  ctx.offboarding.negocios.push(Object.assign({ ID: "9200", TITLE: "Encerramento · Kátia Moraes", ORIGINATOR_ID: dom.ORIGEM_APP, ORIGIN_ID: "9", UF_CRM_OFF_MEMBRO: "Kátia Moraes" }, base));
+  ctx.offboarding.negocios.push(Object.assign({ ID: "9201", TITLE: "Encerramento · Leonardo Dias", ORIGINATOR_ID: dom.ORIGEM_APP, ORIGIN_ID: "10", UF_CRM_OFF_MEMBRO: "Leonardo Dias", UF_CRM_OFF_ANEXOS: [{ id: 5 }] }, base));
+  const sol = Object.fromEntries(dom.solicitacoesOffboarding(ctx).map((s) => [s.id, s]));
+  assert.equal(sol["9200"].membroId, "9");
+  assert.equal(sol["9200"].sci, 2); // 2 feedbacks de desenvolvimento no app
+  assert.equal(sol["9200"].faltamFeedbacks, false);
+  assert.equal(sol["9201"].sci, 0); // Leonardo só tem reconhecimento
+  assert.equal(sol["9201"].faltamFeedbacks, true); // 1 anexo + 0 SCI
+  // as do formulário CRM antigo (sem origem): só os anexos contam, como antes
+  assert.equal(sol["9101"].doApp, false);
+  assert.equal(sol["9101"].sci, 0);
+  assert.equal(sol["9101"].faltamFeedbacks, true);
+});

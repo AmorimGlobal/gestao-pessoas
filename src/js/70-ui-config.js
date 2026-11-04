@@ -11,10 +11,9 @@
   const calc = GP.calc, dom = GP.dominio, ui = GP.ui, c = GP.ui.c;
   const E = () => ui.estado;
 
+  // Os formulários de vaga e de encerramento são do próprio app desde 04/11/2026: não têm mais link aqui
   const LINKS = [
     ["manual", "Manual da liderança", "Faixa no topo do Início e item do menu."],
-    ["formVaga", "Formulário de solicitação de vaga", "Solicitação de Contratação (formulário CRM 259, funil HR | Requisição de Vagas)."],
-    ["formOffboarding", "Formulário de solicitação de encerramento (offboarding)", "Formulário CRM do funil HR | Offboarding. Com o link, o botão da aba Offboarding abre o formulário; sem ele, a solicitação continua pelo app, com a verificação."],
     ["baseConhecimento", "Base de Conhecimento", "Guias de apoio às lideranças."],
     ["guiaOnboarding", "Guia do onboarding", "Link na aba Onboarding."],
     ["guiaOffboarding", "Guia de offboarding (versão 2)", "Card fechado no topo da aba Offboarding."],
@@ -73,6 +72,8 @@
     h += servidorHtml(cfg);
     // Listas e textos
     const fl = cfg.feriadosLocais || {};
+    const pessoas = (E().ctx.usuarios || []).slice().sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).map((u) => ({ valor: u.id, rotulo: u.nome }));
+    const rh0 = String((((cfg.papeis || {}).rh || [])[0] || {}).id || "");
     h += '<div class="card"><h3>Cadastros</h3><div id="form-config">' +
       c.campo({ nome: "niveis", rotulo: "Níveis da Arquitetura de Cargos", tipo: "textoLongo", valor: (cfg.niveis || []).join("\n"), linhas: 5, ajuda: "Um nível por linha, do primeiro ao último. Usados no O2O (próximo nível) e no card do membro." }) +
       '<div class="linha-campos">' + c.campo({ nome: "feriadosSP", rotulo: "Feriados de São Paulo (estado e cidade)", tipo: "textoLongo", valor: linhasFeriados(fl.SP), linhas: 6, ajuda: "Um por linha: AAAA-MM-DD Nome. O RH atualiza todo dezembro." }) +
@@ -82,7 +83,9 @@
       c.campo({ nome: "carencia1a1", rotulo: "Dias para agendar o O2O antes do vermelho", tipo: "numero", valor: (cfg.parametros || {}).carencia1a1 || 7 }) +
       c.campo({ nome: "prazoLeitura", rotulo: "Prazo da leitura de entrega (dias)", tipo: "numero", valor: (cfg.parametros || {}).prazoLeitura || 7 }) + "</div>" +
       '<div class="linha-campos">' + c.campo({ nome: "categoriaVagas", rotulo: "Funil de vagas (CATEGORY_ID dos negócios)", tipo: "numero", valor: (cfg.recrutamento || {}).categoria || 77, ajuda: "Hoje: HR | Requisição de Vagas (77). Troque quando o funil de R&S existir." }) +
-      c.campo({ nome: "categoriaOffboarding", rotulo: "Funil de offboarding (CATEGORY_ID dos negócios)", tipo: "numero", valor: (cfg.offboarding || {}).categoria || 79, ajuda: "HR | Offboarding (79), criado em 29/10/2026. É a esteira das solicitações de encerramento." }) + "</div></div>" +
+      c.campo({ nome: "categoriaOffboarding", rotulo: "Funil de offboarding (CATEGORY_ID dos negócios)", tipo: "numero", valor: (cfg.offboarding || {}).categoria || 79, ajuda: "HR | Offboarding (79), criado em 29/10/2026. É a esteira das solicitações de encerramento." }) + "</div>" +
+      '<div class="linha-campos">' + c.campo({ nome: "respVagas", rotulo: "Quem fica com as vagas novas", tipo: "lista", opcoes: pessoas, valor: (cfg.recrutamento || {}).responsavel || rh0, opcional: true, ajuda: "Responsável pelo card que o formulário de vaga cria. Vazio: a primeira pessoa do RH em Papéis." }) +
+      c.campo({ nome: "respOffboarding", rotulo: "Quem fica com as solicitações de encerramento", tipo: "lista", opcoes: pessoas, valor: (cfg.offboarding || {}).responsavel || rh0, opcional: true, ajuda: "Responsável pelo card que o formulário de encerramento cria na esteira. Vazio: a primeira pessoa do RH em Papéis." }) + "</div></div>" +
       '<div class="grupo-form"><div class="rotulo-grupo">Glossário de competências comportamentais</div>' +
       c.campo({ nome: "competencias", rotulo: "Competências (uma por linha: Nome: descrição)", tipo: "textoLongo", valor: (cfg.competencias || []).map((x) => x.nome + (x.descricao ? ": " + x.descricao : "")).join("\n"), linhas: 8, opcional: true,
         ajuda: "Aparecem como caixas de marcar no planejamento da função e na Ficha do onboarding. A liderança ainda pode acrescentar outras." }) + "</div>" +
@@ -205,8 +208,8 @@
     cfg.links = cfg.links || {};
     LINKS.forEach((l) => { cfg.links[l[0]] = String(d["link_" + l[0]] || "").trim(); });
     cfg.parametros = { carencia1a1: Number(d.carencia1a1) || 7, prazoLeitura: Number(d.prazoLeitura) || 7 };
-    cfg.recrutamento = { categoria: Number(d.categoriaVagas) || 77 };
-    cfg.offboarding = { categoria: Number(d.categoriaOffboarding) || 79 };
+    cfg.recrutamento = { categoria: Number(d.categoriaVagas) || 77, responsavel: String(d.respVagas || "") };
+    cfg.offboarding = { categoria: Number(d.categoriaOffboarding) || 79, responsavel: String(d.respOffboarding || "") };
     cfg.competencias = lerCompetencias(d.competencias);
     gravarConfig(cfg, el, "Cadastros salvos. Recarregue o app para aplicar os funis.");
   };

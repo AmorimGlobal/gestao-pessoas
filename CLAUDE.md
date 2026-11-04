@@ -8,9 +8,10 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
 
 ## Arquitetura: o servidor só entrega a página
 
-- **Dados:** 10 processos inteligentes nativos ("Gestão de Pessoas · Membros", "· Feedbacks SCI", "· 1:1 mensais", "· Ciclo trimestral", "· Planos de alinhamento de resultados", "· Encerramentos de contrato", "· Onboarding", "· Leituras de entrega", "· Planejamento da função", "· Avaliações de finalistas"), agrupados na solução automatizada "Gestão de Pessoas". Dois funis de negócios são lidos:
-  - **HR | Requisição de Vagas (categoria 77):** as vagas.
-  - **HR | Offboarding (categoria 79, 29/10/2026):** a esteira das solicitações de encerramento, criada por `amorim-api/offboarding-bitrix`. Só o RH lê.
+- **Dados:** 10 processos inteligentes nativos ("Gestão de Pessoas · Membros", "· Feedbacks SCI", "· 1:1 mensais", "· Ciclo trimestral", "· Planos de alinhamento de resultados", "· Encerramentos de contrato", "· Onboarding", "· Leituras de entrega", "· Planejamento da função", "· Avaliações de finalistas"), agrupados na solução automatizada "Gestão de Pessoas". Dois funis de negócios são lidos, e desde 04/11/2026 também recebem os cards dos formulários do app:
+  - **HR | Requisição de Vagas (categoria 77):** as vagas. O "Solicitar vaga" do Recrutamento cria o card.
+  - **HR | Offboarding (categoria 79, 29/10/2026):** a esteira das solicitações de encerramento, criada por `amorim-api/offboarding-bitrix`. Só o RH lê. O "Solicitar encerramento" do Offboarding cria o card e grava na timeline dele o histórico do membro (feedbacks SCI, 1:1 mensais e planos de melhoria).
+- **Formulários de vaga e de encerramento (04/11/2026):** são os antigos formulários CRM do Bitrix (o 259 e o da Luciele), com as mesmas perguntas, feitos no app (`52-formularios.js` + `60-ui-formulario.js`). O card nasce com quem pede como responsável, recebe o histórico e passa ao responsável do funil (Configuração → Parâmetros; vazio, o primeiro do RH). Por isso a liderança precisa de Ler, Adicionar e Editar "Próprios" nos funis 77 e 79 (docs, seção 4). Listas vão pelo texto da opção, que o repositório troca pelo ID lido do `crm.item.fields` do negócio (entityTypeId 2).
 - **Nomes que mudaram na tela (29/10/2026), sem mudar os nomes dos processos:**
   - "1:1 do trimestre" virou **O2O**, e continua no "Ciclo trimestral".
   - O plano de alinhamento virou **plano de melhoria**, e foi para o módulo Feedbacks.
@@ -53,7 +54,9 @@ lib/trava-encerramento.js  trava do encerramento (4.1): decidir() puro + tratar(
 lib/avisos.js         avisos da 4.4: planejar() puro (marcos cruzados desde o dia útil anterior) + enviar()
 api/sincronizar.js, api/avisos.js, api/eventos.js, api/painel.js  funções da Vercel (escritas à mão; crons em vercel.json)
 src/js/50-dominio.js  regras de negócio puras: papéis, equipe, pendências, indicadores, verificação do encerramento, agenda, dicas  [Node + navegador]
+src/js/52-formularios.js as perguntas da Solicitação de Contratação e da Solicitação de Encerramento, condições, regra dos 2 registros, histórico para a timeline  [Node + navegador]
 src/js/60-ui-base.js  estado, rotas (hash), layout, componentes, painel lateral, eventos
+src/js/60-ui-formulario.js formulário a partir da definição (seções, condicionais, grade de níveis) e enviarCard (cria o card, histórico, passa ao RH)
 src/js/61..70-ui-*.js telas: início/painel, equipe/card do membro, feedbacks (63-ui-rotinas: SCI, 1:1 mensal, O2O), plano de melhoria (63-ui-planos), desempenho (fora até 2027), onboarding, offboarding, recrutamento, agenda, exportar CSV do RH (69), configuração
 src/js/90-app.js      inicialização (Bitrix ou demonstração)
 build.js              junta tudo em dist/index.html e gera api/app.js
@@ -67,7 +70,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 122 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 132 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -131,15 +134,15 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - **Vocabulário:** "processo" confundiu o usuário, que entendeu "Processos" do Bitrix (fluxos com grupos e tarefas). Fale em "tabela do CRM (processo inteligente)".
 - **03/11/2026, formulário de offboarding:** a Luciele mandou o dela (Google Forms "Solicitação de Encerramento de Contrato"). Feito:
   - **Funil 79:** os campos `UF_CRM_OFF_*` foram acertados e criados por `criar-funil.js --gravar`, com o card em 5 seções. Os da v1 sem pergunta ficaram no portal, fora do formulário e do card.
-  - **Script do formulário:** `form-console.txt` está gerado. As perguntas "Caso..." só aparecem quando se aplicam.
-  - **App:** a esteira lê os campos novos e avisa quando faltam os 2 registros de feedback anexados. Também mostra os riscos e exporta as colunas novas.
-  - **Falta o usuário:** colar o script no console, ativar e testar o formulário, e pôr o link em Configuração → Links. Enquanto isso, a solicitação continua pelo app.
+  - **App:** a esteira lê os campos novos e avisa quando faltam os 2 registros de feedback. Também mostra os riscos e exporta as colunas novas.
+- **04/11/2026, formulários no app (pedido do usuário):** a Solicitação de Contratação (aba Recrutamento) e a Solicitação de Encerramento de Contrato (aba Offboarding) passaram a ser formulários do próprio app, com as perguntas dos formulários CRM. Cada envio cria o card no funil (77 ou 79). No encerramento, o histórico de feedbacks SCI, 1:1 mensais e planos de melhoria do membro vai para a timeline do card. O script do console de 03/11 e os links de formulário em Configuração deixaram de ser usados. O fluxo anterior do app (processo "Encerramentos de contrato", com aprovação da coordenação) ficou só para consulta: o único item no portal estava cancelado. Testado na demonstração com o Edge headless (liderança, RH e coordenação); no portal, o primeiro envio real é o teste (falta a permissão da seção 4).
 - **Portal:**
   - A estrutura está completa: os 10 processos e a primeira carga do Membros (59 itens, 21/10).
   - Em 03/11, com o ok do usuário, `tools/provisionar.js` criou o "1:1 mensais" (`entityTypeId 1134`) e o campo "Ficha enviada ao membro em" do Onboarding. Usou o webhook de administrador do Mathias, o único com `userfieldconfig`. Depois disso, a simulação não acha mais nada a criar.
   - Em 29/10 foi criado o funil de negócios **HR | Offboarding (79)**. Os campos `UF_CRM_OFF_*` seguem o formulário da Luciele desde 03/11.
   - **Falta o administrador:**
     - dar as permissões de CRM (docs, seção 4), com o RH em "Todos", inclusive no "1:1 mensais";
+    - nos funis 77 e 79, dar à Liderança e à Coordenação Ler, Adicionar e Editar "Próprios" (no 77 o Ler continua como está), para os formulários do app criarem os cards;
     - escolher a caixa de e-mail do SMTP.
 - **Vercel:**
   - As variáveis estão na seção 3 de `docs/configuracao-bitrix.md`, mais as da seção 9 (SMTP, opcional, só para a Ficha). O webhook de saída (`BITRIX_EVENTO_TOKEN`) ainda não existe.

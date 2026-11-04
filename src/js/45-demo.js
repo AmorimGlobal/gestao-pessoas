@@ -77,8 +77,7 @@
       },
       links: {
         manual: "https://drive.google.com/file/d/1fZNxcYlnxcGshaoWlYZ9pjLljZOVkqcL/view",
-        formVaga: "https://b24-ljukko.bitrix24.site/crm_form_4nlpe/",
-        formOffboarding: "", baseConhecimento: "", guiaOnboarding: "", guiaOffboarding: "", modelosSCI: "",
+        baseConhecimento: "", guiaOnboarding: "", guiaOffboarding: "", modelosSCI: "",
       },
       recrutamento: { categoria: 77 },
       offboarding: { categoria: 79 },
@@ -409,6 +408,27 @@
       abrirCard: () => {},
       abrirNegocio: () => {},
       offboarding: async () => copia(d.offboarding),
+      /** Formulários do app: o card entra no funil em memória (vagas ou offboarding), na primeira etapa */
+      camposNegocio: async () => ({}),
+      negociosCriados: [],
+      criarNegocio: async function (n) {
+        await atraso();
+        const funil = Number(n.categoria) === Number(d.config.offboarding.categoria) ? d.offboarding : d.vagas;
+        const id = String(++seq);
+        const campos = Object.assign({}, n.campos);
+        Object.keys(campos).forEach((k) => { if (Array.isArray(campos[k]) && Array.isArray(campos[k][0])) campos[k] = campos[k].map((a, i) => ({ id: i + 1, nome: a[0] })); });
+        const estagio = (funil.etapas[0] || {}).id || "";
+        funil.negocios.unshift(Object.assign({ ID: id, TITLE: n.titulo, STAGE_ID: estagio, DATE_CREATE: agora(), DATE_MODIFY: agora(), ASSIGNED_BY_ID: String(n.responsavel) },
+          n.origem ? { ORIGINATOR_ID: n.origem.sistema, ORIGIN_ID: String(n.origem.id) } : {}, campos));
+        this.negociosCriados.push({ id, categoria: Number(n.categoria), titulo: n.titulo, responsavel: String(n.responsavel), campos: n.campos, origem: n.origem || null });
+        return { id, estagio };
+      },
+      passarNegocio: async function (id, responsavel) {
+        [d.vagas, d.offboarding].forEach((f) => f.negocios.forEach((x) => { if (x.ID === String(id)) x.ASSIGNED_BY_ID = String(responsavel); }));
+        const n = this.negociosCriados.find((x) => x.id === String(id));
+        if (n) n.responsavel = String(responsavel);
+      },
+      comentarNegocio: async function (id, texto) { this.comentarios.push({ chave: "negocio", id: String(id), texto }); },
       contagemServidor: async () => null, // fora do Bitrix não há servidor para comparar
       /** Na demonstração a Ficha não sai por e-mail: só marca o envio */
       enviarFicha: async (onboardingId) => {

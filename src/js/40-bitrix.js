@@ -110,9 +110,34 @@
     try { return txt ? JSON.parse(txt) : padrao; } catch (e) { return padrao; }
   }
 
+  const normal = (s) => String(s === undefined || s === null ? "" : s).normalize("NFC").replace(/\s+/g, " ").trim();
+  /** Campos do card de negócio no formato do crm.item.add (entityTypeId 2), a partir dos códigos UF_CRM_*.
+      mapa = upperName -> {chave, tipo, multiplo, itens}, de crm.item.fields. Lista grava o ID da opção (achado pelo
+      texto), arquivo grava [[nome, base64], ...]. Campo ou opção que o Bitrix não tem para tudo, em vez de criar o
+      card pela metade. */
+  function camposParaItem(mapa, campos) {
+    const fields = {}, faltam = [];
+    Object.keys(campos || {}).forEach(function (codigo) {
+      const f = mapa[codigo.toUpperCase()];
+      const v = campos[codigo];
+      if (!f) { faltam.push("campo " + codigo); return; }
+      if (f.tipo === "enumeration") {
+        const id = function (texto) {
+          const it = (f.itens || []).find(function (i) { return normal(i.VALUE) === normal(texto); });
+          if (!it) faltam.push("opção \"" + texto + "\" em " + codigo);
+          return it ? Number(it.ID) : null;
+        };
+        fields[f.chave] = Array.isArray(v) ? v.map(id).filter(function (x) { return x !== null; }) : id(v);
+      } else fields[f.chave] = v;
+    });
+    if (faltam.length) throw { codigo: "", descricao: "o Bitrix não tem " + faltam.join(", ") + ". O formulário do app e o funil precisam ser acertados (amorim-api/offboarding-bitrix ou requisicao-vagas-bitrix)" };
+    return fields;
+  }
+
   function criarRepositorio() {
     const estrutura = {}; // chave -> { eti, typeId, campoPai, estagios, estagioPorId, nomes, campos, defs, enums, presentes }
     let config = null;
+    let mapaNegocio = null; // campos do negócio (crm.item.fields, entityTypeId 2), lidos uma vez
 
     function montarEstrutura(cfg) {
       schema.PROCESSOS.forEach(function (p) {
@@ -409,7 +434,7 @@
           bx("crm.dealcategory.stage.list", { id: cat }),
           bxTudo("crm.deal.list", {
             filter: { CATEGORY_ID: cat }, order: { ID: "DESC" },
-            select: ["ID", "TITLE", "STAGE_ID", "DATE_CREATE", "DATE_MODIFY", "CLOSEDATE", "CLOSED", "ASSIGNED_BY_ID"].concat(CAMPOS_OFFBOARDING),
+            select: ["ID", "TITLE", "STAGE_ID", "DATE_CREATE", "DATE_MODIFY", "CLOSEDATE", "CLOSED", "ASSIGNED_BY_ID", "ORIGINATOR_ID", "ORIGIN_ID"].concat(CAMPOS_OFFBOARDING),
           }),
           bx("crm.deal.fields", {}).catch(function () { return {}; }),
         ]);
@@ -428,9 +453,44 @@
         return { etapas: reg.etapasDoFunil(etapas), negocios };
       },
       abrirNegocio: function (id) { if (BX24.openPath) BX24.openPath("/crm/deal/details/" + id + "/"); },
+
+      /* ---------- formulários do app: o card nos funis 77 e 79 (04/11/2026) ---------- */
+      /** Os campos do negócio pelo código (upperName), com as opções das listas. A tela chama ao abrir o
+          formulário, para a leitura (grande: todos os campos de negócio do portal) já estar pronta no envio. */
+      camposNegocio: async function () {
+        if (!mapaNegocio) {
+          const d = await bx("crm.item.fields", { entityTypeId: 2 });
+          const mapa = {};
+          Object.keys((d && d.fields) || {}).forEach(function (k) {
+            const f = d.fields[k];
+            mapa[String(f.upperName || k).toUpperCase()] = { chave: k, tipo: f.type, multiplo: !!f.isMultiple, itens: f.items || [] };
+          });
+          mapaNegocio = mapa;
+        }
+        return mapaNegocio;
+      },
+      /** Cria o card. n = { categoria, titulo, responsavel, campos: {UF_CRM_...: texto | [textos] | data | [[nome, base64]]},
+          origem: {sistema, id}, restrito }. Sem estágio: o Bitrix põe na primeira etapa do funil ("Nova solicitação"). */
+      criarNegocio: async function (n) {
+        const fields = Object.assign(camposParaItem(await repo.camposNegocio(), n.campos), {
+          title: n.titulo, categoryId: Number(n.categoria), assignedById: Number(n.responsavel),
+        });
+        if (n.origem) { fields.originatorId = n.origem.sistema; fields.originId = String(n.origem.id); }
+        if (n.restrito) fields.opened = "N"; // fora de "disponível para todos"
+        const d = await bx("crm.item.add", { entityTypeId: 2, fields });
+        return { id: String(d.item.id), estagio: d.item.stageId || "" };
+      },
+      /** Passa o card para o responsável do funil (o RH) depois de o histórico entrar na timeline */
+      passarNegocio: async function (id, responsavel) {
+        await bx("crm.item.update", { entityTypeId: 2, id: Number(id), fields: { assignedById: Number(responsavel) } });
+      },
+      /** Comentário na timeline do card de negócio */
+      comentarNegocio: async function (id, texto) {
+        await bx("crm.timeline.comment.add", { fields: { ENTITY_ID: Number(id), ENTITY_TYPE: "deal", COMMENT: texto } });
+      },
     };
     return repo;
   }
 
-  GP.bitrix = { criarRepositorio, mensagemErro, lerValor: reg.lerValor, escreverValor: reg.escreverValor, CHAVE_CONFIG };
+  GP.bitrix = { criarRepositorio, mensagemErro, camposParaItem, lerValor: reg.lerValor, escreverValor: reg.escreverValor, CHAVE_CONFIG };
 })(window);

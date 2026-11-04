@@ -1,16 +1,21 @@
 /* =====================================================================================
-   TELAS — Offboarding: esteira "HR | Offboarding", histórico de desligamentos e os
-   encerramentos de contrato feitos pelo app (3.5.3), com a verificação de registros (4.1)
-   e o guia da liderança (3.5.4). O plano de melhoria foi para Feedbacks (63-ui-planos.js).
+   TELAS — Offboarding: a Solicitação de Encerramento de Contrato, a esteira "HR |
+   Offboarding", o histórico de desligamentos e o guia da liderança (3.5.4). O plano de
+   melhoria foi para Feedbacks (63-ui-planos.js).
    -------------------------------------------------------------------------------------
-   Na solicitação pelo app, a verificação roda antes de criar e de novo a cada envio. A
-   trava "no servidor" (4.1) está em lib/trava-encerramento.js: a tela sozinha não basta.
+   Desde 04/11/2026 a solicitação é o formulário da Luciele feito no próprio app: o card
+   nasce na esteira (funil 79) e o histórico de feedbacks SCI, 1:1 mensais e planos de
+   melhoria do membro vai para a timeline dele. As solicitações do fluxo anterior do app
+   (processo "Encerramentos de contrato", com a verificação de registros da 4.1 e a trava
+   em lib/trava-encerramento.js) continuam aqui só para consulta e para terminar as que
+   já estavam em andamento.
    ===================================================================================== */
 (function (raiz) {
   "use strict";
   const GP = raiz.GP;
   const { esc, icone, primeiroNome, plural } = GP.util;
   const calc = GP.calc, dom = GP.dominio, ui = GP.ui, c = GP.ui.c;
+  const F = GP.formularios;
   const E = () => ui.estado;
   const op = GP.schema.OPCOES;
   const COR_ENC = { NEW: "cinza", AG_COORD: "ambar", BLOQUEADA: "vermelho", ENVIADA_RH: "azul", EM_ANALISE: "azul", APROVADA: "verde", CONVERSA_OK: "verde", POS: "verde", SUCCESS: "verde", FAIL: "cinza" };
@@ -26,10 +31,9 @@
   };
 
   /* ================================================================ TELA OFFBOARDING */
-  /* Reunião de 29/10/2026: a solicitação vai por um formulário do Bitrix e vira um card na esteira
-     "HR | Offboarding" (funil de negócios), onde o RH gerencia. O app mostra o alerta das solicitações
-     novas, a esteira e o histórico de desligamentos por período. Enquanto o formulário não existir
-     (link vazio em Configuração), a solicitação continua pelo próprio app, com a verificação. */
+  /* Reunião de 29/10/2026: a solicitação vira um card na esteira "HR | Offboarding" (funil de negócios),
+     onde o RH gerencia. O app mostra o alerta das solicitações novas, a esteira e o histórico de
+     desligamentos por período. Desde 04/11/2026 o formulário é do próprio app (formEncerramentoApp). */
   ui.rotas.offboarding = function (partes) {
     if (partes[0] === "plano" && partes[1]) return GP.telas.planos.telaPlano(partes[1]); // links antigos: o plano foi para Feedbacks
     if (partes[0] === "encerramento" && partes[1]) return telaEncerramento(partes[1]);
@@ -49,7 +53,7 @@
     let h = c.cabecalho("offboarding", "Offboarding", "<span><b>" + (abertas.length + andamentoApp.length) + "</b> " + (abertas.length + andamentoApp.length === 1 ? "solicitação" : "solicitações") + " em andamento</span>" +
       "<span><b>" + doAno + "</b> " + (doAno === 1 ? "desligamento" : "desligamentos") + " em " + ano + "</span>");
     if (rh) h += alertaRH(funil.filter((s) => s.nova), dom.filaRH(ctx));
-    h += cartaoSolicitar(links);
+    h += cartaoSolicitar();
     h += '<details class="card" style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700;color:var(--navy)">' + icone("manual", 15) + " Guia da liderança para o encerramento de contrato</summary>" +
       '<div style="margin-top:12px">' + Object.keys(GUIA).filter((k) => k !== "AG_COORD").map((k) => "<p><b>" + esc(GUIA[k].t) + ".</b> " + esc(GUIA[k].d) + "</p>").join("") +
       (links.guiaOffboarding ? '<a target="_blank" rel="noopener" href="' + esc(links.guiaOffboarding) + '">Abrir o guia completo na Base de Conhecimento →</a>' : '<span class="muted">O guia completo fica na Base de Conhecimento (link a cadastrar).</span>') + "</div></details>";
@@ -58,7 +62,7 @@
       '<div class="lado">' + c.prazo(a.prazo) + "</div></div>").join("") + "</div></div>";
     if (rh) h += esteiraHtml(funil);
     h += historicoHtml();
-    if (encs.length) h += '<div class="card"><h3>Solicitações feitas pelo app<span class="extra muted">' + plural(encs.length, "solicitação", "solicitações") + "</span></h3>" +
+    if (encs.length) h += '<div class="card"><h3>Solicitações do fluxo anterior do app<span class="extra muted">' + plural(encs.length, "solicitação", "solicitações") + " · até 04/11/2026</span></h3>" +
       '<div class="lista">' + encs.slice().sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1)).map((e) => linhaEnc(e)).join("") + "</div></div>";
     return h;
   };
@@ -90,31 +94,30 @@
   }
 
   /** O que pede a atenção do RH numa solicitação da esteira: os registros de feedback que o formulário
-      exige (no mínimo 2, por desempenho ou incompatibilidade com a função) e os pontos marcados em Riscos */
+      exige (no mínimo 2, por desempenho ou incompatibilidade com a função) e os pontos marcados em Riscos.
+      Nas solicitações feitas pelo app, os feedbacks SCI de desenvolvimento do membro contam (estão na timeline do card). */
   function atencaoFunil(s) {
     let h = "";
-    if (s.faltamFeedbacks) h += '<div class="d" style="color:var(--vermelho)">' + esc((s.anexos ? plural(s.anexos, "registro de feedback anexado", "registros de feedback anexados") : "Nenhum registro de feedback anexado") + ": o formulário pede no mínimo 2") + "</div>";
+    const total = s.anexos + (s.sci || 0);
+    if (s.faltamFeedbacks) h += '<div class="d" style="color:var(--vermelho)">' + esc((total ? plural(total, "registro de feedback", "registros de feedback") + (s.sci ? " (" + plural(s.sci, "feedback SCI do app", "feedbacks SCI do app") + ")" : "") : "Nenhum registro de feedback") + ": o formulário pede no mínimo 2") + "</div>";
     if (s.riscos.length) h += '<div class="d" style="color:var(--ambar)">' + esc("Considerar: " + s.riscos.join(", ")) + "</div>";
     return h;
   }
 
-  /** Quem envia a solicitação (3.6): com coordenação acima da liderança, é a coordenação que envia; sem
-      coordenação acima, segue direto para o RH. */
-  function cartaoSolicitar(links) {
+  /** Solicitar encerramento: o formulário da Luciele, no app. Com coordenação acima, a liderança alinha antes com ela
+      (o motivo, a data e o comunicado à equipe), e ela recebe um aviso quando a solicitação sai. */
+  function cartaoSolicitar() {
     const ctx = E().ctx, uid = String(E().eu.id);
     const p = dom.papeis(ctx, uid);
     const meu = ctx.idx.membroPorUsuario[uid];
     const coord = meu ? String(dom.coordenacaoEfetiva(ctx, meu) || "") : "";
     const coordAcima = !p.rh && !p.enviaFormal && coord && coord !== uid;
-    const texto = E().visao === "rh" ? "O RH registra direto na esteira." : p.enviaFormal ? "Como coordenação, você envia a solicitação direto ao RH." :
-      coordAcima ? "Na sua área, quem envia a solicitação é a coordenação (" + dom.pessoa(ctx, coord).nome + "). Converse com ela antes: ela envia, e o RH acompanha pela esteira." :
-      "Sem coordenação acima de você, a solicitação vai direto para o RH.";
-    const botao = links.formOffboarding
-      ? '<a class="btn' + (coordAcima ? " sec" : "") + '" target="_blank" rel="noopener" href="' + esc(links.formOffboarding) + '">' + icone("externo", 14) + " Abrir o formulário de solicitação</a>"
-      : '<button class="btn' + (coordAcima ? " sec" : "") + '" data-acao="solicitar-encerramento">Verificar registros e solicitar</button>';
+    const texto = E().visao === "rh" ? "O RH também pode registrar uma solicitação por aqui." : p.enviaFormal ? "Como coordenação, você envia a solicitação direto ao RH." :
+      coordAcima ? "Antes de enviar, alinhe com a coordenação (" + dom.pessoa(ctx, coord).nome + ") o motivo, a data e como a equipe será comunicada. Ela recebe um aviso quando você envia." :
+      "A solicitação vai direto para o RH.";
     return '<div class="card acao" style="margin-bottom:16px"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3 style="margin-bottom:4px">Solicitar encerramento de contrato</h3>' +
-      '<div class="muted">' + esc(texto) + (links.formOffboarding ? " O formulário cria o card na esteira HR | Offboarding, e o RH conduz a partir dali." : " Antes de enviar, o app confere se os registros do membro estão completos.") +
-      " Dúvidas sobre o contrato vão para o RH.</div></div>" + botao + "</div></div>";
+      '<div class="muted">' + esc(texto) + " O formulário cria o card na esteira HR | Offboarding, com os feedbacks SCI e os 1:1 do membro na timeline, e o RH conduz a partir dali. Dúvidas sobre o contrato vão para o RH.</div></div>" +
+      '<button class="btn" data-acao="solicitar-encerramento">Solicitar encerramento</button></div></div>';
   }
 
   /** Esteira "HR | Offboarding" (só o RH lê o funil): as solicitações em andamento, por etapa */
@@ -175,7 +178,8 @@
     const podeEditar = !posRH && ["NEW", "BLOQUEADA"].indexOf(e.estagio) >= 0;
     const ver = dom.verificarRegistros(ctx, e.membroId, e.motivo, e.justificativa);
     let acoes = "";
-    if (podeEditar) acoes += '<button class="btn sec" data-acao="editar-encerramento" data-id="' + esc(e.id) + '">Editar</button><button class="btn" data-acao="enviar-encerramento" data-id="' + esc(e.id) + '">' + (e.estagio === "BLOQUEADA" ? "Reenviar" : "Enviar") + "</button>";
+    // Rascunho ou bloqueada do fluxo anterior: o envio agora é pelo formulário (o card vai para a esteira do RH)
+    if (podeEditar) acoes += '<button class="btn sec" data-acao="editar-encerramento" data-id="' + esc(e.id) + '">Editar</button><button class="btn" data-acao="solicitar-encerramento" data-membro="' + esc(e.membroId) + '">Enviar pelo formulário</button>';
     if (souAprovador) acoes += '<button class="btn" data-acao="decidir-encerramento" data-id="' + esc(e.id) + '" data-decisao="aprovar">Aprovar e enviar ao RH</button><button class="btn sec" data-acao="decidir-encerramento" data-id="' + esc(e.id) + '" data-decisao="recusar">Devolver com comentário</button>';
     if (rh) {
       if (e.estagio === "BLOQUEADA") acoes += '<button class="btn sec" data-acao="liberar-encerramento" data-id="' + esc(e.id) + '">Liberar em caso excepcional</button>';
@@ -194,7 +198,8 @@
     let h = c.voltar("#/offboarding", "Offboarding") + c.cabecalho("offboarding", "Encerramento de contrato · " + m.nome, "<span>" + c.tag(e.estagioNome, COR_ENC[e.estagio]) + "</span><span>" + esc(e.origem || "") + "</span>", acoes) +
       '<div class="card">' + passos + (posRH && !rh ? '<p class="muted" style="font-size:12px;margin:8px 0 0">' + icone("cadeado", 13) + " A partir de \"Enviada ao RH\", a liderança só acompanha. Dúvidas vão para o RH.</p>" : "") +
       (e.estagio === "AG_COORD" ? '<p class="muted" style="font-size:12px;margin:8px 0 0">Aprovação com ' + (aprovador.rh ? "o RH (quem pediu é a própria coordenação)" : esc(dom.pessoa(ctx, aprovador.id).nome)) + ".</p>" : "") + "</div>";
-    if (e.estagio === "BLOQUEADA") h += '<div class="card acao vermelho"><h3>Bloqueada</h3><div class="texto-registro">' + esc(e.bloqueio || "") + "</div><p class=\"muted\">Corrija os registros e reenvie. A verificação roda de novo a cada envio.</p></div>";
+    if (podeEditar) h += '<div class="aviso-info" style="margin-bottom:16px">Esta solicitação é do fluxo anterior do app. Desde 04/11/2026 o pedido vai pelo formulário de encerramento, que cria o card na esteira HR | Offboarding com o histórico do membro. Depois de enviar, cancele esta aqui.</div>';
+    if (e.estagio === "BLOQUEADA") h += '<div class="card acao vermelho"><h3>Bloqueada</h3><div class="texto-registro">' + esc(e.bloqueio || "") + "</div><p class=\"muted\">Corrija os registros e envie pelo formulário.</p></div>";
     if (guia) h += '<div class="card dica"><div class="marca-amora">' + icone("manual", 15) + " Guia da liderança · " + esc(guia.t) + '</div><div style="margin-top:6px">' + esc(guia.d) + "</div></div>";
     h += '<div class="card"><h3>Solicitação</h3>' + c.dados([["Motivo", e.motivo], ["Data desejada", calc.fmtDataAno(e.dataDesejada) + (e.dataDesejada && calc.diaSemana(e.dataDesejada) === 5 ? " (sexta-feira)" : "")], ["Reposição da posição", e.reposicao],
       ["Apoio do RH na conversa", e.apoioRH], ["Coordenação responsável", dom.pessoa(ctx, e.coordenacao).nome], ["Quem solicitou", dom.pessoa(ctx, e.solicitante || e.criadoPor).nome], ["Data da conversa", calc.fmtDataAno(e.dataConversa)]]) +
@@ -204,7 +209,109 @@
     return h;
   }
 
-  /* ---------------- solicitar (verificação primeiro) ---------------- */
+  /* ---------------- Solicitação de Encerramento de Contrato (o formulário da Luciele, no app) ---------------- */
+  // Campos que o app preenche a partir do membro escolhido; a pessoa pode reescrever, e a troca de membro só
+  // substitui o que ainda está como o app preencheu (data-auto)
+  const AUTOMATICOS = ["UF_CRM_OFF_SETOR", "UF_CRM_OFF_SOLICIT", "UF_CRM_OFF_CARGO"];
+  /** Quem pode ser escolhido: a equipe que a visão enxerga (o RH, todos os membros ativos), sem a própria pessoa */
+  function membrosParaEncerramento() {
+    const ctx = E().ctx, uid = String(E().eu.id);
+    return (E().visao === "rh" ? dom.membrosAtivos(ctx.registros.membros || []) : ui.membrosDaVisao()).filter((m) => String(m.responsavel) !== uid)
+      .map((m) => dom.infoMembro(ctx, m)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).map((m) => ({ valor: m.id, rotulo: m.nome }));
+  }
+  /** Os feedbacks SCI de desenvolvimento do membro (vão para a timeline do card) e a conta da regra dos 2 registros */
+  function blocoRegistros(r, anexos) {
+    const ctx = E().ctx;
+    if (!r.membroId || !ctx.idx.membro[r.membroId]) return "";
+    const conf = F.conferirRegistros(r, F.feedbacksDeDesenvolvimento(ctx, r.membroId).length, anexos);
+    if (!conf.minimo && r.UF_CRM_OFF_FEEDBACKS !== "Sim") return "";
+    const m = dom.infoMembro(ctx, ctx.idx.membro[r.membroId]);
+    const dev = F.feedbacksDeDesenvolvimento(ctx, r.membroId);
+    return '<div class="rotulo">Feedbacks SCI de desenvolvimento de ' + esc(primeiroNome(m.nome)) + " no app</div>" +
+      (dev.length ? '<div class="checagem">' + dev.map((f) => '<div class="ok"><span class="s">✓</span><span>' + calc.fmtDataAno(f.data) + " · Feedback de " + esc(String(f.tipo || "").toLowerCase()) + " · por " + esc(dom.pessoa(ctx, f.autor || f.criadoPor).nome) + "</span></div>").join("") + "</div>"
+        : '<div class="muted">Nenhum registrado.</div>') +
+      '<div class="ajuda" style="margin-top:8px">Todos os feedbacks SCI e os 1:1 mensais de ' + esc(primeiroNome(m.nome)) + " vão para a timeline do card, para o RH. Anexe só o que foi registrado fora do app.</div>" +
+      (conf.minimo ? (conf.ok ? '<div class="aviso-info" style="margin-top:8px">✓ ' + esc(plural(conf.total, "registro", "registros") + " de " + conf.minimo + " pedidos.") + "</div>"
+        : '<div class="aviso-erro" style="margin-top:8px">' + esc(conf.mensagem) + "</div>") : "");
+  }
+  function abrirFormEncerramento(pre) {
+    const ctx = E().ctx, eu = E().eu;
+    const p = pre || {};
+    const ini = Object.assign({ membroId: p.membroId || "" }, p.membroId ? F.inicialEncerramento(ctx, p.membroId) : {}, p.motivo ? { UF_CRM_OFF_MOTIVO: p.motivo } : {});
+    if (E().repo.camposNegocio) E().repo.camposNegocio().catch((e) => console.warn("Campos do funil não lidos:", e));
+    ui.abrirPainel({
+      titulo: "Solicitar encerramento de contrato", largo: true,
+      sub: "Solicitação de Encerramento de Contrato. O card nasce na esteira HR | Offboarding, com o histórico de feedbacks SCI e 1:1 do membro na timeline, e o RH recebe o aviso.",
+      corpo: '<div id="form-encerramento"><p class="desc-form">' + esc(F.ENCERRAMENTO.descricao) + "</p>" +
+        '<div class="aviso-info" style="margin-bottom:14px">Enviada em nome de <b>' + esc(eu.nome) + "</b>" + (eu.email ? " (" + esc(eu.email) + ")" : "") + ". Só o RH vê a esteira: depois de enviar, o RH conduz e retorna para você.</div>" +
+        GP.ui.formulario.html(F.ENCERRAMENTO, ini, { opcoes: { membroId: membrosParaEncerramento() }, min: { UF_CRM_OFF_DATA_DES: ctx.hoje } }) + "</div>",
+      rodape: '<button class="btn" data-acao="enviar-pedido-encerramento">Enviar ao RH</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+      aoAbrir: (el) => {
+        const f = el.querySelector("#form-encerramento");
+        AUTOMATICOS.forEach((k) => { const n = f.querySelector('[name="' + k + '"]'); if (n) n.dataset.auto = n.value; });
+        GP.ui.formulario.ligar(f, F.ENCERRAMENTO, (r, ev) => {
+          if (ev && ev.target && ev.target.name === "membroId") {
+            const novo = F.inicialEncerramento(E().ctx, r.membroId);
+            AUTOMATICOS.forEach((k) => { const n = f.querySelector('[name="' + k + '"]'); if (n && n.value === (n.dataset.auto || "")) { n.value = novo[k] || ""; n.dataset.auto = n.value; } });
+          }
+          const bloco = f.querySelector('[data-campo="registros"]');
+          if (bloco) bloco.innerHTML = blocoRegistros(r, r.UF_CRM_OFF_FEEDBACKS === "Sim" ? (r.UF_CRM_OFF_ANEXOS || []).length : 0);
+        });
+      },
+    });
+  }
+  /** Data limite: pelo menos 7 dias e nunca numa sexta-feira, como pede o RH (quem envia pode confirmar mesmo assim) */
+  function confirmarData(iso) {
+    const ctx = E().ctx;
+    if (!iso) return true;
+    if (iso < ctx.hoje) { ui.erroNoPainel("A data limite para o desligamento não pode ficar no passado."); return false; }
+    if (calc.diffDias(ctx.hoje, iso) < 7 && !window.confirm("A data limite fica a menos de 7 dias de hoje. O RH pede pelo menos 7 dias. Enviar mesmo assim?")) return false;
+    if (calc.diaSemana(iso) === 5 && !window.confirm("A data limite é uma sexta-feira, que o RH pede para evitar. Enviar mesmo assim?")) return false;
+    return true;
+  }
+  ui.acoes["solicitar-encerramento"] = function (el) { abrirFormEncerramento({ membroId: el.dataset.membro || "", motivo: el.dataset.motivo || "" }); };
+  ui.acoes["enviar-pedido-encerramento"] = function (el) {
+    const FU = GP.ui.formulario;
+    const f = document.getElementById("form-encerramento");
+    const r = FU.aplicar(f, F.ENCERRAMENTO);
+    if (!FU.validar(f, F.ENCERRAMENTO, r)) return;
+    const ctx = E().ctx, eu = E().eu;
+    const m = dom.infoMembro(ctx, ctx.idx.membro[r.membroId]);
+    const arquivos = r.UF_CRM_OFF_FEEDBACKS === "Sim" ? (r.UF_CRM_OFF_ANEXOS || []) : [];
+    const conf = F.conferirRegistros(r, F.feedbacksDeDesenvolvimento(ctx, m.id).length, arquivos.length);
+    if (!conf.ok) {
+      // a regra é do RH: a liderança não envia sem os registros; o próprio RH decide se segue
+      if (E().visao !== "rh") { ui.erroNoPainel(conf.mensagem); const b = f.querySelector('[data-campo="registros"]'); if (b) b.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+      if (!window.confirm(conf.mensagem + "\n\nComo RH, você pode enviar mesmo assim. Enviar?")) return;
+    }
+    if (!confirmarData(r.UF_CRM_OFF_DATA_DES)) return;
+    const cfg = E().config || {};
+    const categoria = Number((cfg.offboarding || {}).categoria) || 79;
+    const responsavel = FU.responsavelDoFunil("offboarding");
+    const titulo = "Encerramento · " + m.nome;
+    const ini = F.inicialEncerramento(ctx, m.id);
+    const coord = ini.coordenacaoId && ini.coordenacaoId !== String(eu.id) && !dom.papeis(ctx, ini.coordenacaoId).rh ? ini.coordenacaoId : "";
+    ui.salvar(el, async () => {
+      const campos = Object.assign(F.camposDoNegocio(F.ENCERRAMENTO, r), { UF_CRM_OFF_EMAIL: eu.email || "", UF_CRM_OFF_MEMBRO: m.nome });
+      if (arquivos.length) campos.UF_CRM_OFF_ANEXOS = await GP.telas.rotinas.arquivosParaBitrix(arquivos);
+      const comentarios = F.historicoEncerramento(ctx, m.id, { quem: eu.nome, registradoPor: E().verComo && E().euReal ? E().euReal.nome : "", data: ctx.hoje });
+      const neg = await FU.enviarCard({ categoria, titulo, campos, origem: { sistema: dom.ORIGEM_APP, id: m.id }, restrito: true, comentarios, responsavel, nomeFunil: "HR | Offboarding" });
+      // o RH vê a solicitação na esteira sem recarregar (as listas do card guardam o texto da opção, como o app lê)
+      const off = ctx.offboarding;
+      if (off && off.categoria && !off.erro && (off.etapas || []).length) {
+        const local = Object.assign({}, campos, { UF_CRM_OFF_ANEXOS: arquivos.map((a, i) => ({ id: i + 1 })) });
+        off.negocios = off.negocios || [];
+        off.negocios.unshift(F.negocioLocal({ id: neg.id, titulo, estagio: neg.estagio || off.etapas[0].id, agora: new Date().toISOString(), campos: local, origem: { sistema: dom.ORIGEM_APP, id: m.id } }));
+      }
+      await GP.app.avisarRH("Nova solicitação de encerramento de contrato na esteira HR | Offboarding (" + m.nome + "), enviada por " + eu.nome + ". O histórico de feedbacks SCI e 1:1 está na timeline do card.");
+      if (coord) await GP.app.avisar([coord], eu.nome + " enviou ao RH uma solicitação de encerramento de contrato (" + m.nome + "). O RH conduz pela esteira HR | Offboarding.");
+      if (neg.avisos.length) ui.avisar("Solicitação enviada ao RH (card " + neg.id + "), mas " + neg.avisos.join("; ") + ".", "erro");
+      else ui.avisar("Solicitação enviada ao RH, com o histórico do membro na timeline do card.");
+      return neg;
+    }, { rotuloOcupado: "Enviando..." });
+  };
+
+  /* ---------------- fluxo anterior do app: editar uma solicitação que ainda estava em rascunho ---------------- */
   function formEncerramento(e, membroId) {
     const ctx = E().ctx;
     const membros = (E().visao === "rh" ? dom.membrosAtivos(ctx.registros.membros || []) : ui.membrosDaVisao()).map((m) => dom.infoMembro(ctx, m)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
@@ -234,47 +341,6 @@
     el.querySelectorAll('[name="membroId"], [name="motivo"], [name="justificativa"]').forEach((x) => x.addEventListener(x.tagName === "TEXTAREA" ? "input" : "change", atualizar));
     atualizar();
   }
-  ui.acoes["solicitar-encerramento"] = function (el) {
-    const formal = dom.papeis(E().ctx, E().eu.id).enviaFormal;
-    ui.abrirPainel({
-      titulo: "Solicitar encerramento de contrato", sub: formal ? "Pelo formulário da coordenação: depois da verificação, vai direto ao RH." : "Depois da verificação, segue para a aprovação da coordenação responsável.",
-      corpo: formEncerramento(null, el.dataset.membro || ""), largo: true,
-      rodape: '<button class="btn" data-acao="criar-encerramento">Enviar a solicitação</button><button class="btn sec" data-acao="criar-encerramento" data-rascunho="1">Salvar como rascunho</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
-      aoAbrir: ligarVerificacao,
-    });
-  };
-  function validarDatas(d) {
-    const ctx = E().ctx;
-    if (d.dataDesejada && calc.diffDias(ctx.hoje, d.dataDesejada) < 7) return window.confirm("A data desejada fica a menos de 7 dias de hoje. O guia pede pelo menos 7 dias. Enviar mesmo assim?");
-    if (d.dataDesejada && calc.diaSemana(d.dataDesejada) === 5) return window.confirm("A data desejada é uma sexta-feira, que o guia pede para evitar. Enviar mesmo assim?");
-    return true;
-  }
-  ui.acoes["criar-encerramento"] = function (el) {
-    const f = document.getElementById("form-enc");
-    const rascunho = !!el.dataset.rascunho;
-    if (!ui.validar(f, rascunho ? ["membroId", "motivo", "coordenacao"] : ["membroId", "motivo", "coordenacao", "descricao", "dataDesejada", "reposicao", "apoioRH"])) return;
-    const d = ui.lerForm(f);
-    if (!rascunho && !validarDatas(d)) return;
-    const ctx = E().ctx;
-    const m = dom.infoMembro(ctx, ctx.idx.membro[d.membroId]);
-    const formal = dom.papeis(ctx, E().eu.id).enviaFormal;
-    const origem = formal ? "Formulário da coordenação" : "Solicitação da liderança direta";
-    const ver = dom.verificarRegistros(ctx, d.membroId, d.motivo, d.justificativa);
-    const estagio = rascunho ? "NEW" : dom.destinoEncerramento({ bloqueado: !ver.ok, motivo: d.motivo, origem });
-    ui.salvar(el, async () => {
-      const e = await ui.criar("encerramentos", {
-        titulo: "Encerramento · " + m.nome, membroId: m.id, responsavel: m.responsavel, motivo: d.motivo, coordenacao: d.coordenacao, descricao: d.descricao, justificativa: d.justificativa,
-        dataDesejada: d.dataDesejada, reposicao: d.reposicao, apoioRH: d.apoioRH, origem, solicitante: E().eu.id, autor: E().eu.id,
-        planoId: ver.plano ? ver.plano.id : "", feedbacksIds: ver.feedbacks.join(","), bloqueio: ver.bloqueios.join("\n"),
-        primeiraVerificacao: rascunho ? "" : (ver.ok ? "Aceita na 1ª verificação" : "Bloqueada na 1ª verificação"),
-        enviadaRHEm: estagio === "ENVIADA_RH" ? ctx.hoje : "", estagio,
-      });
-      if (estagio === "ENVIADA_RH") await GP.app.avisarRH("Nova solicitação de encerramento de contrato enviada ao RH (" + m.nome + ").");
-      if (estagio === "AG_COORD") await avisarAprovador(e, m);
-      ui.navegar("#/offboarding/encerramento/" + e.id);
-      return e;
-    }, { mensagem: rascunho ? "Rascunho salvo." : estagio === "BLOQUEADA" ? "Solicitação bloqueada: confira o que falta." : estagio === "ENVIADA_RH" ? "Solicitação enviada ao RH." : "Solicitação enviada para a coordenação." });
-  };
   ui.acoes["editar-encerramento"] = function (el) {
     const e = E().ctx.idx.porId.encerramentos[el.dataset.id];
     ui.abrirPainel({ titulo: "Editar a solicitação", corpo: formEncerramento(e), largo: true, aoAbrir: ligarVerificacao,
@@ -286,33 +352,6 @@
     const d = ui.lerForm(f);
     ui.salvar(el, () => ui.atualizar("encerramentos", el.dataset.id, { motivo: d.motivo, coordenacao: d.coordenacao, descricao: d.descricao, justificativa: d.justificativa, dataDesejada: d.dataDesejada, reposicao: d.reposicao, apoioRH: d.apoioRH }), { mensagem: "Solicitação salva." });
   };
-  /** Enviar/reenviar um rascunho ou uma solicitação bloqueada: a verificação roda de novo */
-  ui.acoes["enviar-encerramento"] = function (el) {
-    const ctx = E().ctx;
-    const e = ctx.idx.porId.encerramentos[el.dataset.id];
-    const faltam = ["descricao", "dataDesejada", "reposicao", "apoioRH"].filter((k) => !e[k]);
-    if (faltam.length) { ui.avisar("Complete a solicitação antes de enviar (descrição, data desejada, reposição e apoio do RH).", "erro"); return; }
-    if (!validarDatas(e)) return;
-    const ver = dom.verificarRegistros(ctx, e.membroId, e.motivo, e.justificativa);
-    const origem = e.origem || "Solicitação da liderança direta";
-    const estagio = dom.destinoEncerramento({ bloqueado: !ver.ok, motivo: e.motivo, origem });
-    const m = dom.infoMembro(ctx, ctx.idx.membro[e.membroId]);
-    ui.salvar(el, async () => {
-      await ui.atualizar("encerramentos", e.id, {
-        estagio, bloqueio: ver.bloqueios.join("\n"), planoId: ver.plano ? ver.plano.id : e.planoId, feedbacksIds: ver.feedbacks.length ? ver.feedbacks.join(",") : e.feedbacksIds,
-        primeiraVerificacao: e.primeiraVerificacao || (ver.ok ? "Aceita na 1ª verificação" : "Bloqueada na 1ª verificação"), enviadaRHEm: estagio === "ENVIADA_RH" ? ctx.hoje : e.enviadaRHEm,
-      });
-      if (estagio === "ENVIADA_RH") await GP.app.avisarRH("Nova solicitação de encerramento de contrato enviada ao RH (" + m.nome + ").");
-      if (estagio === "AG_COORD") await avisarAprovador(Object.assign({}, e, { estagio }), m);
-    }, { mensagem: estagio === "BLOQUEADA" ? "Bloqueada: confira o que falta." : estagio === "AG_COORD" ? "Enviada para a aprovação da coordenação." : "Enviada ao RH.", fechar: false });
-  };
-  /** "Aguardando coordenação": avisa quem aprova (a coordenação responsável, ou o RH quando ela é quem pediu) */
-  async function avisarAprovador(e, m) {
-    const a = dom.aprovadorDe(E().ctx, e);
-    const texto = "Uma solicitação de encerramento de contrato aguarda a sua aprovação (" + m.nome + "). Abra o app Gestão de Pessoas.";
-    if (a.rh) await GP.app.avisarRH(texto);
-    else await GP.app.avisar([a.id], texto);
-  }
   ui.acoes["decidir-encerramento"] = function (el) {
     const dec = el.dataset.decisao;
     if (dec === "aprovar") {
@@ -406,23 +445,7 @@
     if (!window.confirm("Cancelar esta solicitação de encerramento?")) return;
     ui.salvar(el, () => ui.atualizar("encerramentos", el.dataset.id, { estagio: "FAIL" }), { mensagem: "Solicitação cancelada.", fechar: false });
   };
-  /** Plano encerrado sem os resultados: a liderança decide seguir a sugestão (3.5.3, caminho 2) */
-  ui.acoes["encerramento-de-plano"] = function (el) {
-    const ctx = E().ctx;
-    const p = ctx.idx.porId.planos[el.dataset.id];
-    const m = dom.infoMembro(ctx, ctx.idx.membro[p.membroId]);
-    ui.salvar(el, async () => {
-      const e = await ui.criar("encerramentos", {
-        titulo: "Encerramento · " + m.nome, membroId: m.id, responsavel: m.responsavel, motivo: "Resultados abaixo do acordado", coordenacao: m.coordenacao,
-        planoId: p.id, feedbacksIds: [p.feedbackAberturaId, p.feedbackEncerramentoId].filter(Boolean).join(","), origem: "Plano encerrado sem os resultados",
-        solicitante: E().eu.id, autor: E().eu.id, estagio: "NEW",
-      });
-      ui.navegar("#/offboarding/encerramento/" + e.id);
-      return e;
-    }, { mensagem: "Solicitação criada em Rascunho, com o plano e os feedbacks vinculados.", fechar: false });
-  };
-
   GP.telas = GP.telas || {};
   // planoResumoHtml e abrirFormPlano ficam aqui só por compatibilidade: o plano mora em 63-ui-planos.js
-  GP.telas.offboarding = { encerramentoResumoHtml, planoResumoHtml: (p, x) => GP.telas.planos.planoResumoHtml(p, x), abrirFormPlano: (m) => GP.telas.planos.abrirFormPlano(m) };
+  GP.telas.offboarding = { encerramentoResumoHtml, abrirFormEncerramento, planoResumoHtml: (p, x) => GP.telas.planos.planoResumoHtml(p, x), abrirFormPlano: (m) => GP.telas.planos.abrirFormPlano(m) };
 })(window);

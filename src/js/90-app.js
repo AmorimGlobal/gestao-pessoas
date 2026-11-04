@@ -18,14 +18,13 @@
     feriadosLocais: { SP: [], BA: [] },
     links: {
       manual: "https://drive.google.com/file/d/1fZNxcYlnxcGshaoWlYZ9pjLljZOVkqcL/view",
-      formVaga: "https://b24-ljukko.bitrix24.site/crm_form_4nlpe/",
-      // o formulário de offboarding vem do RH (reunião de 29/10/2026); até lá a solicitação é pelo app
-      formOffboarding: "",
     },
     parametros: { carencia1a1: 7, prazoLeitura: 7 },
-    recrutamento: { categoria: 77 },
+    // os formulários de vaga e de encerramento são do app (04/11/2026). responsavel: quem fica com o card novo
+    // (vazio: a primeira pessoa do RH em Papéis)
+    recrutamento: { categoria: 77, responsavel: "" },
     // esteira "HR | Offboarding", criada em 29/10/2026 por amorim-api/offboarding-bitrix
-    offboarding: { categoria: 79 },
+    offboarding: { categoria: 79, responsavel: "" },
     // glossário de competências comportamentais do RH (Configuração → Cadastros)
     competencias: [],
   };
