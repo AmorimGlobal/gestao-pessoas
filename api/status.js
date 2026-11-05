@@ -12,7 +12,7 @@ const ROTINAS = {
   // envio de e-mail (lib/email.js): a ficha do onboarding (api/ficha.js)
   email: ["BITRIX_WEBHOOK_URL", "SMTP_HOST", "SMTP_USUARIO", "SMTP_SENHA"],
 };
-const OPCIONAIS = ["GP_EXCECOES_IDS", "GP_LINK_APP", "GP_CATEGORIA_VAGAS", "SMTP_PORTA", "EMAIL_REMETENTE"];
+const OPCIONAIS = ["GP_EXCECOES_IDS", "GP_LINK_APP", "GP_CATEGORIA_VAGAS", "SMTP_PORTA", "EMAIL_REMETENTE", "SEMANAL_URL", "SEMANAL_TOKEN"];
 
 function responder(res, status, corpo) {
   res.statusCode = status;

@@ -26,6 +26,9 @@
     this.metodo = metodo;
   }
 
+  /** Erro de uma chamada ao REST 3.0, no mesmo formato do ErroBx (mensagemErro lê codigo e descricao) */
+  function erroV3(codigo, descricao, metodo) { return { codigo: String(codigo || ""), descricao: String(descricao || ""), metodo }; }
+
   function mensagemErro(err) {
     if (!err) return "erro desconhecido";
     const c = err.codigo || "", d = err.descricao || err.message || "";
@@ -130,7 +133,13 @@
         fields[f.chave] = Array.isArray(v) ? v.map(id).filter(function (x) { return x !== null; }) : id(v);
       } else fields[f.chave] = v;
     });
-    if (faltam.length) throw { codigo: "", descricao: "o Bitrix não tem " + faltam.join(", ") + ". O formulário do app e o funil precisam ser acertados (amorim-api/offboarding-bitrix ou requisicao-vagas-bitrix)" };
+    if (faltam.length) {
+      // os campos da promoção (05/11/2026) são criados pelo próprio app; os das vagas e do offboarding, pelos scripts
+      const daPromocao = faltam.some(function (f) { return /UF_CRM_PR_/.test(f); });
+      throw { codigo: "", descricao: "o Bitrix não tem " + faltam.join(", ") + ". " + (daPromocao
+        ? "Um administrador do Bitrix cria os campos da promoção em Configuração → \"Criar ou completar a estrutura\""
+        : "O formulário do app e o funil precisam ser acertados (amorim-api/offboarding-bitrix ou requisicao-vagas-bitrix)") };
+    }
     return fields;
   }
 
@@ -210,7 +219,7 @@
       },
       estrutura: function () { return estrutura; },
       provisionar: function (simular, log) {
-        return GP.provision.provisionar({ chamar: chamarParaProvisionar, simular, log, configAtual: config || {} });
+        return GP.provision.provisionar({ chamar: chamarParaProvisionar, simular, log, configAtual: config || {}, categoriaVagas: Number(((config || {}).recrutamento || {}).categoria) || 77 });
       },
 
       /* ---------- pessoas e estrutura da empresa ---------- */
@@ -317,6 +326,56 @@
         ids.forEach(function (id) { cmds["n" + id] = ["im.notify.system.add", { USER_ID: Number(id), MESSAGE: "[Gestão de Pessoas] " + mensagem }]; });
         await bxLote(cmds);
       },
+      /* ---------- e-mail pela caixa do Bitrix (a Amorim usa o e-mail do Bitrix; pedido do usuário, 04/11/2026) ---------- */
+      /** Chamada ao REST 3.0 (/rest/api/), que o BX24.callMethod não faz: fetch com o token desta sessão no corpo
+          (o portal responde com CORS aberto, conferido em 04/11/2026). Token vencido: renova uma vez e tenta de novo. */
+      v3: async function (metodo, params) {
+        const tentar = async function (auth) {
+          const r = await fetch("https://" + BX24.getDomain() + "/rest/api/" + metodo, {
+            method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(Object.assign({}, params || {}, { auth: auth && auth.access_token })),
+          });
+          const j = await r.json().catch(function () { return {}; });
+          return { status: r.status, j };
+        };
+        let auth = BX24.getAuth ? BX24.getAuth() : null;
+        if (!auth || !auth.access_token) throw erroV3("NO_AUTH", "o Bitrix não entregou o token de acesso desta sessão", metodo);
+        let r = await tentar(auth);
+        // 401: o token desta sessão vence em 1 hora, e esta chamada não passa pela renovação do BX24.callMethod
+        if (r.status === 401 && BX24.refreshAuth) {
+          await new Promise(function (ok) { BX24.refreshAuth(function () { ok(); }); });
+          auth = BX24.getAuth ? BX24.getAuth() : auth;
+          r = await tentar(auth);
+        }
+        if (r.j && r.j.error) {
+          const e = r.j.error;
+          const codigo = typeof e === "object" ? String(e.code || "") : String(e);
+          const val = typeof e === "object" && Array.isArray(e.validation) ? e.validation.map(function (v) { return (v.field ? v.field + ": " : "") + v.message; }).join("; ") : "";
+          const erro = erroV3(codigo, [typeof e === "object" ? e.message : "", val].filter(Boolean).join(" — "), metodo);
+          erro.semEscopo = /INSUFFICIENTSCOPE/i.test(codigo);
+          erro.semAcesso = /ACCESSDENIED/i.test(codigo);
+          throw erro;
+        }
+        if (r.status >= 400) throw erroV3("HTTP_" + r.status, "o Bitrix respondeu " + r.status, metodo);
+        return r.j.result;
+      },
+      /** Envia o e-mail pela caixa do Bitrix de quem está no app (mail.mailbox.senders e mail.message.send, escopo mail).
+          e = { para, cc: [], assunto, corpo }. Fica na pasta de enviados da pessoa, e a resposta chega no e-mail dela. */
+      enviarEmail: async function (e, emailDaPessoa) {
+        const s = await repo.v3("mail.mailbox.senders", { pagination: { page: 1, limit: 50 } });
+        const de = GP.ferias.escolherRemetente((s && s.items) || [], emailDaPessoa);
+        if (!de) {
+          const erro = erroV3("SEM_CAIXA", "você não tem uma caixa de e-mail conectada no Bitrix (Bitrix → E-mail)", "mail.mailbox.senders");
+          erro.semCaixa = true;
+          throw erro;
+        }
+        const params = { from: de.email, to: [e.para], subject: e.assunto, body: GP.ferias.corpoHtml(e.corpo) };
+        if (e.cc && e.cc.length) params.cc = e.cc;
+        await repo.v3("mail.message.send", params);
+        return { de: de.email };
+      },
+      /** A tela "Escrever e-mail" do Bitrix, num painel sobre o app (o texto vai copiado antes) */
+      abrirEmailBitrix: function () { if (BX24.openPath) BX24.openPath("/mail/message/new"); },
       /** Painel da CEO: só números, calculados no servidor (api/painel.js). O servidor confere quem
           pediu pelo token do Bitrix desta sessão, sem precisar de leitura da CEO nos processos. */
       painelServidor: async function () {
@@ -353,6 +412,16 @@
         if (!r.ok || !j.ok) { const e = new Error(j.erro || "o servidor respondeu " + r.status); e.status = r.status; throw e; }
         return j;
       },
+      /** Revisões semanais (04/11/2026): o servidor busca as respostas no app semanal e guarda no Bitrix (api/semanal.js).
+          Só o RH e os administradores; o servidor confere pelo token desta sessão. Devolve o relatório, mesmo quando falha. */
+      buscarSemanal: async function () {
+        const auth = BX24.getAuth ? BX24.getAuth() : null;
+        if (!auth || !auth.access_token) throw new Error("o Bitrix não entregou o token de acesso desta sessão");
+        const r = await fetch("/api/semanal", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auth: auth.access_token }) });
+        const j = await r.json().catch(function () { return null; });
+        if (!j) throw new Error("o servidor respondeu " + r.status);
+        return j;
+      },
       /** O download do dossiê fica registrado: comentário na timeline do item Membros (4.4) */
       registrarDossie: async function (membroId, eu) {
         const e = estrutura.membros;
@@ -380,12 +449,14 @@
           bx("crm.dealcategory.stage.list", { id: cat }),
           bxTudo("crm.deal.list", {
             filter: { CATEGORY_ID: cat }, order: { ID: "DESC" },
-            select: ["ID", "TITLE", "STAGE_ID", "DATE_CREATE", "DATE_MODIFY", "CLOSEDATE", "CLOSED", "ASSIGNED_BY_ID",
-              "UF_CRM_RV_VAGA", "UF_CRM_RV_EMAIL", "UF_CRM_RV_LIDER", "UF_CRM_RV_COORD", "UF_CRM_RV_SETOR", "UF_CRM_RV_DEPTO", "UF_CRM_RV_DATA_ENT"],
+            select: ["ID", "TITLE", "STAGE_ID", "DATE_CREATE", "DATE_MODIFY", "CLOSEDATE", "CLOSED", "ASSIGNED_BY_ID", "ORIGINATOR_ID", "ORIGIN_ID",
+              "UF_CRM_RV_VAGA", "UF_CRM_RV_EMAIL", "UF_CRM_RV_LIDER", "UF_CRM_RV_COORD", "UF_CRM_RV_SETOR", "UF_CRM_RV_DEPTO", "UF_CRM_RV_DATA_ENT"]
+              // as solicitações de promoção dividem o funil (05/11/2026): campo que ainda não existe no portal é ignorado pelo Bitrix
+              .concat(schema.CAMPOS_PROMOCAO.map(function (c) { return c.codigo; })),
           }),
           bxTudo("crm.stagehistory.list", { entityTypeId: 2, filter: { CATEGORY_ID: cat }, order: { ID: "ASC" } }, "items").catch(function () { return []; }),
         ]);
-        return { etapas: reg.etapasDoFunil(etapas), negocios, historico };
+        return { etapas: reg.etapasDoFunil(etapas), negocios, historico, categoria: cat };
       },
 
       /* ---------- offboarding: funil "HR | Offboarding" (formulário CRM, 29/10/2026) ---------- */
@@ -443,8 +514,17 @@
         if (n.origem) { fields.originatorId = n.origem.sistema; fields.originId = String(n.origem.id); }
         if (n.restrito) fields.opened = "N"; // fora de "disponível para todos"
         if (n.observadores && n.observadores.length) fields.observers = n.observadores.map(Number);
+        if (n.estagio) fields.stageId = n.estagio; // a promoção pedida pela coordenação já nasce em "Em análise"
         const d = await bx("crm.item.add", { entityTypeId: 2, fields });
         return { id: String(d.item.id), estagio: d.item.stageId || "" };
+      },
+      /** Decisão sobre o card (promoção, 05/11/2026): grava os campos, a etapa e o novo responsável numa chamada só.
+          o = { campos: {UF_CRM_...}, estagio, responsavel } */
+      atualizarNegocio: async function (id, o) {
+        const fields = camposParaItem(await repo.camposNegocio(), o.campos || {});
+        if (o.estagio) fields.stageId = o.estagio;
+        if (o.responsavel) fields.assignedById = Number(o.responsavel);
+        await bx("crm.item.update", { entityTypeId: 2, id: Number(id), fields });
       },
       /** Passa o card para o responsável do funil (o RH) depois de o histórico entrar na timeline */
       passarNegocio: async function (id, responsavel) {

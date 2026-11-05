@@ -66,7 +66,7 @@
     let seq = 0;
 
     async function chamar(metodo, params) {
-      const escrita = /\.(add|update|delete)$/.test(metodo);
+      const escrita = /\.(add|update|delete|set|forceCommonScopeForAll)$/.test(metodo);
       if (escrita) relatorio.push({ metodo, params, simulado: simular });
       if (simular && escrita) return { dados: resultadoSimulado(metodo), proximo: null };
       return chamarReal(metodo, params);
@@ -248,9 +248,62 @@
       return true;
     });
 
+    /* 6. Solicitação de promoção (05/11/2026): campos do negócio e as seções no card do funil de vagas.
+       Qualquer falha aqui (inclusive de permissão) fica registrada sem parar: os processos acima já
+       foram criados e a configuração deles precisa ser gravada. */
+    await camposDaPromocao(chamar, listarTodos, log, falhas, op.categoriaVagas || ((configAnterior.recrutamento || {}).categoria) || 77);
+
     if (falhas.length) log("\n" + falhas.length + " item(ns) não foram criados. Rode de novo para tentar completar; o que já existe não é recriado.");
     return { config, relatorio, falhas };
   }
 
-  return { provisionar, payloadCampo, codigoDoEstagio, TIPO_UF };
+  /** Payload do crm.deal.userfield.add (o mesmo formato do amorim-api/offboarding-bitrix/criar-funil.js) */
+  function payloadCampoNegocio(campo, ordem) {
+    const rot = { br: campo.rotulo, en: campo.rotulo, la: campo.rotulo }; // sem o rótulo por idioma, o portal em pt-BR mostra vazio
+    const f = {
+      FIELD_NAME: campo.codigo, LABEL: campo.rotulo, EDIT_FORM_LABEL: rot, LIST_COLUMN_LABEL: rot, LIST_FILTER_LABEL: rot,
+      SORT: 7000 + ordem * 10, MANDATORY: "N", SHOW_FILTER: "N", SHOW_IN_LIST: "Y", MULTIPLE: "N",
+      USER_TYPE_ID: { linha: "string", texto: "string", data: "date", pessoa: "employee" }[campo.tipo],
+    };
+    if (campo.tipo === "texto") f.SETTINGS = { ROWS: 5 };
+    if (campo.ajuda) f.HELP_MESSAGE = { br: campo.ajuda, en: campo.ajuda, la: campo.ajuda };
+    return f;
+  }
+  /** O layout do card com as seções da promoção. Os campos RV_ da vaga passam a aparecer só quando preenchidos
+      (num card de promoção eles ficam vazios), e as seções da promoção entram depois da primeira, também só
+      com o que estiver preenchido. Devolve null quando não há o que mudar (já tem as seções ou não há layout salvo). */
+  function layoutComPromocao(secoes) {
+    if (!Array.isArray(secoes) || !secoes.length) return null;
+    const tem = secoes.some((s) => (s.elements || []).some((e) => /^UF_CRM_PR_/.test(e.name)));
+    if (tem) return null;
+    const so = (s) => ({ name: s.name, title: s.title, type: s.type || "section",
+      elements: (s.elements || []).map((e) => ({ name: e.name, optionFlags: /^UF_CRM_RV_/.test(e.name) ? "0" : String(e.optionFlags === undefined ? "1" : e.optionFlags) })) });
+    const novas = schema.SECOES_PROMOCAO.map((s) => ({ name: s.name, title: s.title, type: "section", elements: s.campos.map((c) => ({ name: c, optionFlags: "0" })) }));
+    return [so(secoes[0])].concat(novas, secoes.slice(1).map(so));
+  }
+  async function camposDaPromocao(chamar, listarTodos, log, falhas, categoria) {
+    const falhou = (desc, e) => { const msg = (e && e.message) || String(e); falhas.push(desc + ": " + msg); log("  FALHOU " + desc + ": " + msg); };
+    let existentes;
+    try {
+      existentes = new Set((await listarTodos("crm.deal.userfield.list", { order: { SORT: "ASC" } }, (d) => d)).map((f) => String(f.FIELD_NAME).toUpperCase()));
+    } catch (e) { falhou("leitura dos campos de negócio (solicitação de promoção)", e); return; }
+    let criados = 0;
+    for (let i = 0; i < schema.CAMPOS_PROMOCAO.length; i++) {
+      const campo = schema.CAMPOS_PROMOCAO[i];
+      if (existentes.has(campo.codigo)) continue;
+      try { await chamar("crm.deal.userfield.add", { fields: payloadCampoNegocio(campo, i) }); criados++; } catch (e) { falhou("campo de negócio " + campo.codigo, e); }
+    }
+    log("Solicitação de promoção: " + (schema.CAMPOS_PROMOCAO.length - criados) + " campos de negócio já existiam" + (criados ? ", " + criados + " criados" : ""));
+    try {
+      const extras = { dealCategoryId: Number(categoria) };
+      const atual = await chamar("crm.deal.details.configuration.get", { scope: "C", extras });
+      const novo = layoutComPromocao(atual && atual.dados);
+      if (!novo) { log("  card do funil " + categoria + ": " + (atual && Array.isArray(atual.dados) && atual.dados.length ? "já mostra a promoção" : "sem layout salvo (mostra o que estiver preenchido)")); return; }
+      await chamar("crm.deal.details.configuration.set", { scope: "C", extras, data: novo });
+      await chamar("crm.deal.details.configuration.forceCommonScopeForAll", { extras });
+      log("  card do funil " + categoria + ": seções da promoção incluídas");
+    } catch (e) { falhou("seções da promoção no card do funil " + categoria, e); }
+  }
+
+  return { provisionar, payloadCampo, payloadCampoNegocio, layoutComPromocao, codigoDoEstagio, TIPO_UF };
 });

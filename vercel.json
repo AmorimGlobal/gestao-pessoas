@@ -7,7 +7,8 @@
     "api/avisos.js": { "maxDuration": 60 },
     "api/painel.js": { "maxDuration": 60 },
     "api/ficha.js": { "maxDuration": 30 },
-    "api/contagem.js": { "maxDuration": 30 }
+    "api/contagem.js": { "maxDuration": 30 },
+    "api/semanal.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/sincronizar", "schedule": "0 9 * * *" },

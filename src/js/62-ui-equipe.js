@@ -122,8 +122,9 @@
       { chave: "resumo", rotulo: "Histórico", rota: "#/membro/" + m.id },
       { chave: "feedbacks", rotulo: "Feedbacks SCI", rota: "#/membro/" + m.id + "/feedbacks", qt: fbs.length },
       { chave: "mensal", rotulo: "1:1 mensais", rota: "#/membro/" + m.id + "/mensal", qt: mensais.length },
+    ].concat(ctx.recursos && ctx.recursos.semanal === false ? [] : [{ chave: "semanal", rotulo: "Semanal", rota: "#/membro/" + m.id + "/semanal", qt: GP.semanal.doMembro(ctx, m.id).length }]).concat([
       { chave: "ciclo", rotulo: "O2O", rota: "#/membro/" + m.id + "/ciclo", qt: ciclos.length },
-    ].concat(dom.DESEMPENHO_ATIVO ? [{ chave: "desempenho", rotulo: "Desempenho anual", rota: "#/membro/" + m.id + "/desempenho" }] : [])
+    ]).concat(dom.DESEMPENHO_ATIVO ? [{ chave: "desempenho", rotulo: "Desempenho anual", rota: "#/membro/" + m.id + "/desempenho" }] : [])
       .concat([{ chave: "carreira", rotulo: "Carreira", rota: "#/membro/" + m.id + "/carreira" }]);
     if (planos.length) abas.push({ chave: "planos", rotulo: "Planos de melhoria", rota: "#/membro/" + m.id + "/planos", qt: planos.length });
     if (obs.length) abas.push({ chave: "onboarding", rotulo: "Onboarding", rota: "#/membro/" + m.id + "/onboarding" });
@@ -132,6 +133,7 @@
     if (aba === "feedbacks") h += '<div class="card">' + (fbs.length ? fbs.map((f) => GP.telas.rotinas.feedbackHtml(f, true)).join('<hr style="border:none;border-top:1px solid var(--divisor);margin:16px 0">') : c.vazio("Nenhum feedback SCI registrado.")) + "</div>";
     else if (aba === "mensal") h += '<div class="card">' + (dom.temMensal(ctx) && ["SUCCESS", "FAIL"].indexOf(m.estagio) < 0 ? '<div style="margin-bottom:12px"><button class="btn peq" data-acao="novo-mensal" data-membro="' + esc(m.id) + '">' + icone("mais", 13) + " Registrar o 1:1 do mês</button></div>" : "") +
       (mensais.length ? mensais.map((r) => GP.telas.rotinas.mensalHtml(r)).join('<hr style="border:none;border-top:1px solid var(--divisor);margin:16px 0">') : c.vazio("Nenhum 1:1 mensal registrado.")) + "</div>";
+    else if (aba === "semanal") h += semanalHtml(m);
     else if (aba === "ciclo") h += ciclos.length ? ciclos.map((ci) => GP.telas.rotinas.cicloResumoHtml(ci)).join("") : '<div class="card">' + c.vazio("Nenhum O2O ainda. Membros em onboarding entram no O2O no trimestre seguinte ao Dia 90.") + "</div>";
     else if (aba === "desempenho" && dom.DESEMPENHO_ATIVO) h += GP.telas.desempenho.anualHtml(m, Number(ctx.hoje.slice(0, 4)));
     else if (aba === "carreira") h += carreiraHtml(m, ciclos);
@@ -172,11 +174,24 @@
     return '<div class="card"><div class="linha-tempo">' + ev.map((e) => '<div class="evento"><span class="marcador" style="background:' + e.cor + '"></span><div class="quando">' + calc.fmtDataAno(e.data) + "</div>" +
       '<div class="o-que"><a href="' + e.rota + '">' + esc(e.o) + "</a></div>" + (e.r ? '<div class="resumo">' + esc(e.r) + "</div>" : "") + "</div>").join("") + "</div></div>";
   }
+  /** Revisões semanais: as respostas ao alinhamento semanal pelo WhatsApp, guardadas pela rotina das 6h (04/11/2026) */
+  function semanalHtml(m) {
+    const S = GP.semanal;
+    const revs = S.doMembro(E().ctx, m.id);
+    const nota = '<p class="muted" style="font-size:12px;margin:0 0 12px">As respostas de ' + esc(m.nome) + " ao alinhamento semanal pelo WhatsApp. A rotina das 6h guarda cada semana aqui, porque o app semanal apaga as respostas a cada ciclo.</p>";
+    if (!revs.length) return '<div class="card">' + nota + c.vazio("Nenhuma revisão semanal guardada ainda.") + "</div>";
+    return revs.map((r, i) => '<div class="card"><h3>Semana de ' + esc(S.rotuloSemana(r.semana)) + '<span class="extra">' + c.tag(r.papel === "Liderança" ? "respondeu como liderança" : "respondeu como membro", "cinza") + "</span></h3>" + (i === 0 ? nota : "") +
+      S.lerRespostas(r.respostas).map((q) => '<div class="resposta-semanal"><div class="k">' + esc(q.titulo || q.pergunta) + "</div>" + (q.titulo ? '<div class="muted pergunta">' + esc(q.pergunta) + "</div>" : "") +
+        '<div class="texto-registro">' + esc(q.resposta) + "</div></div>").join("") +
+      '<p class="muted" style="font-size:12px;margin:12px 0 0">Guardada em ' + esc(calc.fmtDataAno(String(r.guardadaEm || r.criadoEm || "").slice(0, 10))) + ".</p></div>").join("");
+  }
   function carreiraHtml(m, ciclos) {
     const ultimo = ciclos.find((ci) => ci.proximoNivel || ci.objetivo);
     const mov = String(m.carreira || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     return '<div class="card"><h3>Carreira</h3>' + c.dados([["Nível atual", m.nivel], ["Próximo nível", ultimo ? ultimo.proximoNivel : ""], ["Objetivo de desenvolvimento", ultimo ? ultimo.objetivo : ""], ["Progresso", ultimo ? ultimo.progresso : ""]]) +
-      '<div class="grupo-form" style="margin-top:16px"><div class="rotulo-grupo">Histórico de movimentações</div>' + (mov.length ? '<div class="lista">' + mov.map((l) => '<div class="item">' + esc(l) + "</div>").join("") + "</div>" : c.vazio("Nenhuma movimentação registrada. A movimentação é decidida na calibração e registrada pelo RH.")) + "</div></div>";
+      '<div class="grupo-form" style="margin-top:16px"><div class="rotulo-grupo">Histórico de movimentações</div>' + (mov.length ? '<div class="lista">' + mov.map((l) => '<div class="item">' + esc(l) + "</div>").join("") + "</div>" : c.vazio("Nenhuma movimentação registrada. A movimentação é decidida na calibração e registrada pelo RH, ou entra sozinha quando o RH aprova uma solicitação de promoção.")) + "</div>" +
+      // solicitações de promoção do membro (05/11/2026): pedir, acompanhar e abrir cada uma
+      (GP.telas.recrutamento ? GP.telas.recrutamento.promocoesDoMembroHtml(m.id) : "") + "</div>";
   }
 
   /* ---------------- dossiê do membro (4.4) ---------------- */

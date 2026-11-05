@@ -272,6 +272,11 @@ table.tabela td.n, table.tabela th.n { text-align: right; font-variant-numeric: 
 .sci { display: grid; gap: 10px; margin-top: 8px; }
 .sci .k { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--suave); font-weight: 700; }
 .texto-registro { white-space: pre-line; }
+/* revisões semanais (aba Semanal do card do membro) */
+.resposta-semanal { padding: 12px 0; border-top: 1px solid var(--divisor); }
+.resposta-semanal:first-of-type { border-top: none; padding-top: 4px; }
+.resposta-semanal .k { font-weight: 700; color: var(--navy); }
+.resposta-semanal .pergunta { font-size: 12px; margin: 2px 0 6px; }
 .adendo { background: var(--sutil); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; white-space: pre-line; }
 
 /* ---------------- formulários e painel lateral ---------------- */

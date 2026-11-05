@@ -116,3 +116,37 @@ test("navegador: o formulário cria o card de negócio com as listas pelo texto,
     (e) => /opção "Motivo novo" em UF_CRM_OFF_MOTIVO/.test(e.descricao) && /campo UF_CRM_OFF_XYZ/.test(e.descricao));
   assert.equal(bx.estado.negocios.length, 1);
 });
+
+test("navegador: a promoção nasce na etapa pedida, e a decisão grava campos, etapa e responsável numa chamada", async () => {
+  const bx = criarBitrixFalso({ camposNegocio: [
+    { fieldName: "UF_CRM_PR_MEMBRO", type: "employee" }, { fieldName: "UF_CRM_PR_NIVEL", type: "string" },
+    { fieldName: "UF_CRM_PR_COORD_DEC", type: "string" }, { fieldName: "UF_CRM_PR_COORD_EM", type: "date" },
+  ] });
+  const GP = carregarApp(bx.chamar);
+  const repo = GP.bitrix.criarRepositorio();
+  // pedida pela coordenação: já nasce em "Em análise", restrita, com a coordenação e a liderança como observadoras
+  const n = await repo.criarNegocio({ categoria: 77, titulo: "Promoção · Ana Ribeiro", responsavel: "2", estagio: "C77:PREPARATION", restrito: true,
+    observadores: ["2", "3"], origem: { sistema: "gestao-pessoas", id: "1" }, campos: { UF_CRM_PR_MEMBRO: 100, UF_CRM_PR_NIVEL: "Analista III" } });
+  assert.equal(n.estagio, "C77:PREPARATION");
+  let card = JSON.parse(JSON.stringify(bx.estado.negocios[0]));
+  assert.equal(card.opened, "N");
+  assert.deepEqual(card.observers, [2, 3]);
+  assert.equal(card.ufCrmPrMembro, 100);
+  // a decisão: campos, etapa e o novo responsável no mesmo crm.item.update
+  const antes = bx.estado.chamadas.length;
+  await repo.atualizarNegocio(n.id, { campos: { UF_CRM_PR_COORD_DEC: "Aprovada", UF_CRM_PR_COORD_EM: "2026-10-08" }, estagio: "C77:WON", responsavel: "6" });
+  const novas = bx.estado.chamadas.slice(antes).filter((c) => c.metodo === "crm.item.update");
+  assert.equal(novas.length, 1);
+  card = JSON.parse(JSON.stringify(bx.estado.negocios[0]));
+  assert.equal(card.stageId, "C77:WON");
+  assert.equal(card.assignedById, 6);
+  assert.equal(card.ufCrmPrCoordDec, "Aprovada");
+  assert.equal(card.ufCrmPrCoordEm, "2026-10-08");
+  // sem responsável no pedido: o responsável não muda
+  await repo.atualizarNegocio(n.id, { campos: {}, estagio: "C77:LOSE" });
+  assert.equal(bx.estado.negocios[0].assignedById, 6);
+  assert.equal(bx.estado.negocios[0].stageId, "C77:LOSE");
+  // campo que o portal ainda não tem (estrutura não criada): nada é gravado, e a mensagem diz qual
+  await assert.rejects(repo.atualizarNegocio(n.id, { campos: { UF_CRM_PR_RH_DEC: "Aprovada" }, estagio: "C77:WON" }), (e) => /campo UF_CRM_PR_RH_DEC/.test(e.descricao));
+  assert.equal(bx.estado.negocios[0].stageId, "C77:LOSE");
+});

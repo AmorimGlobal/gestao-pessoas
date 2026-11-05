@@ -153,7 +153,7 @@ test("a ausência registrada entra na agenda da equipe; a de outra etapa, não",
   assert.deepEqual(ag2.linhas.find((l) => l.pessoa.userId === "101").ausencias.map((a) => a.inicio), ["2026-10-13", "2026-11-13"], "em ordem de data");
 });
 
-test("e-mail do pedido: para o RH, com cópia para a liderança, pronto no Gmail e no e-mail do computador", () => {
+test("e-mail do pedido: para o RH, com cópia para a liderança, pronto para sair pela caixa do Bitrix", () => {
   const ctx = contexto("100");
   const ana = { tipo: "Férias", inicio: "2026-12-07", fim: "2026-12-21", cobertura: "Bruno acompanha os protocolos da carteira." };
   const e = F.emailDoPedido(ctx, Object.assign({}, ana, { foraDaPolitica: "Pedido com 30 dias de antecedência: a política pede pelo menos 60." }), pessoa(ctx, "100"));
@@ -164,10 +164,16 @@ test("e-mail do pedido: para o RH, com cópia para a liderança, pronto no Gmail
   assert.match(e.corpo, /Período: de segunda, 07\/12\/2026 a segunda, 21\/12\/2026 \(15 dias corridos\)/);
   assert.match(e.corpo, /Cobertura das atividades: Bruno acompanha/);
   assert.match(e.corpo, /- Pedido com 30 dias de antecedência/);
-  assert.ok(F.linkMailto(e).startsWith("mailto:hr@amorimlawfirm.com?cc=carla.mendes@amorimglobal.com&subject=Solicita%C3%A7%C3%A3o"));
-  assert.match(F.linkGmail(e), /^https:\/\/mail\.google\.com\/mail\/\?view=cm&fs=1&to=hr%40amorimlawfirm\.com&cc=carla\.mendes%40amorimglobal\.com&su=/);
   assert.doesNotMatch(e.corpo, /registrad/i, "o e-mail é o pedido, como na política: nada é gravado no app");
   assert.equal(F.emailDaDecisao, undefined, "a resposta é do RH e da liderança, no próprio e-mail");
+  assert.equal(F.linkGmail, undefined, "a Amorim usa o e-mail do Bitrix: sem Gmail nem mailto");
+  // o corpo vai em HTML simples: texto escapado, quebras de linha em <br>
+  assert.equal(F.corpoHtml("Olá, RH,\n\nPeríodo: <15 dias> & cobertura\r\nFim"), "Olá, RH,<br><br>Período: &lt;15 dias&gt; &amp; cobertura<br>Fim");
+  // o remetente é a caixa da própria pessoa; sem ela, a primeira oferecida
+  const caixas = [{ email: "geral@amorimglobal.com", name: "Geral" }, { email: "Ana.Ribeiro@amorimglobal.com", name: "Ana" }];
+  assert.equal(F.escolherRemetente(caixas, "ana.ribeiro@amorimglobal.com").name, "Ana");
+  assert.equal(F.escolherRemetente(caixas, "outra@amorimglobal.com").name, "Geral");
+  assert.equal(F.escolherRemetente([], "ana@x.com"), null);
 });
 
 test("notificações: a ausência registrada pelo RH avisa a liderança direta e quem sai; o resto, como antes", () => {

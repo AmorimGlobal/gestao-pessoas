@@ -148,13 +148,16 @@
   }
   /** Cria o card com quem pede como responsável, grava os comentários na timeline e passa o card ao responsável do funil.
       Assim quem pede só precisa de "Adicionar" e "Editar: próprios" no funil, e deixa de ver o card quando ele passa ao RH.
-      o = { categoria, titulo, campos, origem, restrito, comentarios, responsavel, nomeFunil }.
+      o = { categoria, titulo, campos, origem, restrito, comentarios, responsavel, nomeFunil, estagio, observadores }.
+      estagio: a etapa em que o card nasce (vazio: a primeira do funil). observadores: além de quem pede (promoção: a
+      coordenação e a liderança direta, que continuam vendo o card depois que ele passa ao RH).
       Devolve { id, estagio, avisos }: o que não deu certo depois de o card existir vai em avisos, sem desfazer o envio. */
   async function enviarCard(o) {
     const E = ui.estado;
+    const observadores = [String(E.eu.id)].concat((o.observadores || []).map(String)).filter((u, i, l) => u && l.indexOf(u) === i);
     let neg;
     try {
-      neg = await E.repo.criarNegocio({ categoria: o.categoria, titulo: o.titulo, responsavel: E.eu.id, campos: o.campos, origem: o.origem, restrito: o.restrito, observadores: [E.eu.id] });
+      neg = await E.repo.criarNegocio({ categoria: o.categoria, titulo: o.titulo, responsavel: E.eu.id, campos: o.campos, origem: o.origem, restrito: o.restrito, observadores, estagio: o.estagio || "" });
     } catch (e) { throw erroDoFunil(e, o.nomeFunil); }
     const avisos = [];
     for (const texto of o.comentarios || []) {

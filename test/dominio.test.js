@@ -305,7 +305,8 @@ test("offboarding: solicitações da esteira, alerta do RH e histórico por per�
   assert.equal(porNome["Otávio Ramos"].motivoTexto, "Outro: Fim do projeto do cliente");
   const d = dom.demandasRH(ctx);
   assert.equal(d.offboarding, 2); // Igor (esteira, nova) + Fernanda (app, enviada ao RH)
-  assert.equal(d.recrutamento, 0); // nenhuma vaga em "Nova solicitação" na demonstração
+  // nenhuma vaga em "Nova solicitação" na demonstração; a promoção da Júlia, já aprovada pela coordenação, aguarda o RH
+  assert.equal(d.recrutamento, 1);
   const tri = dom.historicoDesligamentos(ctx, "trimestre");
   assert.deepEqual(tri.map((l) => l.periodo.chave), ["2026-T4", "2026-T3", "2026-T1", "2025-T4"]);
   const t3 = tri.find((l) => l.periodo.chave === "2026-T3");

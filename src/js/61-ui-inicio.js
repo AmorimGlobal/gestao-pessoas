@@ -84,11 +84,12 @@
   function atalhosCoordenacao() {
     const ctx = E().ctx, uid = E().eu.id;
     const aprov = dom.aprovacoesPendentes(ctx, uid);
+    const promo = dom.promocoesAguardando(ctx, uid);
     const mapa = dom.mapaCoordenacao(ctx, uid);
     const atrasos = mapa.reduce((s, l) => s + l.atrasos.length, 0);
     const atencao = mapa.filter((l) => l.ind.situacao.chave !== "em-dia");
     return c.kpis([
-      { valor: aprov.length, rotulo: "aprovações aguardando você", tom: "ambar", rota: "#/offboarding" },
+      { valor: aprov.length + promo.length, rotulo: "aprovações aguardando você", tom: "ambar", rota: promo.length && !aprov.length ? "#/recrutamento" : "#/offboarding" },
       { valor: atrasos, rotulo: "itens atrasados nas outras equipes", tom: "vermelho", rota: "#/painel/setor" },
       { valor: atencao.length, rotulo: atencao.length === 1 ? "liderança em Atenção ou Precisa de apoio" : "lideranças em Atenção ou Precisa de apoio", tom: "roxo", rota: "#/painel/setor" },
     ]);
@@ -211,6 +212,7 @@
     const ctx = E().ctx, uid = E().eu.id;
     const mapa = dom.mapaCoordenacao(ctx, uid);
     const aprov = dom.aprovacoesPendentes(ctx, uid);
+    const promo = dom.promocoesAguardando(ctx, uid);
     const perto = mapa.reduce((acc, l) => acc.concat(l.atrasos.filter((a) => a.atrasoDias >= 7 && a.atrasoDias <= 13)), []);
     const planos = mapa.reduce((acc, l) => acc.concat(l.equipe.map((m) => dom.planoAtivoDo(ctx, m.id)).filter(Boolean)), []);
     const membrosSetor = mapa.reduce((n, l) => n + l.tamanho, 0);
@@ -222,7 +224,7 @@
       { valor: atrasosSetor, rotulo: atrasosSetor === 1 ? "item atrasado" : "itens atrasados", tom: "vermelho" },
       { valor: emDia + " de " + mapa.length, rotulo: "equipes em dia", tom: "verde" },
     ] }) + c.kpis([
-      { valor: aprov.length, rotulo: "Suas aprovações", nota: aprov.length ? "a mais antiga há " + Math.max.apply(null, aprov.map((a) => a.dias)) + " dias (prazo de 3)" : "nenhuma aguardando", tom: "ambar", rota: "#/offboarding" },
+      { valor: aprov.length + promo.length, rotulo: "Suas aprovações", nota: aprov.length ? "a mais antiga há " + Math.max.apply(null, aprov.map((a) => a.dias)) + " dias (prazo de 3)" + (promo.length ? " · " + plural(promo.length, "promoção", "promoções") : "") : promo.length ? plural(promo.length, "promoção aguarda", "promoções aguardam") + " você" : "nenhuma aguardando", tom: "ambar", rota: promo.length && !aprov.length ? "#/recrutamento" : "#/offboarding" },
       { valor: perto.length, rotulo: "Perto do aviso de 14 dias", nota: perto.length ? "aviso a partir de " + calc.fmtData(perto.map((p) => p.avisoCoordenacao).sort()[0]) : "nenhum item com 7 a 13 dias de atraso", tom: "vermelho", rota: "#/painel/setor" },
       { valor: planos.length, rotulo: "Planos de melhoria", nota: planos.length ? "em andamento no setor" : "nenhum em andamento", tom: "roxo", rota: "#/rotinas" },
     ]);
@@ -324,10 +326,12 @@
     const fila = dom.filaRH(ctx);
     const esteira = dom.solicitacoesOffboarding(ctx).filter((s) => s.nova);
     const vagas = dom.vagasDe(ctx, null).filter((v) => v.nova);
-    const total = fila.length + esteira.length + vagas.length;
-    let h = '<div class="card' + (esteira.length || vagas.length ? " acao vermelho" : "") + '"><h3>Fila do RH<span class="extra muted">' + plural(total, "item", "itens") + "</span></h3>" + (total ? '<div class="lista">' +
+    const promos = dom.promocoes(ctx).filter((x) => x.situacao === "rh");
+    const total = fila.length + esteira.length + vagas.length + promos.length;
+    let h = '<div class="card' + (esteira.length || vagas.length || promos.length ? " acao vermelho" : "") + '"><h3>Fila do RH<span class="extra muted">' + plural(total, "item", "itens") + "</span></h3>" + (total ? '<div class="lista">' +
       esteira.map((s) => '<div class="item clicavel" data-rota="#/offboarding"><div class="principal-item"><div class="t">Encerramento de contrato · ' + esc(s.membro || s.titulo) + '</div><div class="d">' + esc([s.setor, s.motivoTexto, s.solicitante ? "pedida por " + s.solicitante : ""].filter(Boolean).join(" · ")) + '</div></div><div class="lado">' + c.tag("Nova · esteira", "vermelho") + "</div></div>").join("") +
       vagas.map((v) => '<div class="item clicavel" data-rota="#/recrutamento"><div class="principal-item"><div class="t">Vaga · ' + esc(v.titulo) + '</div><div class="d">' + esc(v.solicitante ? "pedida por " + v.solicitante : "") + '</div></div><div class="lado">' + c.tag("Nova solicitação", "vermelho") + "</div></div>").join("") +
+      promos.map((x) => '<div class="item clicavel" data-rota="#/recrutamento/promocao/' + esc(x.id) + '"><div class="principal-item"><div class="t">Promoção · ' + esc(x.nome) + '</div><div class="d">' + esc([x.nivelAtual && x.nivel ? x.nivelAtual + " → " + x.nivel : x.nivel, "pedida por " + dom.pessoa(ctx, x.solicitante).nome].filter(Boolean).join(" · ")) + '</div></div><div class="lado">' + c.tag("Aguarda o RH", "vermelho") + "</div></div>").join("") +
       fila.map((f) =>
       '<div class="item clicavel" data-rota="#/offboarding/encerramento/' + esc(f.item.id) + '">' + (f.membro ? c.avatar(f.membro, 30) : "") + '<div class="principal-item"><div class="t">Encerramento de contrato · ' + esc(f.membro ? f.membro.nome : "") + '</div><div class="d">' + esc(f.item.motivo || "") + "</div></div>" +
       '<div class="lado">' + c.tag(f.item.estagioNome, f.item.estagio === "BLOQUEADA" ? "vermelho" : "azul") + "</div></div>").join("") + "</div>" : c.vazio("Nada aguardando o RH.")) + "</div>";

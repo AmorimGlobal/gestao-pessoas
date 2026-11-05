@@ -1,6 +1,6 @@
 # Gestão de Pessoas · Amorim
 
-App do Bitrix24 em que cada liderança cuida das rotinas da sua equipe. Os módulos são Minha equipe, Agenda, Recrutamento, Onboarding, Rotinas (1:1 e feedbacks SCI), Desempenho e Offboarding, além do Painel. O app segue a especificação do RH de 08/10/2026, com a revisão de arquitetura de 13/10.
+App do Bitrix24 em que cada liderança cuida das rotinas da sua equipe. Os módulos são Minha equipe, Agenda, Recrutamento (com a solicitação de vaga e, desde 05/11/2026, a de promoção), Onboarding, Rotinas (1:1 e feedbacks SCI), Desempenho e Offboarding, além do Painel. O app segue a especificação do RH de 08/10/2026, com a revisão de arquitetura de 13/10.
 
 - **Dados:** ficam em processos inteligentes nativos do Bitrix, agrupados no menu "Gestão de Pessoas".
 - **Acesso:** o app roda dentro do Bitrix com o login de quem abre, então as permissões do CRM valem sozinhas.
@@ -28,7 +28,7 @@ Não há dependências para instalar.
 
 A Vercel publica a cada push na `main`, em **https://gestao-pessoas-bice.vercel.app** (conta `amorims-projects-ee19b0fd`). Atenção: `gestao-pessoas.vercel.app`, sem o "-bice", é outro app, de outra conta. O Bitrix abre o app com POST, por isso a página sai da função `api/app.js`, e não de um arquivo estático (ver `vercel.json`).
 
-No Bitrix, o app é cadastrado como aplicativo local, com a URL da Vercel e os escopos `crm`, `user`, `department`, `userfieldconfig` e `im` (o calendário do Bitrix não é usado). Depois, um administrador abre o app, vai em **Configuração** e clica em **Criar ou completar a estrutura**.
+No Bitrix, o app é cadastrado como aplicativo local, com a URL da Vercel e os escopos `crm`, `user`, `department`, `userfieldconfig`, `im` e `mail` (o pedido de férias sai pela caixa de e-mail do Bitrix; o calendário do Bitrix não é usado). Depois, um administrador abre o app, vai em **Configuração** e clica em **Criar ou completar a estrutura**.
 
 ### Rotinas no servidor
 

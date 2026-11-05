@@ -6,6 +6,8 @@
    - Férias e ausências: a ausência que o RH registra avisa a liderança direta e a própria
      pessoa. O pedido e a decisão ficam no e-mail (decisão do usuário, 04/11/2026).
    - Vagas (funil 77): a solicitação avisa o RH e a coordenação do setor.
+   - Promoções (funil 77, 05/11/2026): o pedido avisa quem decide agora (a coordenação ou o RH); cada
+     decisão avisa quem pediu, a liderança direta e a coordenação. O membro nunca é avisado.
    - Encerramento (funil 79 e fluxo anterior do app): a solicitação avisa o RH; a do fluxo
      anterior que espera aprovação avisa a coordenação.
    - Finalistas: a avaliação nova avisa a liderança que avalia.
@@ -62,6 +64,28 @@
           titulo: "Nova solicitação de vaga: " + v.titulo, texto: (v.solicitante ? "Pedida por " + v.solicitante + ". " : "") + "Está no funil HR | Requisição de Vagas, em \"" + v.etapa + "\"." });
       });
     }
+
+    /* Promoções (05/11/2026): quem decide agora recebe o pedido; quem pediu, a liderança direta e a coordenação
+       recebem cada decisão que não foi delas. O membro nunca: a conversa com ele fica com a liderança. */
+    const D = dom.DECISAO_PROMOCAO;
+    dom.promocoesDe(ctx, id).forEach((x) => {
+      const rota = "#/recrutamento/promocao/" + x.id;
+      const dePara = (x.nivelAtual ? x.nivelAtual + " → " : "") + x.nivel;
+      const decide = dom.decisorDaPromocao(ctx, id, x);
+      if (decide) add({ id: "promo-" + x.id + "-" + x.situacao, quando: decide === "rh" ? (x.coordEm || x.criadaEm) : x.criadaEm, area: "Recrutamento", rota, acao: true,
+        titulo: "Promoção aguardando a sua aprovação: " + x.nome, texto: dePara + " · pedida por " + nome(x.solicitante) + "." });
+      const acompanha = x.solicitante === id || x.lideranca === id;
+      if (acompanha && x.coordenacao !== id && (x.coordDecisao === D.aprovada || x.coordDecisao === D.naoAprovada)) {
+        add({ id: "promo-" + x.id + "-coord", quando: x.coordEm, area: "Recrutamento", rota,
+          titulo: (x.coordDecisao === D.aprovada ? "A coordenação aprovou a promoção de " : "A coordenação não aprovou a promoção de ") + x.nome,
+          texto: x.coordDecisao === D.aprovada ? "Agora aguarda o RH." : x.coordObs });
+      }
+      if ((acompanha || x.coordenacao === id) && x.rhPor !== id && (x.rhDecisao === D.aprovada || x.rhDecisao === D.naoAprovada)) {
+        add({ id: "promo-" + x.id + "-rh", quando: x.rhEm, area: "Recrutamento", rota,
+          titulo: (x.rhDecisao === D.aprovada ? "O RH aprovou a promoção de " : "O RH não aprovou a promoção de ") + x.nome,
+          texto: x.rhDecisao === D.aprovada ? (x.nivel ? x.nivel + (x.vigencia ? " a partir de " + calc.fmtDataAno(x.vigencia) : "") + ". " : "") + "A conversa com a pessoa fica com a liderança." : x.rhObs });
+      }
+    });
 
     /* Encerramento de contrato: a esteira (só o RH lê) e o fluxo anterior do app */
     if (p.rh) {

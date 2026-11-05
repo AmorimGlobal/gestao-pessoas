@@ -267,31 +267,98 @@
     abrirEmail(e);
   };
 
-  /* ================================================================ O E-MAIL PRONTO */
+  /* ================================================================ O E-MAIL PRONTO, PELA CAIXA DO BITRIX */
+  // A Amorim usa o e-mail do Bitrix (04/11/2026): o app envia pela caixa de quem pede (mail.message.send, escopo
+  // mail), e o e-mail fica nos enviados dela. A mensagem pode ser ajustada antes. Sem a permissão de e-mail no app,
+  // "Abrir o e-mail do Bitrix" copia o texto e abre a tela de escrever do Bitrix sobre o app.
   let emailAberto = null;
   function abrirEmail(e) {
     emailAberto = e;
     ui.abrirPainel({
       titulo: "Enviar o e-mail ao RH", largo: true,
-      sub: "A política pede o pedido por e-mail para " + esc(F.EMAIL_RH) + ", com cópia para a sua liderança direta. Está pronto: abra no seu e-mail e envie. O RH responde por e-mail e, aprovado, registra a ausência no app.",
+      sub: "A política pede o pedido por e-mail para " + esc(F.EMAIL_RH) + ", com cópia para a sua liderança direta. O e-mail sai pela sua caixa do Bitrix e fica nos seus enviados. O RH responde por e-mail e, aprovado, registra a ausência no app.",
       corpo: '<div class="email-pronto">' + c.dados([["Para", e.para], ["Cópia", e.cc.join(", ") || "—"], ["Assunto", e.assunto]]) +
-        '<pre class="email-corpo" id="email-corpo">' + esc(e.corpo) + "</pre></div>",
-      rodape: '<a class="btn" target="_blank" rel="noopener" href="' + esc(F.linkGmail(e)) + '">' + icone("email", 14) + " Abrir no Gmail</a>" +
-        '<a class="btn sec" target="_blank" rel="noopener" href="' + esc(F.linkMailto(e)) + '">Abrir no e-mail do computador</a>' +
+        c.campo({ nome: "corpoEmail", rotulo: "Mensagem", tipo: "textoLongo", valor: e.corpo, linhas: 14, ajuda: "Pode ajustar o texto antes de enviar." }) + "</div>",
+      rodape: '<button class="btn" data-acao="enviar-email-bitrix">' + icone("email", 14) + " Enviar pelo e-mail do Bitrix</button>" +
+        '<button class="btn sec" data-acao="abrir-email-bitrix">Abrir o e-mail do Bitrix</button>' +
         '<button class="btn sec" data-acao="copiar-email">Copiar</button><button class="btn link" data-acao="fechar-painel">Fechar</button>',
+      // o texto já veio pronto: fechar sem enviar não pergunta "fechar sem salvar?"
+      aoAbrir: (painel) => { const corpo = painel.querySelector("#painel-corpo"); if (corpo) corpo.dataset.limpo = "1"; },
     });
   }
-  ui.acoes["copiar-email"] = function () {
-    if (!emailAberto) return;
-    const texto = F.textoDoEmail(emailAberto);
-    const feito = () => ui.avisar("E-mail copiado: cole no seu e-mail e envie.");
-    const reserva = () => {
-      // dentro do Bitrix (iframe) a área de transferência pode ser bloqueada: seleciona o texto para o Ctrl+C
-      const pre = document.getElementById("email-corpo");
-      try { const r = document.createRange(); r.selectNodeContents(pre); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); if (document.execCommand("copy")) { feito(); return; } } catch (e) { /* segue */ }
-      ui.avisar("Não consegui copiar sozinho: o texto está selecionado, use Ctrl+C.", "erro");
+  /** O e-mail como está no painel (a mensagem pode ter sido ajustada) */
+  function emailAtual() {
+    if (!emailAberto) return null;
+    const t = document.querySelector('#painel [name="corpoEmail"]');
+    return Object.assign({}, emailAberto, { corpo: t ? t.value : emailAberto.corpo });
+  }
+  function erroNoEnvio(texto) {
+    const el = document.querySelector("#painel-rodape .erro-envio");
+    if (el) el.innerHTML = '<div class="aviso-erro"><b>Não foi enviado.</b> ' + esc(texto) + "</div>";
+  }
+  /** Copia para a área de transferência. Dentro do Bitrix (iframe) o navigator.clipboard pode ser bloqueado, então
+      tenta antes o comando de copiar, ainda no clique; se nada der certo, seleciona a mensagem para o Ctrl+C. */
+  function copiarTexto(texto, depois) {
+    const t = document.createElement("textarea");
+    t.value = texto;
+    t.setAttribute("readonly", "");
+    t.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+    document.body.appendChild(t);
+    t.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(t);
+    if (ok) { depois(true); return; }
+    let feito = false;
+    const fim = (copiou) => {
+      if (feito) return;
+      feito = true;
+      if (!copiou) { const m = document.querySelector('#painel [name="corpoEmail"]'); if (m) { m.focus(); m.select(); } }
+      depois(copiou);
     };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(feito, reserva); else reserva();
+    if (!(navigator.clipboard && navigator.clipboard.writeText)) { fim(false); return; }
+    // sem a permissão do iframe, a promessa pode ficar parada: depois de 1,5 s vale como não copiado
+    navigator.clipboard.writeText(texto).then(() => fim(true), () => fim(false));
+    setTimeout(() => fim(false), 1500);
+  }
+  ui.acoes["enviar-email-bitrix"] = async function (el) {
+    const e = emailAtual();
+    if (!e || E().ocupado) return;
+    if (!String(e.corpo || "").trim()) { erroNoEnvio("A mensagem está vazia."); return; }
+    if (E().verComo) { erroNoEnvio("Em \"Ver como\", o e-mail sairia pela sua caixa, e não pela da pessoa."); return; }
+    const repo = E().repo;
+    const rotulo = el.innerHTML;
+    E().ocupado = true;
+    el.disabled = true;
+    el.textContent = "Enviando...";
+    try {
+      const r = await repo.enviarEmail(e, E().eu.email);
+      ui.fecharPainel(true);
+      ui.avisar("E-mail enviado pela sua caixa do Bitrix" + (r && r.de ? " (" + r.de + ")" : "") + " para o RH" + (e.cc.length ? ", com cópia para a sua liderança" : "") + ". Ele fica nos seus enviados.");
+    } catch (err) {
+      console.warn("E-mail pelo Bitrix:", err);
+      erroNoEnvio(err && err.semEscopo ? "O app ainda não tem a permissão de e-mail do Bitrix (falta o escopo \"mail\" no aplicativo; avise o TI). Por enquanto, use \"Abrir o e-mail do Bitrix\": o texto vai copiado."
+        : err && err.codigo === "SEM_CAIXA" ? "Você não tem uma caixa de e-mail conectada no Bitrix. Conecte em Bitrix → E-mail, ou copie o texto."
+        : err && err.semAcesso ? "O Bitrix não deixou enviar pela sua caixa (" + repo.mensagemErro(err) + "). Use \"Abrir o e-mail do Bitrix\": o texto vai copiado."
+        : repo.mensagemErro(err) + ". Use \"Abrir o e-mail do Bitrix\": o texto vai copiado.");
+    } finally {
+      E().ocupado = false;
+      if (document.body.contains(el)) { el.disabled = false; el.innerHTML = rotulo; }
+    }
+  };
+  ui.acoes["abrir-email-bitrix"] = function () {
+    const e = emailAtual();
+    if (!e) return;
+    // copia ainda no clique (o comando de copiar só vale nele) e abre a tela de escrever do Bitrix sem esperar
+    copiarTexto(F.textoDoEmail(e), function (ok) {
+      ui.avisar(ok ? "Texto copiado. No e-mail do Bitrix, cole (Ctrl+V) e confira o destinatário, a cópia e o assunto." : "Não consegui copiar sozinho: a mensagem está selecionada aqui no app, use Ctrl+C.", ok ? "" : "erro");
+    });
+    if (E().repo.abrirEmailBitrix) E().repo.abrirEmailBitrix();
+  };
+  ui.acoes["copiar-email"] = function () {
+    const e = emailAtual();
+    if (!e) return;
+    copiarTexto(F.textoDoEmail(e), (ok) => ui.avisar(ok ? "E-mail copiado: cole no seu e-mail e envie." : "Não consegui copiar sozinho: a mensagem está selecionada, use Ctrl+C.", ok ? "" : "erro"));
   };
 
   /* ================================================================ MEU ANIVERSÁRIO */

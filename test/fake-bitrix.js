@@ -2,6 +2,8 @@
 // itens (crm.item.*), comentários, avisos, usuários e departamentos.
 // Negócios (entityTypeId 2): os campos vêm de o.camposNegocio [{fieldName, type, multiple, items}],
 // e os cards criados ficam em estado.negocios.
+// Campos de negócio criados por crm.deal.userfield.add (provisionamento da promoção) ficam em estado.camposDeNegocio;
+// o layout do card de cada funil em estado.layouts[categoria] (o.layouts para começar com um layout salvo).
 // Responde no mesmo formato da API (result/next), via chamar(metodo, params) -> {dados, proximo}.
 const { camelDoCampo } = require("../src/js/20-schema.js");
 
@@ -21,14 +23,22 @@ function criarBitrixFalso(opcoes) {
     usuarios: o.usuarios || [],         // formato do user.get
     departamentos: o.departamentos || [], // formato do department.get
     agora: o.agora || "2026-10-08T10:00:00-03:00",
+    camposDeNegocio: (o.camposDeNegocioIniciais || []).map((n, i) => ({ ID: String(100 + i), FIELD_NAME: n, USER_TYPE_ID: "string" })),
+    layouts: JSON.parse(JSON.stringify(o.layouts || {})), // categoria -> [seções]
   };
   let proxTipo = 50, proxEti = 1200, proxCat = 300, proxStatus = 1, proxSol = 10, proxEnum = 9000, proxItem = 500;
 
   const tipoPorEti = (eti) => estado.tipos.find((t) => String(t.entityTypeId) === String(eti));
-  /** filtro simples do crm.item.list: igualdade (lista = "um destes"), com ou sem "=" na frente */
+  /** filtro simples do crm.item.list: igualdade (lista = "um destes"), com ou sem "=" na frente, e as comparações >=, <=, >, < */
   function confere(it, filtro) {
     return Object.keys(filtro || {}).every((k) => {
-      const v = filtro[k], atual = it[k.replace(/^=/, "")];
+      const op = (/^(>=|<=|>|<)/.exec(k) || [""])[0];
+      const v = filtro[k], atual = it[k.slice(op.length).replace(/^=/, "")];
+      if (op) {
+        if (atual === undefined || atual === null || atual === "") return false;
+        const a = String(atual), b = String(v);
+        return op === ">=" ? a >= b : op === "<=" ? a <= b : op === ">" ? a > b : a < b;
+      }
       return Array.isArray(v) ? v.map(String).indexOf(String(atual)) >= 0 : String(atual) === String(v);
     });
   }
@@ -108,6 +118,22 @@ function criarBitrixFalso(opcoes) {
         if (o.semEscopoCampos) throw new Error("insufficient_scope");
         estado.campos.push(Object.assign({}, params.field, params.field.enum ? { enum: params.field.enum.map((e) => Object.assign({ id: proxEnum++ }, e)) } : {}));
         return { dados: { field: params.field }, proximo: null };
+      /* ---------- campos e layout do card de negócio (solicitação de promoção) ---------- */
+      case "crm.deal.userfield.list": // como no portal: devolve tudo de uma vez, sem paginar
+        return { dados: estado.camposDeNegocio.map((f) => ({ ID: f.ID, FIELD_NAME: f.FIELD_NAME, USER_TYPE_ID: f.USER_TYPE_ID })), proximo: null };
+      case "crm.deal.userfield.add": {
+        if (String(params.fields.FIELD_NAME).length > 20) throw new Error("crm.deal.userfield.add: FIELD_NAME com mais de 20 caracteres");
+        const f = Object.assign({ ID: String(5000 + estado.camposDeNegocio.length) }, params.fields);
+        estado.camposDeNegocio.push(f);
+        return { dados: Number(f.ID), proximo: null };
+      }
+      case "crm.deal.details.configuration.get":
+        return { dados: estado.layouts[String(params.extras.dealCategoryId)] || [], proximo: null };
+      case "crm.deal.details.configuration.set":
+        estado.layouts[String(params.extras.dealCategoryId)] = JSON.parse(JSON.stringify(params.data));
+        return { dados: true, proximo: null };
+      case "crm.deal.details.configuration.forceCommonScopeForAll":
+        return { dados: true, proximo: null };
       case "crm.automatedsolution.list":
         return { dados: { automatedSolutions: estado.solucoes }, proximo: null };
       case "crm.automatedsolution.add": {

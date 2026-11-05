@@ -123,6 +123,7 @@
           mensal: repo.temProcesso ? repo.temProcesso("mensal") : true,
           ferias: repo.temProcesso ? repo.temProcesso("ferias") : true,
           feriados: repo.temProcesso ? repo.temProcesso("feriados") : true,
+          semanal: repo.temProcesso ? repo.temProcesso("semanal") : true,
         },
       });
       const papeis = dom.papeis(ctx, eu.id);

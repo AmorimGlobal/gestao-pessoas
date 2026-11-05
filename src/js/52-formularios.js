@@ -267,12 +267,12 @@
     return d.length === 1 ? "em " + calc.fmtDataAno(d[0]) : "de " + calc.fmtDataAno(d[0]) + " a " + calc.fmtDataAno(d[d.length - 1]);
   };
   /** Os comentários que vão para a timeline do card, na ordem de gravação. A timeline mostra o mais novo no alto:
-      os planos de melhoria (quando há) ficam embaixo, depois os 1:1 mensais, e os feedbacks SCI no alto.
-      o = { quem, registradoPor, data } */
+      os planos de melhoria (quando há) ficam embaixo, depois os O2O (só na promoção), os 1:1 mensais, e os feedbacks SCI no alto.
+      o = { quem, registradoPor, data, pedido: "na solicitação de ..." (padrão: encerramento de contrato), o2o: inclui os O2O realizados } */
   function historicoEncerramento(ctx, membroId, o) {
     const m = dom.infoMembro(ctx, ctx.idx.membro[membroId] || {});
     const autor = (it) => dom.pessoa(ctx, it.autor || it.criadoPor).nome;
-    const origem = "Copiado do app Gestão de Pessoas na solicitação de encerramento de contrato, enviada por " + o.quem +
+    const origem = "Copiado do app Gestão de Pessoas " + (o.pedido || "na solicitação de encerramento de contrato") + ", enviada por " + o.quem +
       (o.registradoPor ? " (registrado por " + o.registradoPor + ")" : "") + " em " + calc.fmtDataAno(o.data) + ".";
     const textos = [];
 
@@ -283,6 +283,15 @@
         linhas([["Resultado esperado 1", p.resultado1], ["Check-in do resultado 1", p.checkin1], ["Situação final do resultado 1", p.final1], ["Evidência 1", p.evidencia1],
           ["Resultado esperado 2", p.resultado2], ["Check-in do resultado 2", p.checkin2], ["Situação final do resultado 2", p.final2], ["Evidência 2", p.evidencia2],
           ["Apoio oferecido", p.apoio], [p.checkinData ? "Check-in de " + calc.fmtDataAno(p.checkinData) : "Check-in", p.checkinComentario], ["Adendos", p.adendos]])).join("\n\n"));
+    }
+
+    if (o.o2o) {
+      const o2o = ((ctx.idx.porMembro.ciclo || {})[membroId] || []).filter((ci) => ci.realizadoEm).sort((a, b) => (a.realizadoEm < b.realizadoEm ? 1 : -1));
+      textos.push("[B]O2O de " + m.nome + "[/B]\n" + origem + " " +
+        (o2o.length ? plural(o2o.length, "registro", "registros") + ", " + faixa(o2o.map((ci) => ci.realizadoEm)) + "." : "Nenhum O2O registrado no app.") +
+        (o2o.length ? "\n\n" + o2o.map((ci) => "[B]" + calc.fmtDataAno(ci.realizadoEm) + " · O2O do " + ((calc.trimestrePorChave(ci.trimestre) || {}).curto || ci.trimestre || "trimestre") + "[/B] · registrado por " + autor(ci) + "\n" +
+          linhas([["Temas trazidos pelo membro", ci.temas], ["Objetivo de desenvolvimento", ci.objetivo], ["Próximo nível", ci.proximoNivel], ["Progresso no objetivo", ci.progresso],
+            ["Resultados do trimestre", ci.resultados], ["Evidências de crescimento", ci.crescimento], ["Percepções da liderança", ci.percepcoes], ["Pontos de atenção", ci.pontosAtencao]])).join("\n\n") : ""));
     }
 
     const mensais = dom.temMensal(ctx) ? dom.mensaisDo(ctx, membroId) : [];
@@ -301,6 +310,151 @@
     return textos;
   }
 
+  /* ================================================================ Solicitação de Promoção (05/11/2026) */
+  /* Pedido do usuário: "elabore um formulário" (sem modelo do RH). A liderança direta ou a coordenação pede; a
+     coordenação e o RH aprovam; o card cai no funil de vagas (77), com os campos UF_CRM_PR_* (20-schema.js). */
+  const REMUNERACAO = ["Sim", "Não", "A definir com o RH"];
+  const IMPACTO = ["Continuam com a pessoa", "Serão redistribuídas no time", "Será preciso contratar alguém"];
+  const CIENTE = ["Não: a conversa fica para depois da aprovação", "Sim, já conversamos"];
+  // reserva quando o RH ainda não cadastrou o glossário de competências (Configuração): as da Solicitação de Contratação
+  const COMPETENCIAS_PADRAO = ["Comunicação Interpessoal", "Pensamento Analítico", "Influência e Persuasão", "Resolução de Problemas", "Orientação para Execução",
+    "Atenção aos Detalhes", "Foco em Resultados", "Visão Estratégica", "Planejamento e Organização", "Tomada de Decisão", "Orientação ao Cliente", "Liderança (quando aplicável)"];
+  /** O formulário com as listas da Configuração. o = { niveis: [...], senioridades: [...], competencias: [nomes] } */
+  function formPromocao(o) {
+    const op = o || {};
+    const niveis = (op.niveis || []).filter(Boolean);
+    const competencias = (op.competencias || []).filter(Boolean);
+    return {
+      chave: "promocao",
+      nome: "Solicitação de Promoção",
+      descricao: "Este formulário formaliza a indicação de um membro para promoção, com os fatos que a sustentam. " +
+        "A coordenação e o RH precisam aprovar: quando a liderança direta pede, a coordenação aprova primeiro e depois o RH; quando a própria coordenação pede, vai direto ao RH. " +
+        "Use fatos e exemplos: entregas, números e situações observadas. Os feedbacks SCI, os 1:1 mensais e os O2O do membro registrados no app vão junto para o card. " +
+        "O app não avisa o membro: a conversa com a pessoa fica com a liderança, depois da aprovação.",
+      secoes: [
+        { titulo: "1. Membro e posição atual", campos: [
+          { codigo: "membroId", rotulo: "Membro indicado", tipo: "lista", obrigatorio: true },
+          // a tela preenche com o tempo de casa, a última movimentação e os registros do membro no app
+          { codigo: "resumo", tipo: "bloco" },
+          { codigo: "UF_CRM_PR_ATUAL", rotulo: "Cargo e área atuais", tipo: "texto", obrigatorio: true, ajuda: "Vem do card do membro. Corrija se estiver desatualizado." },
+          { codigo: "UF_CRM_PR_NIVEL_ATU", rotulo: "Nível atual na Arquitetura de Cargos", tipo: "texto", obrigatorio: false, ajuda: "Vem do card do membro." },
+        ] },
+        { titulo: "2. Proposta", campos: [
+          Object.assign({ codigo: "UF_CRM_PR_NIVEL", rotulo: "Nível proposto", obrigatorio: true }, niveis.length ? { tipo: "lista", opcoes: niveis } : { tipo: "texto" }),
+          { codigo: "UF_CRM_PR_SENIOR", rotulo: "Senioridade proposta", tipo: "lista", obrigatorio: false, opcoes: op.senioridades || [], ajuda: "Só se a senioridade muda com a promoção." },
+          { codigo: "UF_CRM_PR_CARGO", rotulo: "Novo cargo ou função", tipo: "texto", obrigatorio: false, ajuda: "Só se o título do cargo ou a função mudam." },
+          { codigo: "UF_CRM_PR_DATA", rotulo: "A partir de quando a promoção deve valer?", tipo: "data", obrigatorio: true, ajuda: "Data sugerida. O RH confirma na aprovação." },
+          { codigo: "UF_CRM_PR_REMUN", rotulo: "A promoção vem com reajuste salarial?", tipo: "escolha", obrigatorio: true, opcoes: REMUNERACAO },
+          { codigo: "UF_CRM_PR_REAJUSTE", rotulo: "Reajuste sugerido", tipo: "texto", obrigatorio: false, se: { campo: "UF_CRM_PR_REMUN", igual: "Sim" }, ajuda: "Valor ou percentual. O RH confere com a faixa do nível." },
+        ] },
+        { titulo: "3. Justificativa e evidências", texto: "Fatos e exemplos, não impressões. O RH e a coordenação leem isto junto com o histórico do membro no app.", campos: [
+          { codigo: "UF_CRM_PR_MOTIVO", rotulo: "Por que esta pessoa está pronta para a promoção agora?", tipo: "textoLongo", obrigatorio: true },
+          { codigo: "UF_CRM_PR_RESULT", rotulo: "Principais resultados e entregas dos últimos 6 a 12 meses", tipo: "textoLongo", obrigatorio: true,
+            ajuda: "Metas atingidas, casos ou projetos conduzidos, indicadores, retorno de clientes." },
+          { codigo: "UF_CRM_PR_RESPONS", rotulo: "Que responsabilidades do novo nível a pessoa já assume hoje?", tipo: "textoLongo", obrigatorio: true, ajuda: "Exemplos concretos do dia a dia." },
+          { codigo: "UF_CRM_PR_COMPET", rotulo: "Competências comportamentais que se destacam", tipo: "multi", obrigatorio: false, opcoes: competencias.length ? competencias : COMPETENCIAS_PADRAO },
+          { codigo: "UF_CRM_PR_DESENV", rotulo: "O que a pessoa ainda precisa desenvolver no novo nível, e como você vai apoiar?", tipo: "textoLongo", obrigatorio: true },
+        ] },
+        { titulo: "4. Impacto e comunicação", campos: [
+          { codigo: "UF_CRM_PR_IMPACTO", rotulo: "Como ficam as atividades atuais da pessoa?", tipo: "escolha", obrigatorio: true, empilhado: true, opcoes: IMPACTO },
+          { codigo: "UF_CRM_PR_IMPAC_DSC", rotulo: "Conte como fica a operação", tipo: "textoLongo", obrigatorio: true, se: { campo: "UF_CRM_PR_IMPACTO", em: IMPACTO.slice(1) },
+            ajuda: "Quem assume o quê e a partir de quando. Se for preciso contratar, abra também a solicitação de vaga." },
+          { codigo: "UF_CRM_PR_CIENTE", rotulo: "A pessoa já sabe da indicação?", tipo: "escolha", obrigatorio: true, empilhado: true, opcoes: CIENTE },
+          { codigo: "UF_CRM_PR_OBS", rotulo: "Observações", tipo: "textoLongo", obrigatorio: false },
+        ] },
+      ],
+    };
+  }
+  /** O que o app já sabe do membro: cargo e área, nível e senioridade do card, e a liderança e a coordenação */
+  function inicialPromocao(ctx, membroId) {
+    const m0 = ctx.idx.membro[membroId];
+    if (!m0) return {};
+    const m = dom.infoMembro(ctx, m0);
+    return {
+      UF_CRM_PR_ATUAL: m.funcao || m.cargo || "", UF_CRM_PR_NIVEL_ATU: m.nivel || "",
+      nome: m.nome, senioridadeAtual: m.senioridade || "", liderancaId: dom.liderancaEfetiva(ctx, m0) || "", coordenacaoId: dom.coordenacaoEfetiva(ctx, m0) || "",
+    };
+  }
+  /** Meses inteiros entre duas datas AAAA-MM-DD */
+  function mesesEntre(de, ate) {
+    if (!de || !ate || ate < de) return 0;
+    const [a1, m1, d1] = de.split("-").map(Number), [a2, m2, d2] = ate.split("-").map(Number);
+    return (a2 - a1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
+  }
+  function duracao(meses) {
+    const a = Math.floor(meses / 12), m = meses % 12;
+    if (!a && !m) return "menos de 1 mês";
+    return [a ? plural(a, "ano", "anos") : "", m ? plural(m, "mês", "meses") : ""].filter(Boolean).join(" e ");
+  }
+  /** O resumo do membro que aparece no formulário (o que vai junto para o card) */
+  function resumoPromocao(ctx, membroId) {
+    const m0 = ctx.idx.membro[membroId];
+    if (!m0) return null;
+    const m = dom.infoMembro(ctx, m0);
+    const mov = String(m.carreira || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const sci = dom.feedbacksDo(ctx, membroId);
+    const dev = sci.filter((f) => calc.ehFeedbackDesenvolvimento(f.tipo)).length;
+    const o2o = ((ctx.idx.porMembro.ciclo || {})[membroId] || []).filter((ci) => ci.realizadoEm).sort((a, b) => (a.realizadoEm < b.realizadoEm ? 1 : -1));
+    const comNivel = o2o.find((ci) => ci.proximoNivel || ci.objetivo);
+    return {
+      nome: m.nome, ingresso: m.ingresso || "", tempoDeCasa: m.ingresso ? duracao(mesesEntre(m.ingresso, ctx.hoje)) : "",
+      ultimaMovimentacao: mov.length ? mov[mov.length - 1] : "",
+      feedbacks: sci.length, reconhecimento: sci.length - dev, mensais: dom.temMensal(ctx) ? dom.mensaisDo(ctx, membroId).length : 0, o2o: o2o.length,
+      proximoNivel: comNivel ? comNivel.proximoNivel || "" : "", objetivo: comNivel ? comNivel.objetivo || "" : "", progresso: comNivel ? comNivel.progresso || "" : "",
+      planoAtivo: !!dom.planoAtivoDo(ctx, membroId),
+    };
+  }
+  const normal = (s) => String(s || "").trim().toLowerCase();
+  /** Confere o pedido antes de enviar: o que bloqueia volta em mensagem. o = { niveis, promocoes (dom.promocoes), hoje } */
+  function conferirPromocao(ctx, r, o) {
+    const op = o || {};
+    const ini = inicialPromocao(ctx, r.membroId);
+    const aberta = (op.promocoes || []).find((x) => x.membroId === String(r.membroId) && (x.situacao === "coordenacao" || x.situacao === "rh"));
+    if (aberta) return { ok: false, mensagem: "Já há uma solicitação de promoção de " + (ini.nome || "este membro") + " em andamento (" + (aberta.situacao === "coordenacao" ? "aguarda a coordenação" : "aguarda o RH") + "). Acompanhe em Recrutamento → Promoções." };
+    if (r.UF_CRM_PR_DATA && r.UF_CRM_PR_DATA < (op.hoje || ctx.hoje)) return { ok: false, mensagem: "A data sugerida não pode ficar no passado." };
+    const atual = normal(r.UF_CRM_PR_NIVEL_ATU), novo = normal(r.UF_CRM_PR_NIVEL);
+    const niveis = (op.niveis || []).map(normal);
+    const iA = niveis.indexOf(atual), iN = niveis.indexOf(novo);
+    if (iA >= 0 && iN >= 0 && iN < iA) return { ok: false, mensagem: "O nível proposto fica abaixo do atual na Arquitetura de Cargos. Para uma promoção, escolha um nível acima." };
+    const mudaSenioridade = r.UF_CRM_PR_SENIOR && normal(r.UF_CRM_PR_SENIOR) !== normal(ini.senioridadeAtual);
+    if (novo && novo === atual && !normal(r.UF_CRM_PR_CARGO) && !mudaSenioridade) return { ok: false, mensagem: "Nada muda na proposta: o nível proposto é o atual. Escolha um nível acima, uma nova senioridade ou um novo cargo." };
+    return { ok: true, mensagem: "" };
+  }
+  /** Respostas -> campos do card. As várias escolhas vão como texto, porque os campos da promoção não são listas. */
+  function camposDaPromocao(def, r) {
+    const f = camposDoNegocio(def, r);
+    Object.keys(f).forEach((k) => { if (Array.isArray(f[k])) f[k] = f[k].join("; "); });
+    return f;
+  }
+  /** O pedido inteiro como comentário da timeline do card (o RH lê ali, mesmo sem as seções no layout do card).
+      o = { nome, quem, papel, registradoPor, data, aprovacao: texto de quem aprova } */
+  function textoPedidoPromocao(def, r, o) {
+    const valor = (c) => {
+      const v = r[c.codigo];
+      if (Array.isArray(v)) return v.filter((x) => x !== NENHUM).join("; ");
+      if (c.tipo === "data") return v ? calc.fmtDataAno(v) : "";
+      return String(v || "").trim();
+    };
+    const rotulo = (c) => (/\?$/.test(c.rotulo) ? c.rotulo : c.rotulo + ":");
+    const secoes = def.secoes.map((s) => {
+      const itens = s.campos.filter((c) => /^UF_CRM_/.test(c.codigo) && visivel(c, r) && valor(c))
+        .map((c) => rotulo(c) + (c.tipo === "textoLongo" ? "\n" : " ") + valor(c));
+      return itens.length ? "[B]" + s.titulo + "[/B]\n" + itens.join("\n") : "";
+    }).filter(Boolean);
+    return "[B]Solicitação de promoção de " + o.nome + "[/B]\nEnviada por " + o.quem + (o.papel ? " (" + o.papel.toLowerCase() + ")" : "") + " em " + calc.fmtDataAno(o.data) +
+      ", pelo app Gestão de Pessoas" + (o.registradoPor ? " (registrado por " + o.registradoPor + ")" : "") + "." + (o.aprovacao ? "\nAprovação: " + o.aprovacao + "." : "") +
+      "\n\n" + secoes.join("\n\n");
+  }
+  /** O histórico do membro para a timeline do card da promoção: planos de melhoria, O2O, 1:1 mensais e feedbacks SCI */
+  function historicoPromocao(ctx, membroId, o) {
+    return historicoEncerramento(ctx, membroId, Object.assign({ pedido: "na solicitação de promoção", o2o: true }, o));
+  }
+  /** A linha da movimentação na aba Carreira do membro, no formato de lá ("AAAA-MM-DD · de um nível para outro") */
+  function linhaCarreira(o) {
+    const de = o.de || "nível não registrado";
+    return o.vigencia + " · de " + de + " para " + o.para + (o.cargo ? " (" + o.cargo + ")" : "") + " · promoção aprovada pelo RH";
+  }
+
   /* ================================================================ o card como a tela lê (sem recarregar) */
   /** O card recém-criado no formato do crm.deal.list (listas com o texto da opção), para entrar na lista da tela.
       o = { id, titulo, estagio, agora, campos, origem } */
@@ -313,5 +467,7 @@
     NENHUM, PEDE_DOIS, VAGA, ENCERRAMENTO,
     campos, atende, visivel, faltando, camposDoNegocio, feedbacksDeDesenvolvimento, conferirRegistros,
     lotacao, inicialVaga, inicialEncerramento, historicoEncerramento, negocioLocal,
+    REMUNERACAO, IMPACTO, CIENTE, COMPETENCIAS_PADRAO, formPromocao, inicialPromocao, resumoPromocao, conferirPromocao, camposDaPromocao, textoPedidoPromocao,
+    historicoPromocao, linhaCarreira, mesesEntre, duracao,
   };
 });

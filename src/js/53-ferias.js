@@ -220,18 +220,24 @@
     corpo.push("", "Obrigado(a),", pessoa.nome);
     return { para: EMAIL_RH, cc: lid && lid.email ? [lid.email] : [], assunto: "Solicitação de " + NOME_TIPO[p.tipo] + " · " + pessoa.nome + " · " + periodoCurto(p), corpo: corpo.join("\n") };
   }
-  function linkMailto(e) {
-    return "mailto:" + encodeURIComponent(e.para).replace(/%40/g, "@") + "?" + [e.cc.length ? "cc=" + encodeURIComponent(e.cc.join(",")).replace(/%40/g, "@") : "", "subject=" + encodeURIComponent(e.assunto), "body=" + encodeURIComponent(e.corpo)].filter(Boolean).join("&");
-  }
-  function linkGmail(e) {
-    return "https://mail.google.com/mail/?view=cm&fs=1&to=" + encodeURIComponent(e.para) + (e.cc.length ? "&cc=" + encodeURIComponent(e.cc.join(",")) : "") + "&su=" + encodeURIComponent(e.assunto) + "&body=" + encodeURIComponent(e.corpo);
-  }
   function textoDoEmail(e) { return "Para: " + e.para + (e.cc.length ? "\nCópia: " + e.cc.join(", ") : "") + "\nAssunto: " + e.assunto + "\n\n" + e.corpo; }
+
+  /* ---------- envio pela caixa de e-mail do Bitrix (a Amorim usa o e-mail do Bitrix, 04/11/2026) ---------- */
+  /** O corpo em HTML simples para o mail.message.send: o texto escapado, e cada quebra de linha vira <br> */
+  function corpoHtml(texto) {
+    return String(texto || "").replace(/\r\n?/g, "\n").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").split("\n").join("<br>");
+  }
+  /** O remetente: a caixa com o e-mail da própria pessoa, senão a primeira que o Bitrix oferece (mail.mailbox.senders) */
+  function escolherRemetente(itens, emailDaPessoa) {
+    const lista = (itens || []).filter((x) => x && x.email);
+    const meu = String(emailDaPessoa || "").trim().toLowerCase();
+    return lista.find((x) => String(x.email).toLowerCase() === meu) || lista[0] || null;
+  }
 
   return {
     EMAIL_RH, TIPOS, PRAZOS, FERIAS_ANO, PARCELAS, PAUSA_MAX, POLITICA, NOME_TIPO,
     diasCorridos, periodo, periodoCurto, pedidosDe, dadosDaPessoa, conferirPedido,
     registradas, visiveisPara, proximas,
-    emailDoPedido, linkMailto, linkGmail, textoDoEmail,
+    emailDoPedido, textoDoEmail, corpoHtml, escolherRemetente,
   };
 });

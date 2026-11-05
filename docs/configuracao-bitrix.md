@@ -22,7 +22,7 @@ Configure o app em Bitrix24 → Recursos para desenvolvedores → Outros → Apl
 | Caminho do manipulador | `https://<projeto>.vercel.app/` |
 | Caminho de instalação | o mesmo |
 | Nome no menu | Gestão de Pessoas |
-| Escopos | `crm`, `user`, `department`, `userfieldconfig`, `im`. O `calendar` não é mais usado (04/11/2026: a empresa não usa o calendário do Bitrix). O `task` entra quando as entregas forem lidas direto das tarefas. |
+| Escopos | `crm`, `user`, `department`, `userfieldconfig`, `im` e `mail` (desde 04/11/2026: o pedido de férias sai pela caixa de e-mail do Bitrix de quem pede, seção 11). O `calendar` não é mais usado (04/11/2026: a empresa não usa o calendário do Bitrix). O `task` entra quando as entregas forem lidas direto das tarefas. |
 
 O app chama `BX24.installFinish()` na primeira abertura.
 
@@ -122,7 +122,7 @@ A rotina `api/avisos.js` roda todo dia às 8h (horário de Brasília, com a marg
 
 ## 4. Funções de acesso (2.4) — à mão
 
-Configure em CRM → Configurações → Permissões. Para cada um dos 10 processos de registros da equipe (o "1:1 mensais" entrou em 29/10/2026). Os dois de 04/11/2026, "Férias e ausências" e "Feriados", têm regras próprias, logo abaixo da tabela:
+Configure em CRM → Configurações → Permissões. Para cada um dos 11 processos de registros da equipe (o "1:1 mensais" entrou em 29/10/2026, e as "Revisões semanais" em 04/11/2026, seção 12). Os dois de 04/11/2026, "Férias e ausências" e "Feriados", têm regras próprias, logo abaixo da tabela:
 
 | Função | Ler | Criar e editar | Observação |
 |---|---|---|---|
@@ -145,6 +145,9 @@ Quem tem mais de uma função soma as permissões, então a liderança continua 
 Mais três permissões:
 
 - **Funil 77 (HR \| Requisição de Vagas):** a Liderança e a Coordenação precisam de **Ler** para a aba Recrutamento mostrar as vagas que pediram (o app filtra pelo e-mail do solicitante, `UF_CRM_RV_EMAIL`), e de **Adicionar** e **Editar** com "Próprios" para o formulário de vaga do app criar o card (04/11/2026).
+  - **Desde 05/11/2026 o funil 77 também recebe as solicitações de promoção (seção 13), que são sensíveis.** O card de promoção nasce restrito (fora de "disponível para todos"). Só o veem o responsável pelo card, os observadores (quem pediu, a coordenação e a liderança direta do membro) e quem tem "Todos". Por isso, no funil 77, a leitura da Liderança e da Coordenação deve ser no máximo **"Todos abertos"**, nunca "Todos". Assim elas continuam vendo as vagas, que nascem abertas, e não veem as promoções dos outros.
+  - A Coordenação aprova a promoção pelo app, num card que está com ela como responsável: "Editar: Próprios" basta. O RH precisa de **"Todos"** (Ler e Editar) no funil 77 para decidir qualquer solicitação.
+  - **Para a decisão final ficar com o RH:** enquanto o card está com a coordenação, o "Editar: Próprios" também deixaria a coordenação mover o card direto para "Vaga preenchida" no Bitrix, sem passar pelo RH. Use a permissão por etapa do funil 77 para que a Liderança e a Coordenação não movam cards para as etapas finais ("Vaga preenchida", "Reprovada" e "Cancelada"). As vagas não mudam com isso, porque é o RH quem conduz o funil.
 - **Funil 79 (HR \| Offboarding):** o RH precisa de leitura e edição ("Todos"). A Liderança e a Coordenação recebem só **Ler, Adicionar e Editar com "Próprios"**: é o que o formulário de encerramento do app precisa para criar o card, gravar o histórico na timeline e passar o card ao RH. Depois disso o card não é mais "próprio" de quem pediu, e ela deixa de vê-lo. As solicitações são sensíveis: não dê "Todos" nem "Do departamento" às lideranças neste funil.
 - **Como o formulário do app grava (04/11/2026):** o card nasce com quem pede como responsável (por isso o "Próprios" basta), recebe os comentários do histórico e passa para o responsável do funil (Configuração → Parâmetros; vazio, a primeira pessoa do RH em Papéis). Sem a permissão, o app mostra o que liberar e não perde o que foi digitado.
 - **CEO:** **nenhuma** permissão nos 9 processos. O painel dela é calculado no servidor (`api/painel.js`), que devolve só números. Para ligar, grave na Vercel:
@@ -302,7 +305,8 @@ Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Aus�
 1. **Estrutura:** dois processos novos, "Gestão de Pessoas · Férias e ausências" e "Gestão de Pessoas · Feriados". Um administrador cria pelo app: Configuração → "Criar ou completar a estrutura". Até lá, o app mostra o aviso no topo e a tela de férias diz o que falta. Depois, dê as permissões da seção 4. A função "Membros" para todos os funcionários é opcional.
 2. **Férias e ausências:** decisão do usuário de 04/11/2026: a comunicação é feita por e-mail, e o app serve para acompanhar quem está fora em cada dia.
    - **Pedir (qualquer pessoa):** em "Pedir férias ou ausência", a pessoa escolhe o tipo, lê as regras e marca que leu. O app confere o pedido com a política: antecedência, segunda-feira, partes de 23, 15 ou 8 dias, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. O que não bate não trava: vira "ponto fora da política", e a pessoa justifica.
-   - O app escreve o e-mail que a política pede (para hr@amorimlawfirm.com, com cópia para a liderança direta): Gmail, e-mail do computador ou copiar. Nada é gravado: o pedido e a resposta do RH e da liderança ficam no e-mail.
+   - O app escreve o e-mail que a política pede (para hr@amorimlawfirm.com, com cópia para a liderança direta), e a pessoa pode ajustar o texto. **"Enviar pelo e-mail do Bitrix"** manda pela caixa do Bitrix de quem pede (a Amorim usa o e-mail do Bitrix, pedido do usuário de 04/11/2026), e o e-mail fica nos enviados dela. Nada é gravado no app: o pedido e a resposta do RH e da liderança ficam no e-mail.
+   - O envio usa o REST 3.0 (`mail.mailbox.senders` e `mail.message.send`, chamados por `fetch` em `/rest/api/` com o token da sessão; o portal responde com CORS aberto). **O aplicativo precisa do escopo `mail`**: em Desenvolvedores → Outros → aplicativo local Gestão de Pessoas, marque "E-mail (mail)" e salve. Sem o escopo, sem caixa conectada ou com recusa do Bitrix, o app explica, e **"Abrir o e-mail do Bitrix"** copia o texto e abre a tela de escrever do Bitrix (`/mail/message/new`) sobre o app. "Copiar" continua como reserva. O Gmail e o e-mail do computador saíram.
    - **Registrar (o RH):** aprovado o pedido, o RH usa "Registrar ausência" (pessoa, tipo, primeiro e último dia, observação). O item nasce direto na etapa "Aprovada", com a pessoa como responsável. A pessoa e a liderança direta recebem o aviso. O RH também edita e exclui, e a exclusão avisa as duas.
    - **Acompanhar:** o RH vê todas as ausências; a liderança e a coordenação, as da equipe; o membro, as suas. A Agenda da equipe mostra quem está fora em cada dia.
    - Não há saldo de dias por pessoa: o direito muda por contrato, e quem confere é o RH.
@@ -317,3 +321,90 @@ Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Aus�
 5. **Link do card depois de enviar (vaga e encerramento):** quem pede entra como observador do card. Ao enviar, o app mostra o link do card na pipe (abrir ou copiar), e o mesmo link vai no aviso do Bitrix para quem pediu, para o RH e para a coordenação. Na aba Recrutamento, cada vaga da lista abre o card. Com "Ler: Próprios" no funil, o observador abre o card mesmo depois que ele passa ao RH (a ajuda do Bitrix diz que o observador vê o card quando a função tem leitura); confira no primeiro envio real.
 6. **Altura do app dentro do Bitrix:** o app cresce até a altura do conteúdo e encolhe quando a página é menor. O menu termina logo depois dos itens, o painel lateral ocupa a área visível da tela, com os botões à vista, e o aviso rápido aparece perto do clique (`modoBitrix` e `ajustarAltura` em `60-ui-base.js`).
 7. **Aniversário:** cada pessoa cadastra o seu em Perfil, na Agenda ou na tela de férias. A data vem preenchida quando o perfil do Bitrix já tem. Ela é gravada no próprio perfil do Bitrix (`user.update`, escopo `user`), de onde a agenda já lia. O app mostra só o dia e o mês.
+
+
+## 12. Revisões semanais: o alinhamento pelo WhatsApp no card do membro (04/11/2026)
+
+Pedido do usuário: guardar a revisão semanal de cada membro, ligando o app de gestão semanal (repositório AmorimGlobal/app-gestao-semanal, `https://app-gestao-semanal.vercel.app`) ao Gestão de Pessoas.
+
+1. **O que é guardado:** as respostas de cada pessoa ao alinhamento semanal pelo WhatsApp. Os liderados respondem de sexta até segunda 07h, e as lideranças na segunda. Fica um item por pessoa e por semana na tabela do CRM **"Gestão de Pessoas · Revisões semanais"**, filha de Membros, com estes campos:
+   - a semana (a sexta-feira da semana de trabalho);
+   - "Respondeu como" (membro ou liderança);
+   - as perguntas e respostas;
+   - quantas foram respondidas;
+   - quando foi guardada;
+   - a chave no app semanal.
+
+   No app, aparece no card do membro, na aba **Semanal**.
+2. **Por que todo dia:** o app semanal só guarda o ciclo atual e apaga as respostas quando começa o ciclo seguinte (às sextas, para os liderados). A rotina das 6h (`api/sincronizar.js`) guarda todo dia, antes do ciclo novo, e o botão **Configuração → Revisões semanais → Buscar agora** (`api/semanal.js`, só o RH e os administradores) faz o mesmo na hora.
+3. **Como lê:** pelas rotas do painel do próprio app semanal (`/api/status` e, por liderança, `/api/respostas` e `/api/respostas-liderados`). O app semanal não foi alterado. Ele não informa a data de cada resposta, então a semana segue o calendário dele: as respostas que estão lá são as do ciclo mais recente, que começa às 8h de sexta (liderados) ou de segunda (lideranças). A mesma resposta da semana anterior não vira semana nova. A lógica está em `src/js/56-semanal.js` e `lib/semanal-servidor.js`.
+4. **Quem é quem:** a pessoa do Bitrix é achada pelo celular do perfil (DDD e os 8 últimos dígitos, com ou sem o 9). Sem telefone, vale o nome completo e, depois, o primeiro e o último nome, quando só uma pessoa bate. Quem não for achado aparece no resultado do "Buscar agora", para o RH conferir o celular no perfil ou o nome no app semanal. O telefone nunca vai para o Bitrix.
+5. **Quem vê:** a pergunta 2 é "Casos sensíveis". A tabela segue as permissões dos outros registros da equipe (seção 4): a liderança, a coordenação e o RH veem, e o membro não vê.
+6. **Para ligar:**
+   - um administrador cria a tabela em Configuração → "Criar ou completar a estrutura";
+   - dá as permissões da seção 4;
+   - clica em "Buscar agora" antes do ciclo novo de sexta.
+
+   Na Vercel nada muda: o endereço padrão já é o do app semanal. `SEMANAL_URL` troca o endereço, e `SEMANAL_TOKEN` vai como "Authorization: Bearer" quando o app semanal pedir senha (ver o item 7).
+7. **Atenção: o app semanal está aberto.** O painel e as rotas `/api/*` dele não pedem login nem senha. Quem tiver o endereço lê as respostas e os WhatsApps de todo mundo, e consegue começar um ciclo (que manda WhatsApp para todos) ou apagar as respostas (`/api/reset-semana`). Conferido no código e no endereço publicado em 04/11/2026. A correção é no app semanal: exigir um token nessas rotas e passar o mesmo valor em `SEMANAL_TOKEN` aqui.
+
+
+## 13. Solicitação de promoção (05/11/2026)
+
+Pedido do usuário: "aqui devia ter algo de solicitar promoção também, já que possui a aba Carreira no perfil de cada um". Pedem a **liderança direta e a coordenação**. **A coordenação e o RH aprovam.** O formulário foi elaborado no app, porque não havia modelo do RH, e **os cards caem no mesmo funil da requisição de vagas** (77).
+
+1. **Onde se pede:** Recrutamento → **"Solicitar promoção"** (ao lado de "Solicitar vaga") ou a aba **Carreira** do card do membro. Cada pessoa vê os membros ativos de que é a liderança direta ou a coordenação. Membro em encerramento fica de fora, e cada membro tem no máximo uma solicitação em andamento.
+2. **O formulário** (`52-formularios.js`, `formPromocao`), em 4 seções:
+   - **Membro e posição atual:** o cargo e área e o nível vêm do card do membro. Abaixo do membro aparece um resumo:
+     - o tempo de casa;
+     - a última movimentação na Carreira;
+     - o próximo nível do último O2O;
+     - os registros no app;
+     - o aviso de plano de melhoria em andamento.
+   - **Proposta:**
+     - o nível proposto, da lista da Arquitetura de Cargos da Configuração;
+     - a senioridade e o cargo novos, se mudam;
+     - a data sugerida;
+     - se vem com reajuste salarial, e o reajuste sugerido.
+   - **Justificativa e evidências:**
+     - por que agora;
+     - os resultados dos últimos 6 a 12 meses;
+     - as responsabilidades do novo nível que a pessoa já assume;
+     - as competências que se destacam, do glossário da Configuração;
+     - o que desenvolver.
+   - **Impacto e comunicação:**
+     - como ficam as atividades atuais e, se forem redistribuídas ou for preciso contratar, como fica a operação;
+     - se a pessoa já sabe;
+     - observações.
+
+   O app não deixa enviar nível abaixo do atual, proposta em que nada muda, nem data no passado.
+3. **O card:** fica no funil 77, com o título "Promoção · Nome".
+   - Tem os 28 campos `UF_CRM_PR_*` (`20-schema.js`, `CAMPOS_PROMOCAO`), todos texto, data ou pessoa, sem lista.
+   - É restrito, e a origem é o item do Membros.
+   - Na timeline entra o histórico do membro (planos de melhoria, O2O, 1:1 mensais e feedbacks SCI) e, por cima, o pedido inteiro.
+   - **As promoções não contam como vagas:** ficam fora da lista de vagas, do tempo de preenchimento e do painel.
+4. **A aprovação segue as etapas do funil:**
+
+   | Etapa | Na promoção | Responsável pelo card |
+   |---|---|---|
+   | Nova solicitação | aguarda a coordenação | a coordenação do membro |
+   | Em análise | aguarda o RH | o responsável do funil (Configuração → Parâmetros) |
+   | Vaga preenchida (ganha) | aprovada | não muda |
+   | Reprovada | não aprovada, pela coordenação ou pelo RH | não muda |
+   | Cancelada | cancelada no funil | não muda |
+
+   - A solicitação já nasce em "Em análise" quando a própria coordenação pede, ou quando o membro não tem coordenação na estrutura.
+   - A decisão é dada no app, na tela da solicitação (Recrutamento → a solicitação). O comentário é obrigatório para não aprovar.
+   - Cada decisão grava os campos de decisão, a etapa, o novo responsável e um comentário na timeline.
+   - O app acha as etapas pelo nome ("Em análise", "Reprovada") e, sem ele, pela posição. Por isso dá para renomear "Vaga preenchida" para algo como "Concluída" sem mexer no app.
+5. **Aprovada pelo RH:** o RH confirma a data em que a promoção vale. Com a caixa marcada (padrão), o app atualiza o card do membro: o nível, a senioridade e a linha "AAAA-MM-DD · de X para Y · promoção aprovada pelo RH" na aba Carreira. O cargo do perfil do Bitrix não muda sozinho.
+6. **Avisos:** saem pelo Bitrix (com o link do card) e pelo sino.
+   - Quem decide recebe o pedido.
+   - Quem pediu, a liderança direta e a coordenação recebem cada decisão que não foi delas.
+   - **O membro nunca é avisado pelo app:** a conversa fica com a liderança.
+7. **Para ligar:**
+   - Um administrador clica em Configuração → **"Criar ou completar a estrutura"**. Isso cria os 28 campos de negócio e põe as seções "Promoção: …" no layout do card do funil 77.
+     - No mesmo layout, os campos da vaga (`UF_CRM_RV_*`) passam a aparecer só quando preenchidos, para o card de promoção não mostrar a vaga vazia.
+     - Sem os campos, o formulário avisa e não envia.
+   - Ajuste as permissões do funil 77 (seção 4).
+   - Os robôs de e-mail do funil 77 usam `UF_CRM_RV_EMAIL`, que fica vazio no card de promoção, então não mandam e-mail sobre promoções. Já um robô de notificação ao RH na entrada avisa também das promoções.

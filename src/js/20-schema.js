@@ -66,6 +66,8 @@
     motivoDayOff: ["Aniversário", "Desempenho", "Campanha institucional"],
     decisao: ["Aprovada", "Recusada"],
     abrangenciaFeriado: ["Todos", "São Paulo (SP)", "Salvador (BA)"],
+    // Revisões semanais (alinhamento pelo WhatsApp, 04/11/2026)
+    papelSemanal: ["Membro", "Liderança"],
   };
 
   const PROCESSOS = [
@@ -420,9 +422,73 @@
         c("observacao", "OBSERVACAO", "texto", "Observação"),
       ],
     },
+    /* ---------------- Revisões semanais: o alinhamento pelo WhatsApp (app-gestao-semanal), 04/11/2026 ---------------- */
+    {
+      chave: "semanal", nome: "Revisões semanais", modulo: "Feedbacks", pai: "membros",
+      descricao: "As respostas de cada pessoa ao alinhamento semanal pelo WhatsApp (app de gestão semanal), uma por semana. A rotina das 6h guarda as respostas, porque o app semanal apaga tudo a cada ciclo novo. Responsável = quem respondeu.",
+      estagios: [
+        { codigo: "NEW", nome: "Guardada", cor: COR.azul },
+        { codigo: "SUCCESS", nome: "Lida", cor: COR.verde },
+        { codigo: "FAIL", nome: "Descartada", cor: COR.cinza },
+      ],
+      campos: [
+        c("semana", "SEMANA", "data", "Semana (a sexta-feira)", { ajuda: "A sexta-feira da semana de trabalho a que as respostas se referem." }),
+        c("papel", "PAPEL", "lista", "Respondeu como", { opcoes: OPCOES.papelSemanal }),
+        c("respostas", "RESPOSTAS", "textoLongo", "Perguntas e respostas"),
+        c("respondidas", "RESPONDIDAS", "numero", "Perguntas respondidas"),
+        c("guardadaEm", "GUARDADA_EM", "dataHora", "Guardada em"),
+        c("origem", "ORIGEM", "texto", "Chave no app semanal", { ajuda: "Quem respondeu e a semana: assim a rotina não guarda a mesma revisão duas vezes." }),
+      ],
+    },
   ];
 
   const ENTITY_TYPE_NEGOCIO = 2; // pai do processo de finalistas: o negócio da vaga
+
+  /* ---------------- Solicitação de promoção (05/11/2026): campos do negócio no funil de vagas ----------------
+     Pedido do usuário: a liderança direta ou a coordenação pede pelo app, a coordenação e o RH aprovam, e o card
+     cai no mesmo funil da requisição de vagas (77). São campos de negócio, que valem para todos os funis: nenhum
+     é obrigatório no Bitrix (a obrigatoriedade fica no formulário do app) e todos são texto, data ou pessoa, sem
+     lista, para o app ler e gravar sem traduzir opções. FIELD_NAME tem no máximo 20 caracteres (UF_CRM_ incluído).
+     tipo: linha | texto (várias linhas) | data | pessoa. O "Criar ou completar a estrutura" cria o que falta. */
+  const CAMPOS_PROMOCAO = [
+    ["UF_CRM_PR_MEMBRO", "Promoção: membro indicado", "pessoa"],
+    ["UF_CRM_PR_SOLICIT", "Promoção: quem pediu", "pessoa"],
+    ["UF_CRM_PR_COORD", "Promoção: coordenação que aprova", "pessoa", "Vazio quando a própria coordenação pediu ou quando o membro não tem coordenação na estrutura."],
+    ["UF_CRM_PR_ATUAL", "Promoção: cargo e área atuais", "linha"],
+    ["UF_CRM_PR_NIVEL_ATU", "Promoção: nível atual", "linha"],
+    ["UF_CRM_PR_NIVEL", "Promoção: nível proposto", "linha"],
+    ["UF_CRM_PR_SENIOR", "Promoção: senioridade proposta", "linha"],
+    ["UF_CRM_PR_CARGO", "Promoção: novo cargo ou função", "linha"],
+    ["UF_CRM_PR_DATA", "Promoção: data sugerida", "data"],
+    ["UF_CRM_PR_REMUN", "Promoção: vem com reajuste salarial?", "linha"],
+    ["UF_CRM_PR_REAJUSTE", "Promoção: reajuste sugerido", "linha"],
+    ["UF_CRM_PR_MOTIVO", "Promoção: por que agora", "texto"],
+    ["UF_CRM_PR_RESULT", "Promoção: resultados e entregas", "texto"],
+    ["UF_CRM_PR_RESPONS", "Promoção: responsabilidades do novo nível que já assume", "texto"],
+    ["UF_CRM_PR_COMPET", "Promoção: competências que se destacam", "texto"],
+    ["UF_CRM_PR_DESENV", "Promoção: o que desenvolver e como apoiar", "texto"],
+    ["UF_CRM_PR_IMPACTO", "Promoção: atividades atuais", "linha"],
+    ["UF_CRM_PR_IMPAC_DSC", "Promoção: como fica a operação", "texto"],
+    ["UF_CRM_PR_CIENTE", "Promoção: a pessoa já sabe?", "linha"],
+    ["UF_CRM_PR_OBS", "Promoção: observações", "texto"],
+    ["UF_CRM_PR_COORD_DEC", "Promoção: decisão da coordenação", "linha"],
+    ["UF_CRM_PR_COORD_EM", "Promoção: data da decisão da coordenação", "data"],
+    ["UF_CRM_PR_COORD_OBS", "Promoção: comentário da coordenação", "texto"],
+    ["UF_CRM_PR_RH_DEC", "Promoção: decisão do RH", "linha"],
+    ["UF_CRM_PR_RH_POR", "Promoção: quem decidiu no RH", "pessoa"],
+    ["UF_CRM_PR_RH_EM", "Promoção: data da decisão do RH", "data"],
+    ["UF_CRM_PR_RH_OBS", "Promoção: comentário do RH", "texto"],
+    ["UF_CRM_PR_VIGENCIA", "Promoção: vale a partir de", "data"],
+  ].map(([codigo, rotulo, tipo, ajuda]) => ({ codigo, rotulo, tipo, ajuda: ajuda || "" }));
+  /** Seções do card do funil de vagas para as promoções (o layout do card só mostra o que está nele) */
+  const SECOES_PROMOCAO = [
+    { name: "user_prpedido", title: "Promoção: pedido e proposta", campos: ["UF_CRM_PR_MEMBRO", "UF_CRM_PR_SOLICIT", "UF_CRM_PR_COORD", "UF_CRM_PR_ATUAL", "UF_CRM_PR_NIVEL_ATU",
+      "UF_CRM_PR_NIVEL", "UF_CRM_PR_SENIOR", "UF_CRM_PR_CARGO", "UF_CRM_PR_DATA", "UF_CRM_PR_REMUN", "UF_CRM_PR_REAJUSTE", "UF_CRM_PR_CIENTE"] },
+    { name: "user_prjustif", title: "Promoção: justificativa", campos: ["UF_CRM_PR_MOTIVO", "UF_CRM_PR_RESULT", "UF_CRM_PR_RESPONS", "UF_CRM_PR_COMPET", "UF_CRM_PR_DESENV",
+      "UF_CRM_PR_IMPACTO", "UF_CRM_PR_IMPAC_DSC", "UF_CRM_PR_OBS"] },
+    { name: "user_prdecisao", title: "Promoção: aprovações", campos: ["UF_CRM_PR_COORD_DEC", "UF_CRM_PR_COORD_EM", "UF_CRM_PR_COORD_OBS", "UF_CRM_PR_RH_DEC", "UF_CRM_PR_RH_POR",
+      "UF_CRM_PR_RH_EM", "UF_CRM_PR_RH_OBS", "UF_CRM_PR_VIGENCIA"] },
+  ];
 
   /* ---------- códigos ---------- */
   function nomeCampo(typeId, sufixo) { return "UF_CRM_" + typeId + "_" + sufixo; }
@@ -447,7 +513,7 @@
   function tituloProcesso(p) { return PREFIXO_TITULO + p.nome; }
 
   return {
-    COR, PREFIXO_TITULO, SOLUCAO, OPCOES, PROCESSOS, ENTITY_TYPE_NEGOCIO,
+    COR, PREFIXO_TITULO, SOLUCAO, OPCOES, PROCESSOS, ENTITY_TYPE_NEGOCIO, CAMPOS_PROMOCAO, SECOES_PROMOCAO,
     nomeCampo, camelDoCampo, codigoCampo, processo, tituloProcesso,
   };
 });

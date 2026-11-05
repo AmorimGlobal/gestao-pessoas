@@ -624,6 +624,7 @@
     const emailsSetor = {};
     if (p.coordenacao && uid) liderancasDoSetor(ctx, uid).forEach((l) => { if (l.lideranca.email) emailsSetor[l.lideranca.email.toLowerCase()] = true; });
     return (v.negocios || []).filter((n) => {
+      if (ehPromocao(n)) return false; // as solicitações de promoção dividem o funil (05/11/2026), mas não são vagas
       if (!uid || p.rh || p.ceo) return true;
       const e = String(n.UF_CRM_RV_EMAIL || "").toLowerCase();
       return e === email || emailsSetor[e];
@@ -649,6 +650,90 @@
         solicitante: n.UF_CRM_RV_LIDER || "", entradaDesejada: dataDe(n.UF_CRM_RV_DATA_ENT), atualizadoEm: dataDe(n.DATE_MODIFY),
       };
     });
+  }
+
+  /* ================================================================ solicitação de promoção (05/11/2026) */
+  /* Pedido do usuário: a liderança direta ou a coordenação pede pelo app; a coordenação e o RH aprovam; o card
+     fica no funil de vagas (77), com os campos UF_CRM_PR_*. As etapas do funil viram o andamento:
+       1ª etapa ("Nova solicitação")  aguarda a coordenação (o card fica com ela como responsável)
+       "Em análise"                    aguarda o RH (o card passa ao responsável do funil)
+       ganha ("Vaga preenchida")       aprovada (o RH aprovou pelo app, que registra a movimentação na Carreira)
+       perdida ("Reprovada")           não aprovada, pela coordenação ou pelo RH
+       "Cancelada"                     cancelada no funil
+     Pedida pela própria coordenação, ou para um membro sem coordenação na estrutura: nasce em "Em análise". */
+  const ehPromocao = (n) => !!(n && n.UF_CRM_PR_MEMBRO && String(n.UF_CRM_PR_MEMBRO) !== "0");
+  const DECISAO = { aprovada: "Aprovada", naoAprovada: "Não aprovada", pelaCoordenacao: "Pedida pela própria coordenação", semCoordenacao: "Sem coordenação na estrutura" };
+  /** As etapas do funil que a promoção usa, achadas pelo nome e, sem ele, pela posição */
+  function etapasPromocao(etapas, categoria) {
+    const lista = etapas || [];
+    const abertas = lista.filter((e) => !e.semantica);
+    const falhas = lista.filter((e) => e.semantica === "F");
+    const pref = "C" + (categoria || 77) + ":";
+    const id = (e, reserva) => (e && e.id) || reserva;
+    return {
+      coordenacao: id(abertas[0], pref + "NEW"),
+      rh: id(abertas.find((e) => /an[aá]lise/i.test(e.nome)) || abertas[1], pref + "PREPARATION"),
+      aprovada: id(lista.find((e) => e.semantica === "S"), pref + "WON"),
+      naoAprovada: id(falhas.find((e) => /reprov|recus|n[aã]o aprov/i.test(e.nome)) || falhas[0], pref + "LOSE"),
+    };
+  }
+  const textoUF = (v) => (v === undefined || v === null || v === false ? "" : String(v).trim());
+  /** Os cards de promoção do funil de vagas, no formato da tela */
+  function promocoes(ctx) {
+    const v = ctx.vagas || { etapas: [], negocios: [] };
+    const et = etapasPromocao(v.etapas, v.categoria);
+    return (v.negocios || []).filter(ehPromocao).map((n) => {
+      const etapa = (v.etapas || []).find((e) => e.id === n.STAGE_ID) || { id: n.STAGE_ID, nome: n.STAGE_ID, semantica: "" };
+      const coordDec = textoUF(n.UF_CRM_PR_COORD_DEC), rhDec = textoUF(n.UF_CRM_PR_RH_DEC);
+      let situacao;
+      if (etapa.semantica === "S") situacao = "aprovada";
+      else if (etapa.semantica === "F") situacao = /cancel/i.test(etapa.nome) ? "cancelada" : "naoAprovada";
+      else situacao = n.STAGE_ID === et.coordenacao ? "coordenacao" : "rh";
+      const membroUid = textoUF(n.UF_CRM_PR_MEMBRO);
+      const doApp = n.ORIGINATOR_ID === ORIGEM_APP && n.ORIGIN_ID;
+      const m = doApp && ctx.idx.membro[String(n.ORIGIN_ID)] ? ctx.idx.membro[String(n.ORIGIN_ID)] : ctx.idx.membroPorUsuario[membroUid];
+      return {
+        id: String(n.ID), titulo: n.TITLE || "", membroUid, membroId: m ? m.id : "", nome: pessoa(ctx, membroUid).nome,
+        solicitante: textoUF(n.UF_CRM_PR_SOLICIT), coordenacao: textoUF(n.UF_CRM_PR_COORD), lideranca: m ? liderancaEfetiva(ctx, m) : "",
+        atual: textoUF(n.UF_CRM_PR_ATUAL), nivelAtual: textoUF(n.UF_CRM_PR_NIVEL_ATU), nivel: textoUF(n.UF_CRM_PR_NIVEL), senioridade: textoUF(n.UF_CRM_PR_SENIOR),
+        cargo: textoUF(n.UF_CRM_PR_CARGO), data: dataDe(n.UF_CRM_PR_DATA), remuneracao: textoUF(n.UF_CRM_PR_REMUN), reajuste: textoUF(n.UF_CRM_PR_REAJUSTE),
+        motivo: textoUF(n.UF_CRM_PR_MOTIVO), resultados: textoUF(n.UF_CRM_PR_RESULT), responsabilidades: textoUF(n.UF_CRM_PR_RESPONS), competencias: textoUF(n.UF_CRM_PR_COMPET),
+        desenvolver: textoUF(n.UF_CRM_PR_DESENV), impacto: textoUF(n.UF_CRM_PR_IMPACTO), impactoTexto: textoUF(n.UF_CRM_PR_IMPAC_DSC), ciente: textoUF(n.UF_CRM_PR_CIENTE), obs: textoUF(n.UF_CRM_PR_OBS),
+        coordDecisao: coordDec, coordEm: dataDe(n.UF_CRM_PR_COORD_EM), coordObs: textoUF(n.UF_CRM_PR_COORD_OBS),
+        rhDecisao: rhDec, rhPor: textoUF(n.UF_CRM_PR_RH_POR), rhEm: dataDe(n.UF_CRM_PR_RH_EM), rhObs: textoUF(n.UF_CRM_PR_RH_OBS), vigencia: dataDe(n.UF_CRM_PR_VIGENCIA),
+        etapa: etapa.nome, etapaId: etapa.id, situacao,
+        // quem não aprovou: a decisão gravada pelo app; sem ela, o card foi movido à mão no funil (pelo RH)
+        naoAprovadaPor: situacao !== "naoAprovada" ? "" : coordDec === DECISAO.naoAprovada ? "coordenacao" : "rh",
+        criadaEm: n.DATE_CREATE || "", atualizadaEm: n.DATE_MODIFY || "",
+      };
+    }).sort((a, b) => (a.criadaEm < b.criadaEm ? 1 : -1));
+  }
+  /** As promoções que a pessoa acompanha: o RH e a CEO todas; os outros, as que pediram, as que aprovam
+      como coordenação e as da própria equipe direta */
+  function promocoesDe(ctx, uid) {
+    const id = String(uid || "");
+    const p = papeis(ctx, id);
+    return promocoes(ctx).filter((x) => p.rh || p.ceo || x.solicitante === id || x.coordenacao === id || x.lideranca === id);
+  }
+  /** Quem decide agora: "coordenacao" (a coordenação gravada no card), "rh" (qualquer pessoa do RH) ou "" */
+  function decisorDaPromocao(ctx, uid, x) {
+    const id = String(uid || "");
+    if (x.situacao === "coordenacao" && x.coordenacao && x.coordenacao === id) return "coordenacao";
+    if (x.situacao === "rh" && papeis(ctx, id).rh) return "rh";
+    return "";
+  }
+  function promocoesAguardando(ctx, uid) { return promocoes(ctx).filter((x) => decisorDaPromocao(ctx, uid, x)); }
+  /** Para quem a pessoa pode pedir promoção (pedido do usuário: a liderança direta e a coordenação): os membros
+      ativos de que ela é a liderança direta ou a coordenação. Membro em encerramento fica de fora. */
+  function membrosParaPromover(ctx, uid) {
+    const id = String(uid || "");
+    if (!id) return [];
+    return membrosAtivos(ctx.registros.membros || []).filter((m) => m.estagio !== "EM_ENCERRAMENTO" && m.responsavel !== id &&
+      (liderancaEfetiva(ctx, m) === id || coordenacaoEfetiva(ctx, m) === id));
+  }
+  /** Como a pessoa pede a promoção deste membro: "Coordenação" (a aprovação dela já conta) ou "Liderança direta" */
+  function papelNaPromocao(ctx, uid, m) {
+    return coordenacaoEfetiva(ctx, m) === String(uid) ? "Coordenação" : liderancaEfetiva(ctx, m) === String(uid) ? "Liderança direta" : "";
   }
 
   /* ================================================================ offboarding pelo funil de negócios (29/10/2026) */
@@ -694,7 +779,8 @@
   function demandasRH(ctx) {
     const doFunil = solicitacoesOffboarding(ctx).filter((s) => s.nova).length;
     const doApp = (ctx.registros.encerramentos || []).filter((e) => e.estagio === "ENVIADA_RH" || (e.estagio === "AG_COORD" && aprovadorDe(ctx, e).rh)).length;
-    return { offboarding: doFunil + doApp, recrutamento: vagasDe(ctx, null).filter((v) => v.nova).length };
+    // recrutamento: vagas em "Nova solicitação" e promoções que já passaram pela coordenação (05/11/2026)
+    return { offboarding: doFunil + doApp, recrutamento: vagasDe(ctx, null).filter((v) => v.nova).length + promocoes(ctx).filter((x) => x.situacao === "rh").length };
   }
   /** Histórico do offboarding por trimestre, semestre ou ano (reunião de 29/10/2026).
       - desligamentos: itens do Membros que passaram para Encerrado, pela data da mudança de estágio
@@ -1069,6 +1155,7 @@
     verificarRegistros, destinoEncerramento, aprovadorDe,
     pendenciasDe, ordenarPendencias, aprovacoesPendentes, filaRH,
     indicadoresEquipe, conquistas, mapaCoordenacao, vagasDe, solicitacoesOffboarding, demandasRH, historicoDesligamentos, podeExcluir,
+    ehPromocao, DECISAO_PROMOCAO: DECISAO, etapasPromocao, promocoes, promocoesDe, decisorDaPromocao, promocoesAguardando, membrosParaPromover, papelNaPromocao,
     agendaEquipe, dicas, anoDoMembro, painelGeral, resumoPainel, checagemImplantacao, setoresSemChefe, mudancasSetorSemChefe,
   };
 });

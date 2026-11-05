@@ -264,6 +264,23 @@
     ausencia("111", "4", { id: "303", tipo: "Pausa contratual", inicio: "2026-11-23", fim: "2026-11-27", dias: 5, estagio: "FAIL", autor: "111", criadoEm: "2026-09-20T10:00:00-03:00",
       justificativa: "Mudança de cidade.", rhDecisao: "", rhEm: "", canceladaEm: "2026-09-22T10:00:00-03:00" });
 
+    /* Revisões semanais (o alinhamento pelo WhatsApp, guardado pela rotina das 6h) */
+    const P1 = "1. Sua semana — Como foi a sua semana? Conte as principais atividades e entregas, o que funcionou bem e qual foi a maior dificuldade que você enfrentou.\n";
+    const P2 = "\n\n2. Casos sensíveis — Teve algum caso sensível ou delicado nesta semana, que exigiu atenção especial ou a intervenção da liderança?\n";
+    const P3 = "\n\n3. Pontos de atenção — Existe algum gargalo, risco ou situação que precisa de acompanhamento?\n";
+    const P4 = "\n\n4. Próxima semana — Quais são as suas prioridades para a próxima semana?\n";
+    const revisao = (mid, resp, semana, respostas, n) => add("semanal", {
+      titulo: "Revisão semanal · " + nomeDe(resp) + " · " + calc.fmtData(calc.addDias(semana, -4)) + " a " + calc.fmtData(semana),
+      membroId: mid, responsavel: resp, semana, papel: "Membro", respostas, respondidas: n, estagio: "NEW",
+      guardadaEm: calc.addDias(semana, 1) + "T06:00:00-03:00", criadoEm: calc.addDias(semana, 1) + "T06:00:00-03:00", origem: "liderado:demo-" + resp + ":" + semana,
+    });
+    revisao("1", "100", "2026-09-25", P1 + "Fechei os três protocolos de visto da carteira e atualizei o checklist de documentos. A maior dificuldade foi a demora do consulado em um dos casos." +
+      P2 + "Não." + P3 + "O prazo do caso da família Souza depende de um documento do cliente." + P4 + "Protocolar os dois pedidos de cidadania e revisar o modelo de parecer.", 4);
+    revisao("1", "100", "2026-10-02", P1 + "Protocolei os dois pedidos de cidadania e entreguei o parecer revisado na primeira versão." +
+      P2 + "Um cliente ficou muito ansioso com o prazo; pedi apoio da Carla para a ligação." + P3 + "Nenhum novo." + P4 + "Atender a fila de dúvidas dos clientes e preparar a auditoria de documentos.", 4);
+    revisao("2", "101", "2026-10-02", P1 + "Semana de muitas reuniões com clientes; consegui fechar o relatório mensal." + P3 + "Preciso de acesso ao sistema do cartório para agilizar as certidões." +
+      P4 + "Fechar as certidões pendentes.", 3);
+
     /* Onboarding */
     add("onboarding", {
       id: "60", titulo: "Onboarding · Daniela Rocha", membroId: "3", responsavel: "102", estagio: "IMERSAO", criadoEm: "2026-08-20T10:00:00-03:00",
@@ -318,6 +335,23 @@
         { ID: "9001", TITLE: "Analista de Imigração Pleno", STAGE_ID: "C77:EXECUTING", DATE_CREATE: "2026-09-08T10:00:00-03:00", DATE_MODIFY: "2026-10-06T15:00:00-03:00", UF_CRM_RV_VAGA: "Analista de Imigração Pleno", UF_CRM_RV_EMAIL: "carla.mendes@amorimglobal.com", UF_CRM_RV_LIDER: "Carla Mendes", UF_CRM_RV_SETOR: "Soluções", UF_CRM_RV_DATA_ENT: "2026-11-03" },
         { ID: "9002", TITLE: "Assistente de Imigração", STAGE_ID: "C77:WON", DATE_CREATE: "2026-08-20T10:00:00-03:00", DATE_MODIFY: "2026-09-25T10:00:00-03:00", CLOSEDATE: "2026-09-25", UF_CRM_RV_VAGA: "Assistente de Imigração", UF_CRM_RV_EMAIL: "carla.mendes@amorimglobal.com", UF_CRM_RV_LIDER: "Carla Mendes", UF_CRM_RV_SETOR: "Soluções" },
         { ID: "9003", TITLE: "Analista Tributário Júnior", STAGE_ID: "C77:PREPARATION", DATE_CREATE: "2026-10-02T10:00:00-03:00", DATE_MODIFY: "2026-10-03T10:00:00-03:00", UF_CRM_RV_VAGA: "Analista Tributário Júnior", UF_CRM_RV_EMAIL: "marcos.lima@amorimglobal.com", UF_CRM_RV_LIDER: "Marcos Lima", UF_CRM_RV_SETOR: "Soluções" },
+        // Solicitações de promoção (05/11/2026): o mesmo funil, com os campos UF_CRM_PR_*
+        { ID: "9011", TITLE: "Promoção · Ana Ribeiro", STAGE_ID: "C77:NEW", DATE_CREATE: "2026-10-07T11:00:00-03:00", DATE_MODIFY: "2026-10-07T11:00:00-03:00", ASSIGNED_BY_ID: "2",
+          ORIGINATOR_ID: "gestao-pessoas", ORIGIN_ID: "1", UF_CRM_PR_MEMBRO: "100", UF_CRM_PR_SOLICIT: "3", UF_CRM_PR_COORD: "2",
+          UF_CRM_PR_ATUAL: "Imigração · Analista", UF_CRM_PR_NIVEL_ATU: "Analista II", UF_CRM_PR_NIVEL: "Analista III", UF_CRM_PR_SENIOR: "Sênior", UF_CRM_PR_DATA: "2026-11-01",
+          UF_CRM_PR_REMUN: "A definir com o RH", UF_CRM_PR_MOTIVO: "Conduz sozinha os casos de vistos de investidor desde março e virou referência do time nesse tema.",
+          UF_CRM_PR_RESULT: "Fechou 42 processos no semestre, sem nenhuma exigência do consulado por documentação. Treinou as duas analistas novas.",
+          UF_CRM_PR_RESPONS: "Revisa os dossiês das colegas antes do envio e atende os clientes mais sensíveis da carteira.", UF_CRM_PR_COMPET: "Comunicação clara; Organização; Autonomia",
+          UF_CRM_PR_DESENV: "Delegar mais e dar retorno estruturado às colegas que revisa. Vou acompanhar nos 1:1 do mês.", UF_CRM_PR_IMPACTO: "Continuam com a pessoa",
+          UF_CRM_PR_CIENTE: "Não: a conversa fica para depois da aprovação" },
+        { ID: "9012", TITLE: "Promoção · Júlia Freitas", STAGE_ID: "C77:PREPARATION", DATE_CREATE: "2026-10-05T09:00:00-03:00", DATE_MODIFY: "2026-10-06T17:30:00-03:00", ASSIGNED_BY_ID: "6",
+          ORIGINATOR_ID: "gestao-pessoas", ORIGIN_ID: "8", UF_CRM_PR_MEMBRO: "111", UF_CRM_PR_SOLICIT: "4", UF_CRM_PR_COORD: "2",
+          UF_CRM_PR_ATUAL: "Tributário · Analista", UF_CRM_PR_NIVEL_ATU: "Analista I", UF_CRM_PR_NIVEL: "Analista II", UF_CRM_PR_SENIOR: "Pleno", UF_CRM_PR_DATA: "2026-11-01",
+          UF_CRM_PR_REMUN: "Sim", UF_CRM_PR_REAJUSTE: "Faixa do Analista II", UF_CRM_PR_MOTIVO: "Assumiu a apuração mensal de dois clientes grandes sem supervisão.",
+          UF_CRM_PR_RESULT: "Entregou todas as apurações do trimestre no prazo e encontrou um crédito de PIS/COFINS que o cliente não tinha visto.",
+          UF_CRM_PR_RESPONS: "Faz a primeira revisão das obrigações acessórias do time.", UF_CRM_PR_DESENV: "Apresentar resultados direto ao cliente. Vai acompanhar as reuniões comigo.",
+          UF_CRM_PR_IMPACTO: "Continuam com a pessoa", UF_CRM_PR_CIENTE: "Sim, já conversamos",
+          UF_CRM_PR_COORD_DEC: "Aprovada", UF_CRM_PR_COORD_EM: "2026-10-06", UF_CRM_PR_COORD_OBS: "De acordo. A Júlia já atua como Analista II há alguns meses." },
       ],
       historico: [
         { OWNER_ID: "9001", STAGE_ID: "C77:PREPAYMENT_INVOIC", CREATED_TIME: "2026-09-14T10:00:00-03:00" },
@@ -436,11 +470,20 @@
         const id = String(++seq);
         const campos = Object.assign({}, n.campos);
         Object.keys(campos).forEach((k) => { if (Array.isArray(campos[k]) && Array.isArray(campos[k][0])) campos[k] = campos[k].map((a, i) => ({ id: i + 1, nome: a[0] })); });
-        const estagio = (funil.etapas[0] || {}).id || "";
+        const estagio = n.estagio || (funil.etapas[0] || {}).id || "";
         funil.negocios.unshift(Object.assign({ ID: id, TITLE: n.titulo, STAGE_ID: estagio, DATE_CREATE: agora(), DATE_MODIFY: agora(), ASSIGNED_BY_ID: String(n.responsavel) },
           n.origem ? { ORIGINATOR_ID: n.origem.sistema, ORIGIN_ID: String(n.origem.id) } : {}, campos));
-        this.negociosCriados.push({ id, categoria: Number(n.categoria), titulo: n.titulo, responsavel: String(n.responsavel), campos: n.campos, origem: n.origem || null, observadores: (n.observadores || []).map(String) });
+        this.negociosCriados.push({ id, categoria: Number(n.categoria), titulo: n.titulo, responsavel: String(n.responsavel), campos: n.campos, origem: n.origem || null, observadores: (n.observadores || []).map(String), estagio, restrito: !!n.restrito });
         return { id, estagio };
+      },
+      /** Decisão sobre o card (promoção): grava os campos, a etapa e o responsável no funil em memória */
+      negociosAtualizados: [],
+      atualizarNegocio: async function (id, o2) {
+        await atraso();
+        const n = d.vagas.negocios.concat(d.offboarding.negocios).find((x) => x.ID === String(id));
+        if (!n) throw { descricao: "card " + id + " não encontrado" };
+        Object.assign(n, o2.campos || {}, { DATE_MODIFY: agora() }, o2.estagio ? { STAGE_ID: o2.estagio } : {}, o2.responsavel ? { ASSIGNED_BY_ID: String(o2.responsavel) } : {});
+        this.negociosAtualizados.push({ id: String(id), campos: o2.campos || {}, estagio: o2.estagio || "", responsavel: o2.responsavel ? String(o2.responsavel) : "" });
       },
       passarNegocio: async function (id, responsavel) {
         [d.vagas, d.offboarding].forEach((f) => f.negocios.forEach((x) => { if (x.ID === String(id)) x.ASSIGNED_BY_ID = String(responsavel); }));
@@ -463,6 +506,28 @@
       vagas: async () => copia(d.vagas),
       notificacoes: [],
       notificar: async function (ids, mensagem) { this.notificacoes.push({ ids, mensagem }); },
+      /** E-mail pela caixa do Bitrix: na demonstração, fica guardado aqui (nada sai) */
+      emailsEnviados: [],
+      enviarEmail: async function (e, emailDaPessoa) {
+        await atraso();
+        this.emailsEnviados.push(Object.assign({ de: emailDaPessoa }, e));
+        return { de: emailDaPessoa, demo: true };
+      },
+      abrirEmailBitrix: function () { this.emailBitrixAberto = (this.emailBitrixAberto || 0) + 1; },
+      /** Revisões semanais: na demonstração, a busca "acha" a resposta da Daniela da última semana */
+      buscarSemanal: async function () {
+        await atraso();
+        const ja = (d.registros.semanal || []).some((x) => x.responsavel === "102" && x.semana === "2026-10-02");
+        if (!ja) {
+          (d.registros.semanal = d.registros.semanal || []).push({
+            id: String(++seq), titulo: "Revisão semanal · Daniela Rocha · 28/09 a 02/10", membroId: "3", responsavel: "102", estagio: "NEW", estagioNome: "Guardada",
+            semana: "2026-10-02", papel: "Membro", respondidas: 2, origem: "liderado:demo-102:2026-10-02", guardadaEm: agora(), criadoEm: agora(), atualizadoEm: agora(), criadoPor: euId,
+            respostas: "1. Sua semana — Como foi a sua semana?\nTerminei a imersão e acompanhei dois atendimentos.\n\n4. Próxima semana — Quais são as suas prioridades para a próxima semana?\nAssumir os seis casos da carteira.",
+          });
+        }
+        return { ok: true, demo: true, agora: "2026-10-08T06:00", pessoas: 5, guardadas: ja ? 0 : 1, atualizadas: 0, semMudanca: 3, semResposta: 1,
+          naoEncontradas: [{ nome: "Contato Amorim", papel: "Membro" }], semMembro: [], semanas: ja ? [] : ["2026-10-02"], falhas: [] };
+      },
       registrarDossie: async () => {},
       /** Na demonstração o resumo da CEO é calculado aqui, com a mesma função do servidor */
       painelServidor: async (ctx) => {

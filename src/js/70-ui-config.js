@@ -68,6 +68,13 @@
       '<p class="muted" style="font-size:12px">Roda sozinha todo dia de manhã quando a rotina da Vercel estiver configurada (docs/configuracao-bitrix.md). A primeira carga, com todo mundo, é melhor fazer por aqui.</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-acao="sync-previa">Ver o que mudaria</button><button class="btn" data-acao="sync-executar">Sincronizar agora</button></div>' +
       '<div id="sync-resultado" style="margin-top:14px"></div></div>';
+    // Revisões semanais: o alinhamento pelo WhatsApp (app-gestao-semanal) no card do membro (04/11/2026)
+    const semTabela = E().ctx.recursos && E().ctx.recursos.semanal === false;
+    h += '<div class="card"><h3>Revisões semanais (alinhamento pelo WhatsApp)' + (semTabela ? '<span class="extra">' + c.tag("falta criar a tabela", "ambar") + "</span>" : "") + "</h3>" +
+      '<p class="muted" style="margin-top:0">As respostas de cada pessoa ao alinhamento semanal do app de gestão semanal ficam no card do membro, na aba Semanal. O app semanal apaga as respostas quando começa o ciclo seguinte (às sextas), então a rotina das 6h guarda todo dia. Quem respondeu é achado pelo telefone do perfil do Bitrix e, sem telefone, pelo nome.</p>' +
+      (semTabela ? '<p class="muted" style="font-size:12px">Primeiro crie a tabela "Revisões semanais" com o botão "Criar ou completar a estrutura", acima, e dê as permissões da seção 4 do guia (as mesmas dos outros registros da equipe).</p>' : "") +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-acao="semanal-buscar"' + (semTabela ? " disabled" : "") + ">Buscar agora</button></div>" +
+      '<div id="semanal-resultado" style="margin-top:14px"></div></div>';
     h += checagemHtml();
     h += servidorHtml(cfg);
     // Listas e textos
@@ -149,7 +156,7 @@
 
   /* ---------------- rotinas do servidor (Vercel) ---------------- */
   const ROTINAS = [
-    ["sincronizacao", "Sincronização diária com a estrutura", "Todo dia às 6h."],
+    ["sincronizacao", "Sincronização diária com a estrutura", "Todo dia às 6h. Também guarda as revisões semanais do WhatsApp."],
     ["avisos", "Avisos da 4.4", "Resumo semanal, dia do atraso, 7 e 14 dias. Todo dia às 8h."],
     // opcional: só protege as solicitações do fluxo anterior do app; desde 04/11/2026 o encerramento vai pelo formulário para o funil 79
     ["trava", "Trava do encerramento no servidor", "Só para as solicitações do fluxo anterior do app (antes de 04/11/2026). O encerramento agora vai pelo formulário para a esteira HR | Offboarding: não precisa ligar.", true],
@@ -196,6 +203,41 @@
       "</tbody></table></div>" +
       '<p class="muted" style="font-size:12px">Webhook de saída (Bitrix → Desenvolvedores → Outros → Webhook de saída), com os eventos ONCRMDYNAMICITEMADD e ONCRMDYNAMICITEMUPDATE: <b class="num">' + esc((/^https?:/.test(location.origin) ? location.origin : "https://gestao-pessoas-bice.vercel.app") + "/api/eventos") + "</b></p></div></div>";
   }
+
+  /* ---------------- revisões semanais: buscar agora ---------------- */
+  function resultadoSemanalHtml(r) {
+    if (!r.ok && r.erro) return '<div class="aviso-erro"><b>Não foi possível buscar.</b> ' + esc(r.erro) + "</div>";
+    const nomes = (l) => l.map((x) => esc(x.nome) + (x.papel ? " (" + esc(x.papel.toLowerCase()) + ")" : "")).join(", ");
+    return '<div class="' + (r.falhas && r.falhas.length ? "aviso-atencao" : "aviso-info") + '"><b>' + (r.guardadas ? plural(r.guardadas, "revisão nova guardada", "revisões novas guardadas") : "Nenhuma revisão nova") + "</b>" +
+      (r.atualizadas ? " · " + plural(r.atualizadas, "atualizada", "atualizadas") : "") + (r.semMudanca ? " · " + plural(r.semMudanca, "já estava guardada", "já estavam guardadas") : "") +
+      (r.semResposta ? " · " + plural(r.semResposta, "pessoa ainda sem resposta", "pessoas ainda sem resposta") : "") + "." +
+      (r.semanas && r.semanas.length ? " Semana de " + r.semanas.map((s) => esc(GP.semanal.rotuloSemana(s))).join(", ") + "." : "") +
+      (r.naoEncontradas && r.naoEncontradas.length ? '<div style="margin-top:6px">Sem pessoa no Bitrix (confira o celular no perfil ou o nome no app semanal): ' + nomes(r.naoEncontradas) + ".</div>" : "") +
+      (r.semMembro && r.semMembro.length ? '<div style="margin-top:6px">Sem item ativo no Membros: ' + nomes(r.semMembro) + ".</div>" : "") +
+      (r.falhas && r.falhas.length ? '<div style="margin-top:6px">Falhas: ' + r.falhas.map(esc).join("; ") + "</div>" : "") + "</div>";
+  }
+  ui.acoes["semanal-buscar"] = async function (el) {
+    const alvo = document.getElementById("semanal-resultado");
+    if (!E().repo.buscarSemanal || E().ocupado) return;
+    const rotulo = el.innerHTML;
+    E().ocupado = true;
+    el.disabled = true;
+    el.textContent = "Buscando...";
+    try {
+      const r = await E().repo.buscarSemanal();
+      // o que entrou no Bitrix aparece no card de cada membro
+      if (r.ok || r.guardadas || r.atualizadas) {
+        const itens = await E().repo.listar("semanal").catch(() => null);
+        if (itens) { E().ctx.registros.semanal = itens; dom.indexar(E().ctx); }
+      }
+      if (alvo) alvo.innerHTML = resultadoSemanalHtml(r);
+    } catch (e) {
+      if (alvo) alvo.innerHTML = resultadoSemanalHtml({ ok: false, erro: E().repo.mensagemErro(e) });
+    } finally {
+      E().ocupado = false;
+      if (document.body.contains(el)) { el.disabled = false; el.innerHTML = rotulo; }
+    }
+  };
 
   async function gravarConfig(novo, botao, mensagem) {
     return ui.salvar(botao, async () => {
