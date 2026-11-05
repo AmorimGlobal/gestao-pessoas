@@ -452,7 +452,7 @@ details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy)
 :root[data-bitrix] .gp { min-height: 0; }
 :root[data-bitrix] .lateral { position: static; height: auto; overflow: visible; }
 :root[data-bitrix] .lateral .rodape { margin-top: 18px; }
-:root[data-bitrix] .painel-lateral { bottom: auto; height: var(--altura-visivel, 100vh); }
+:root[data-bitrix] .painel-lateral { bottom: auto; height: min(var(--altura-visivel, 100vh), 100vh); } /* 100vh aqui é a altura do iframe: o painel nunca passa dela */
 :root[data-bitrix] .toast { position: absolute; bottom: auto; top: var(--toast-top, 16px); }
 :root[data-bitrix] .tour { align-items: flex-start; padding-top: 48px; }
 :root[data-bitrix] .carregando { min-height: 320px; }

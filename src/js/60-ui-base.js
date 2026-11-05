@@ -525,10 +525,22 @@
   // pode medir 100vh: a janela nunca encolheria (o BX24.fitWindow só cresce), e o rodapé do menu iria para o fim da
   // página mais longa já aberta. Com data-bitrix no <html>, o CSS deixa o menu na altura dele, e ajustarAltura() mede o
   // conteúdo. O painel lateral ocupa a área visível estimada pela tela, e o aviso rápido aparece perto do último clique.
+  //
+  // Queixa de 05/11/2026 ("janela de onboarding está mal formatada"): o app não ocupava a largura toda (faixa branca à
+  // direita, painel solto no meio) e o painel lateral parava antes do fim da tela.
+  // - Largura: o BX24.resizeWindow do SDK converte a largura em número, e o Bitrix fixa o iframe nesses pixels
+  //   (bitrix/js/rest/applayout.js: f.style.width = largura + "px"); a largura medida aqui dentro é a do próprio
+  //   iframe, então uma vez fixada menor (slider ainda abrindo, janela que cresceu) ela nunca mais crescia. Só o
+  //   BX24.fitWindow manda "100%": ele vai primeiro, e a resposta dele traz a largura real, usada no resizeWindow
+  //   que acerta a altura medida (o fitWindow sozinho põe a altura do scroll, que nunca encolhe).
+  // - Altura do painel: o IntersectionObserver, dentro de um iframe de outro domínio, devolve a parte do iframe que
+  //   aparece na janela do navegador (conferido no Edge em 05/11/2026). Uma sonda do tamanho do iframe dá a altura
+  //   visível de verdade; a estimativa pela tela fica só até a primeira medida.
   let ultimoClique = 0, agendada = false;
   const noBitrix = () => !!(estado.repo && estado.repo.modo === "bitrix" && window.BX24);
-  /** Área visível do app dentro do Bitrix: a tela menos o navegador e o topo do Bitrix (estimativa) */
-  function alturaVisivel() { return Math.max(520, ((window.screen && window.screen.availHeight) || 900) - 250); }
+  const telaDisponivel = () => (window.screen && window.screen.availHeight) || 900;
+  /** Estimativa da área visível do app (a tela menos o navegador e o topo do Bitrix), até a medida chegar */
+  function alturaVisivel() { return Math.max(520, telaDisponivel() - 250); }
   function ajustarAltura() {
     if (!noBitrix() || agendada) return;
     agendada = true;
@@ -537,14 +549,38 @@
       try {
         const app = document.getElementById("app");
         const sobreposto = !!(document.getElementById("painel").innerHTML || document.getElementById("tour").innerHTML);
-        const altura = Math.max(app ? app.offsetHeight : 0, sobreposto ? alturaVisivel() : 0, 480);
-        BX24.resizeWindow((BX24.getScrollSize && BX24.getScrollSize().scrollWidth) || document.documentElement.scrollWidth, altura);
+        // com o painel aberto, o iframe passa da altura da janela: a medida da sonda recorta o painel no que aparece
+        const altura = Math.max(app ? app.offsetHeight : 0, sobreposto ? Math.max(520, telaDisponivel() - 60) : 0, 480);
+        const larguraAtual = (BX24.getScrollSize && BX24.getScrollSize().scrollWidth) || document.documentElement.scrollWidth;
+        if (BX24.fitWindow) BX24.fitWindow(function (r) { BX24.resizeWindow((r && r.width) || larguraAtual, altura); });
+        else BX24.resizeWindow(larguraAtual, altura);
       } catch (e) { /* SDK sem resizeWindow */ }
     });
+  }
+  /** A altura do iframe que aparece na tela, em --altura-visivel (o painel lateral e o tour usam) */
+  function medirAreaVisivel() {
+    if (!window.IntersectionObserver || document.getElementById("sonda-visivel")) return;
+    const sonda = document.createElement("div");
+    sonda.id = "sonda-visivel";
+    sonda.setAttribute("aria-hidden", "true");
+    sonda.style.cssText = "position:fixed;top:0;left:0;bottom:0;width:1px;visibility:hidden;pointer-events:none";
+    document.body.appendChild(sonda);
+    const limiares = [];
+    for (let i = 0; i <= 100; i++) limiares.push(i / 100);
+    const io = new IntersectionObserver(function (entradas) {
+      const r = entradas[entradas.length - 1].intersectionRect;
+      // fora da tela, ou quase: fica a última medida
+      if (r && r.height >= 300) document.documentElement.style.setProperty("--altura-visivel", Math.round(r.height) + "px");
+    }, { threshold: limiares });
+    io.observe(sonda);
+    // o observador só avisa quando a fração visível muda: com o iframe inteiro na tela, ela fica em 100% enquanto a
+    // altura muda. Quando o Bitrix redimensiona o iframe, observar de novo traz a medida na hora.
+    window.addEventListener("resize", function () { io.unobserve(sonda); io.observe(sonda); });
   }
   function modoBitrix() {
     document.documentElement.setAttribute("data-bitrix", "1");
     document.documentElement.style.setProperty("--altura-visivel", alturaVisivel() + "px");
+    medirAreaVisivel();
     // mudou o tamanho do conteúdo (tela nova, pergunta que aparece, detalhe aberto): mede de novo
     if (window.ResizeObserver) new ResizeObserver(ajustarAltura).observe(document.getElementById("app"));
   }
