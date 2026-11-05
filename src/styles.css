@@ -460,9 +460,10 @@ details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy)
 :root[data-bitrix] .gp { min-height: 0; }
 :root[data-bitrix] .lateral { position: static; height: auto; overflow: visible; }
 :root[data-bitrix] .lateral .rodape { margin-top: 18px; }
-:root[data-bitrix] .painel-lateral { bottom: auto; height: min(var(--altura-visivel, 100vh), 100vh); } /* 100vh aqui é a altura do iframe: o painel nunca passa dela */
+:root[data-bitrix] .painel-lateral { top: var(--visivel-topo, 0px); bottom: auto; height: min(var(--altura-visivel, 100vh), 100vh); } /* na parte do app que está na tela; 100vh aqui é a altura do iframe */
+:root[data-bitrix] #painel[data-medindo] .painel-lateral { visibility: hidden; }
 :root[data-bitrix] .toast { position: absolute; bottom: auto; top: var(--toast-top, 16px); }
-:root[data-bitrix] .tour { align-items: flex-start; padding-top: 48px; }
+:root[data-bitrix] .tour { align-items: flex-start; padding-top: calc(var(--visivel-topo, 0px) + 48px); }
 :root[data-bitrix] .carregando { min-height: 320px; }
 
 .checagem .neutro { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); }

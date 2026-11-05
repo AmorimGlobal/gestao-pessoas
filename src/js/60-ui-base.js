@@ -203,7 +203,13 @@
     const primeiro = el.querySelector(".corpo input:not([type=hidden]):not([disabled]), .corpo textarea, .corpo select");
     if (primeiro) setTimeout(() => primeiro.focus({ preventScroll: true }), 50);
     if (o.aoAbrir) o.aoAbrir(el);
-    if (noBitrix()) { try { BX24.scrollParentWindow(0); } catch (e) { /* sem SDK */ } ajustarAltura(); }
+    if (noBitrix()) {
+      // o painel abre na parte do app que está na tela (medirAreaVisivel); escondido até a medida nova chegar, para não
+      // aparecer primeiro no lugar antigo. Sem o observador (navegador antigo), rola o Bitrix até o topo, como antes.
+      if (remedir) { el.setAttribute("data-medindo", "1"); setTimeout(function () { el.removeAttribute("data-medindo"); }, 300); remedir(); }
+      else { try { BX24.scrollParentWindow(0); } catch (e) { /* sem SDK */ } }
+      ajustarAltura();
+    }
   }
   function fecharPainel(forcar) {
     const el = document.getElementById("painel");
@@ -549,6 +555,8 @@
       try {
         const app = document.getElementById("app");
         const sobreposto = !!(document.getElementById("painel").innerHTML || document.getElementById("tour").innerHTML);
+        // painel ou tour aberto: a posição deles vem da medida da parte visível, que precisa estar em dia
+        if (sobreposto && remedir) remedir();
         // com o painel aberto, o iframe passa da altura da janela: a medida da sonda recorta o painel no que aparece
         const altura = Math.max(app ? app.offsetHeight : 0, sobreposto ? Math.max(520, telaDisponivel() - 60) : 0, 480);
         const larguraAtual = (BX24.getScrollSize && BX24.getScrollSize().scrollWidth) || document.documentElement.scrollWidth;
@@ -557,7 +565,11 @@
       } catch (e) { /* SDK sem resizeWindow */ }
     });
   }
-  /** A altura do iframe que aparece na tela, em --altura-visivel (o painel lateral e o tour usam) */
+  /** A parte do iframe que aparece na tela: onde começa (--visivel-topo) e a altura (--altura-visivel). O painel lateral
+      e o tour se posicionam nela. Queixa de 05/11/2026 ("continua mal formatado"): com a página do Bitrix rolada para
+      baixo, o painel abria no topo do app, fora da tela, e o BX24.scrollParentWindow(0) não rola o layout novo do
+      Bitrix (quem rola lá não é a janela). Agora o painel abre onde a pessoa está olhando. */
+  let remedir = null;
   function medirAreaVisivel() {
     if (!window.IntersectionObserver || document.getElementById("sonda-visivel")) return;
     const sonda = document.createElement("div");
@@ -568,14 +580,24 @@
     const limiares = [];
     for (let i = 0; i <= 100; i++) limiares.push(i / 100);
     const io = new IntersectionObserver(function (entradas) {
-      const r = entradas[entradas.length - 1].intersectionRect;
+      const e = entradas[entradas.length - 1];
+      const r = e.intersectionRect, b = e.boundingClientRect;
       // fora da tela, ou quase: fica a última medida
-      if (r && r.height >= 300) document.documentElement.style.setProperty("--altura-visivel", Math.round(r.height) + "px");
+      if (r && r.height >= 200) {
+        const raiz = document.documentElement.style;
+        raiz.setProperty("--altura-visivel", Math.round(r.height) + "px");
+        // o retângulo vem nas coordenadas do iframe (conferido no Edge): a diferença é quanto do app ficou acima da tela
+        raiz.setProperty("--visivel-topo", Math.max(0, Math.round(r.top - b.top)) + "px");
+      }
+      const painel = document.getElementById("painel");
+      if (painel) painel.removeAttribute("data-medindo");
     }, { threshold: limiares });
     io.observe(sonda);
-    // o observador só avisa quando a fração visível muda: com o iframe inteiro na tela, ela fica em 100% enquanto a
-    // altura muda. Quando o Bitrix redimensiona o iframe, observar de novo traz a medida na hora.
-    window.addEventListener("resize", function () { io.unobserve(sonda); io.observe(sonda); });
+    // o observador só avisa quando a fração visível muda: com o iframe inteiro na tela, ou rolando no meio de um app
+    // mais alto que a tela, ela não muda. Observar de novo traz a medida na hora (quando o Bitrix redimensiona o
+    // iframe e quando um painel ou o tour abre).
+    remedir = function () { io.unobserve(sonda); io.observe(sonda); };
+    window.addEventListener("resize", remedir);
   }
   function modoBitrix() {
     document.documentElement.setAttribute("data-bitrix", "1");
