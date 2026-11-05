@@ -3,11 +3,14 @@
    o texto que a pessoa lê antes de pedir, a conferência do pedido com as regras, o e-mail
    para o RH com cópia à liderança e as ausências que o RH registra
    -------------------------------------------------------------------------------------
-   Fluxo da política: e-mail para hr@amorimlawfirm.com com cópia para a liderança direta
-   → o RH analisa → a liderança confirma → os dois respondem por e-mail. Decisão do usuário
-   (04/11/2026): o pedido e a decisão ficam no e-mail. O app escreve o e-mail, e o RH
-   registra no processo "Férias e ausências" a ausência aprovada, que aparece na Agenda.
-   Regra não atendida não trava o e-mail: vira "ponto fora da política", quem pede
+   Fluxo da política: pedido ao RH com cópia para a liderança direta → o RH analisa → a
+   liderança confirma. Desde 05/11/2026 (pedido do usuário: "não apenas no e-mail, mas no
+   app, principalmente para a liderança e o RH aprovarem e ficar registrado para o RH quem
+   estará ausente"), o pedido fica na tabela "Férias e ausências": "Aguardando o RH" →
+   "Aguardando a liderança" → "Aprovada", e só a aprovada entra na Agenda. O e-mail da
+   política sai pronto, pela caixa do Bitrix, como complemento. O RH também registra direto
+   uma ausência combinada fora do app (já em "Aprovada").
+   Regra não atendida não trava o pedido: vira "ponto fora da política", quem pede
    justifica, e o RH decide. Sem saldo de dias por pessoa (o direito muda por contrato e o
    RH confere): o app confere cada pedido, não a soma do ano.
    Funções puras (Node + navegador): test/ferias.test.js.
@@ -35,10 +38,10 @@
   /** A política, como o RH escreveu (a pessoa lê antes de pedir) */
   const POLITICA = {
     fluxo: [
-      ["Abrir a solicitação", "Envie um e-mail para " + EMAIL_RH + " com cópia para a sua liderança direta, com o tipo de solicitação, o período desejado e a justificativa, quando necessário. O app escreve o e-mail para você."],
+      ["Abrir a solicitação", "Peça aqui no app, com o tipo de solicitação, o período desejado e a justificativa, quando necessário. O pedido vai para o RH e para a sua liderança direta. O e-mail para " + EMAIL_RH + " com cópia para a liderança, que a política pede, sai pronto para enviar pela sua caixa do Bitrix."],
       ["O RH analisa", "O RH verifica se você tem direito ao período solicitado e se o time tem cobertura para essa data."],
       ["A liderança avalia", "A sua liderança considera o impacto nas entregas e nos prazos do time."],
-      ["Você recebe o retorno", "RH e liderança respondem por e-mail com a decisão. O RH registra a resposta, e a liderança acompanha o andamento."],
+      ["Você recebe o retorno", "O RH e a liderança decidem no app, e você recebe o aviso no Bitrix. Aprovado, o período entra na Agenda da equipe."],
     ],
     "Férias": [
       "Contratos PJ e de associação têm 30 dias corridos de pausa remunerada por ano. Membros CLT e estagiários seguem a legislação brasileira.",
@@ -87,9 +90,9 @@
   function periodoCurto(p) { const fim = fimDe(p); return fim === p.inicio ? calc.fmtData(p.inicio) : calc.fmtData(p.inicio) + " a " + calc.fmtData(fim); }
   const NOME_TIPO = { "Férias": "férias", "Day off": "day off", "Pausa contratual": "pausa contratual" };
 
-  /** As ausências registradas de uma pessoa, menos a que está sendo conferida ou editada */
+  /** Os pedidos e as ausências que contam de uma pessoa (aguardando ou aprovados), menos o que está sendo conferido ou editado */
   function pedidosDe(ctx, uid, excetoId) {
-    return registradas(ctx).filter((p) => String(p.responsavel) === String(uid) && p.id !== excetoId);
+    return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => String(p.responsavel) === String(uid) && p.estagio !== "FAIL" && p.inicio && p.id !== excetoId);
   }
 
   /** Quem pede: contrato, ingresso e cidade pelo Membros (quando o login lê), e o resto pelo perfil e pela estrutura do Bitrix */
@@ -178,16 +181,14 @@
     }
 
     const junto = outros.find((x) => x.inicio && x.inicio <= fim && fimDe(x) >= inicio);
-    if (junto) fora.push("Já há uma ausência sua registrada nesse período (" + NOME_TIPO[junto.tipo] + ", " + periodoCurto(junto) + ").");
+    if (junto) fora.push("Já há " + (junto.estagio === "SUCCESS" ? "uma ausência sua aprovada" : "um pedido seu em andamento") + " nesse período (" + NOME_TIPO[junto.tipo] + ", " + periodoCurto(junto) + ").");
     if (fora.length && !texto(p.justificativa)) erros.push("Explique na justificativa os pontos fora da política.");
     return { erros, fora, ok, dias };
   }
 
-  /* ---------------- ausências registradas pelo RH ---------------- */
-  // Decisão do usuário (04/11/2026): o pedido e a resposta seguem por e-mail, como na política. No app, o RH registra
-  // a ausência aprovada (direto em "Aprovada"), e a Agenda da equipe mostra quem está fora em cada dia.
-  /** As ausências registradas, da mais próxima à mais distante: só as da etapa "Aprovada", as mesmas da agenda
-      (dom.ausenciasAprovadas). Um item em outra etapa, como os pedidos do fluxo de aprovação anterior, não conta. */
+  /* ---------------- ausências aprovadas (as da agenda) ---------------- */
+  /** As ausências aprovadas, da mais próxima à mais distante: só as da etapa "Aprovada", as mesmas da agenda
+      (dom.ausenciasAprovadas). Pedido em andamento, recusado ou cancelado não conta. */
   function registradas(ctx) {
     return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => p.estagio === "SUCCESS" && p.inicio)
       .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
@@ -203,9 +204,52 @@
   /** Ainda por vir ou em curso */
   function proximas(lista, hoje) { return lista.filter((p) => fimDe(p) >= hoje); }
 
+  /* ---------------- pedidos no app: prazos, situação e quem decide (05/11/2026) ---------------- */
+  /** Pedido feito pela própria pessoa no app (ela leu as regras); sem isso, é ausência que o RH registrou direto */
+  const ehPedido = (p) => !!(p && p.regrasLidasEm);
+  /** Quando a liderança direta é a própria pessoa do RH que aprova, a confirmação sai junto, com este comentário */
+  const CONFIRMADO_PELO_RH = "Confirmado junto com a aprovação do RH (a liderança direta é do RH).";
+  const dataDe = (v) => String(v || "").slice(0, 10);
+  /** O RH responde em até 3 dias úteis (5 na pausa contratual), contados do pedido */
+  function prazoRH(ctx, p) { return calc.addDiasUteis(dataDe(p.criadoEm) || ctx.hoje, (PRAZOS[p.tipo] || PRAZOS["Férias"]).rh, dom.feriadosDe(ctx, "SP")); }
+  /** A liderança confirma em até 2 dias úteis (5 na pausa) depois da aprovação do RH */
+  function prazoLideranca(ctx, p) { return p.rhEm ? calc.addDiasUteis(dataDe(p.rhEm), (PRAZOS[p.tipo] || PRAZOS["Férias"]).lideranca, dom.feriadosDe(ctx, "SP")) : ""; }
+  /** A situação para a tela: texto, cor e, enquanto aguarda, o prazo de quem decide */
+  function situacao(ctx, p) {
+    if (p.estagio === "SUCCESS") return { texto: ehPedido(p) ? "Aprovado" : "Registrada pelo RH", cor: "verde" };
+    if (p.estagio === "FAIL") return p.canceladaEm ? { texto: "Cancelado", cor: "cinza" } : { texto: p.liderancaDecisao === "Recusada" ? "Recusado pela liderança" : "Recusado pelo RH", cor: "cinza" };
+    if (p.estagio === "AG_LIDERANCA") { const pz = prazoLideranca(ctx, p); return { texto: "Aguardando a liderança", cor: pz && calc.atrasado(pz, ctx.hoje) ? "vermelho" : "ambar", prazo: pz }; }
+    const pz = prazoRH(ctx, p);
+    return { texto: "Aguardando o RH", cor: calc.atrasado(pz, ctx.hoje) ? "vermelho" : "azul", prazo: pz };
+  }
+  const recentes = (lista) => lista.slice().sort((a, b) => (String(a.criadoEm) < String(b.criadoEm) ? 1 : -1));
+  const doApp = (ctx) => (ctx.registros && ctx.registros.ferias) || [];
+  /** Aguardando o RH, do mais antigo (o prazo vence antes) ao mais novo */
+  function paraRH(ctx) { return recentes(doApp(ctx).filter((p) => p.estagio === "NEW")).reverse(); }
+  /** Aguardando a confirmação desta liderança */
+  function paraLideranca(ctx, uid) { return recentes(doApp(ctx).filter((p) => p.estagio === "AG_LIDERANCA" && String(p.lideranca) === String(uid))).reverse(); }
+  /** Os pedidos e as ausências que a pessoa enxerga, em qualquer etapa: o RH, todos; a liderança e a coordenação, os da
+      equipe, os em que é a liderança direta e os seus; o membro, os seus */
+  function pedidosVisiveis(ctx, uid, visao) {
+    const id = String(uid);
+    if (visao === "rh") return doApp(ctx).slice();
+    const equipe = {};
+    if (visao !== "membro") dom.membrosVisiveis(ctx, id).forEach((m) => { equipe[String(m.responsavel)] = true; });
+    return doApp(ctx).filter((p) => String(p.responsavel) === id || String(p.lideranca) === id || equipe[String(p.responsavel)]);
+  }
+  /** Quem decide este pedido agora: "rh" (aguardando o RH, e quem vê é do RH), "lideranca" (aguardando a liderança direta)
+      ou "". Ninguém decide o próprio pedido. */
+  function decisorDoPedido(ctx, uid, rh, p) {
+    const id = String(uid);
+    if (!p || String(p.responsavel) === id) return "";
+    if (p.estagio === "NEW" && rh) return "rh";
+    if (p.estagio === "AG_LIDERANCA" && String(p.lideranca) === id) return "lideranca";
+    return "";
+  }
+
   /* ---------------- e-mails ---------------- */
   /** O e-mail que abre a solicitação: para o RH, com cópia para a liderança direta (fluxo da política) */
-  function emailDoPedido(ctx, p, pessoa) {
+  function emailDoPedido(ctx, p, pessoa, opcoes) {
     const lid = pessoa.lideranca ? dom.pessoa(ctx, pessoa.lideranca) : null;
     const corpo = [
       "Olá, RH" + (lid ? " e " + primeiroNome(lid.nome) : "") + ",", "",
@@ -217,6 +261,8 @@
     if (String(p.justificativa || "").trim()) corpo.push("Justificativa: " + String(p.justificativa).trim());
     const fora = String(p.foraDaPolitica || "").split("\n").filter(Boolean);
     if (fora.length) corpo.push("", "Pontos fora da política, apontados pelo app:", ...fora.map((f) => "- " + f));
+    // o pedido gravado no app (05/11/2026): o e-mail avisa que dá para decidir por lá
+    if (opcoes && opcoes.registrado) corpo.push("", "O pedido também está registrado no app Gestão de Pessoas, onde o RH e a liderança aprovam.");
     corpo.push("", "Obrigado(a),", pessoa.nome);
     return { para: EMAIL_RH, cc: lid && lid.email ? [lid.email] : [], assunto: "Solicitação de " + NOME_TIPO[p.tipo] + " · " + pessoa.nome + " · " + periodoCurto(p), corpo: corpo.join("\n") };
   }
@@ -238,6 +284,7 @@
     EMAIL_RH, TIPOS, PRAZOS, FERIAS_ANO, PARCELAS, PAUSA_MAX, POLITICA, NOME_TIPO,
     diasCorridos, periodo, periodoCurto, pedidosDe, dadosDaPessoa, conferirPedido,
     registradas, visiveisPara, proximas,
+    ehPedido, CONFIRMADO_PELO_RH, prazoRH, prazoLideranca, situacao, paraRH, paraLideranca, pedidosVisiveis, decisorDoPedido,
     emailDoPedido, textoDoEmail, corpoHtml, escolherRemetente,
   };
 });

@@ -123,7 +123,7 @@
   }
   function atalhosRH() {
     const d = dom.demandasRH(E().ctx);
-    const n = d.offboarding + d.recrutamento + dom.filaRH(E().ctx).filter((f) => ["ENVIADA_RH", "AG_COORD"].indexOf(f.item.estagio) < 0).length;
+    const n = d.offboarding + d.recrutamento + dom.filaRH(E().ctx).filter((f) => ["ENVIADA_RH", "AG_COORD"].indexOf(f.item.estagio) < 0).length + (GP.ferias ? GP.ferias.paraRH(E().ctx).length : 0);
     if (!n) return "";
     return '<div class="card acao vermelho" style="margin-bottom:16px"><h3>' + icone("alerta", 16) + " " + plural(n, "solicitação aguarda o RH", "solicitações aguardam o RH") +
       '<a class="extra" href="#/painel">Abrir a fila do RH →</a></h3></div>';
@@ -354,10 +354,12 @@
     const esteira = dom.solicitacoesOffboarding(ctx).filter((s) => s.nova);
     const vagas = dom.vagasDe(ctx, null).filter((v) => v.nova);
     const promos = dom.promocoes(ctx).filter((x) => x.situacao === "rh");
-    const total = fila.length + esteira.length + vagas.length + promos.length;
-    let h = '<div class="card' + (esteira.length || vagas.length || promos.length ? " acao vermelho" : "") + '"><h3>Fila do RH<span class="extra muted">' + plural(total, "item", "itens") + "</span></h3>" + (total ? '<div class="lista">' +
+    const ferias = GP.ferias ? GP.ferias.paraRH(ctx) : [];
+    const total = fila.length + esteira.length + vagas.length + promos.length + ferias.length;
+    let h = '<div class="card' + (esteira.length || vagas.length || promos.length || ferias.length ? " acao vermelho" : "") + '"><h3>Fila do RH<span class="extra muted">' + plural(total, "item", "itens") + "</span></h3>" + (total ? '<div class="lista">' +
       esteira.map((s) => '<div class="item clicavel" data-rota="#/offboarding"><div class="principal-item"><div class="t">Encerramento de contrato · ' + esc(s.membro || s.titulo) + '</div><div class="d">' + esc([s.setor, s.motivoTexto, s.solicitante ? "pedida por " + s.solicitante : ""].filter(Boolean).join(" · ")) + '</div></div><div class="lado">' + c.tag("Nova · esteira", "vermelho") + "</div></div>").join("") +
       vagas.map((v) => '<div class="item clicavel" data-rota="#/recrutamento"><div class="principal-item"><div class="t">Vaga · ' + esc(v.titulo) + '</div><div class="d">' + esc(v.solicitante ? "pedida por " + v.solicitante : "") + '</div></div><div class="lado">' + c.tag("Nova solicitação", "vermelho") + "</div></div>").join("") +
+      ferias.map((p) => { const s = GP.ferias.situacao(ctx, p); return '<div class="item clicavel" data-rota="#/ferias/' + esc(p.id) + '"><div class="principal-item"><div class="t">' + esc(p.tipo) + " · " + esc(dom.pessoa(ctx, p.responsavel).nome) + '</div><div class="d">' + esc(GP.ferias.periodo(p)) + '</div></div><div class="lado">' + c.tag("Aguarda o RH", s.cor === "vermelho" ? "vermelho" : "azul") + '<span class="prazo">até ' + calc.fmtData(s.prazo) + "</span></div></div>"; }).join("") +
       promos.map((x) => '<div class="item clicavel" data-rota="#/recrutamento/promocao/' + esc(x.id) + '"><div class="principal-item"><div class="t">Promoção · ' + esc(x.nome) + '</div><div class="d">' + esc([x.nivelAtual && x.nivel ? x.nivelAtual + " → " + x.nivel : x.nivel, "pedida por " + dom.pessoa(ctx, x.solicitante).nome].filter(Boolean).join(" · ")) + '</div></div><div class="lado">' + c.tag("Aguarda o RH", "vermelho") + "</div></div>").join("") +
       fila.map((f) =>
       '<div class="item clicavel" data-rota="#/offboarding/encerramento/' + esc(f.item.id) + '">' + (f.membro ? c.avatar(f.membro, 30) : "") + '<div class="principal-item"><div class="t">Encerramento de contrato · ' + esc(f.membro ? f.membro.nome : "") + '</div><div class="d">' + esc(f.item.motivo || "") + "</div></div>" +

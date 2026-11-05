@@ -334,7 +334,11 @@
       (contador ? '<span class="contador' + (dica ? " novo" : "") + '" title="' + esc(dica || "Pendências atrasadas") + '">' + contador + "</span>" : "") + "</a>";
     if (estado.visao === "ceo") return item("inicio", "inicio", "Início") + item("painel", "painel", "Painel geral");
     // Férias e ausências: sem contador, porque o pedido e a decisão ficam no e-mail (04/11/2026)
-    const itemFerias = item("ferias", "ferias", "Férias e ausências");
+    // Férias e ausências: o número é o que espera esta pessoa (o RH analisa; a liderança confirma), desde 05/11/2026
+    const F = GP.ferias;
+    const naFila = F ? (estado.visao === "rh" ? F.paraRH(estado.ctx).filter((p) => String(p.responsavel) !== String(estado.eu.id)).length : 0) +
+      F.paraLideranca(estado.ctx, estado.eu.id).filter((p) => String(p.responsavel) !== String(estado.eu.id)).length : 0;
+    const itemFerias = item("ferias", "ferias", "Férias e ausências", naFila, "Pedidos aguardando você");
     if (estado.visao === "membro") return itemFerias + item("perfil", "perfil", "Perfil") + (estado.eu.admin ? item("config", "config", "Configuração") : "");
     const atrasadas = dom.pendenciasDe(estado.ctx, minhaEquipe(), { uid: estado.eu.id }).filter((p) => p.atrasado).length;
     const links = (estado.config && estado.config.links) || {};

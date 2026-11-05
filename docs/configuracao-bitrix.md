@@ -135,10 +135,19 @@ Configure em CRM → Configurações → Permissões. Para cada um dos 11 proces
 
 | Tabela do CRM | Membros (todos, opcional) | Liderança | Coordenação | RH |
 |---|---|---|---|---|
-| Férias e ausências | Ler: Próprios | Ler: Do departamento | Ler: Departamento e subdepartamentos | Todos |
+| Férias e ausências | Ler, Adicionar e Editar: Próprios | Ler e Editar: Departamento e subdepartamentos | Ler: Departamento e subdepartamentos | Todos |
 | Feriados | Ler: Todos | Ler: Todos | Ler: Todos | Todos (o RH cadastra) |
 
-Quem tem mais de uma função soma as permissões, então a liderança continua com as dela nas outras tabelas. A função "Membros" (para todos os funcionários, ligada ao departamento raiz) é opcional: pedir férias não grava nada, então quem não tem a função pede normalmente. Ela só deixa cada pessoa ver as próprias ausências registradas e o calendário de feriados do RH. Sem leitura em "Feriados", a pessoa vê a lista oficial de feriados. "Próprios" funciona porque o RH registra a ausência com a própria pessoa como responsável.
+Quem tem mais de uma função soma as permissões, então a liderança continua com as dela nas outras tabelas.
+
+**Desde 05/11/2026, a função "Membros" é necessária para todos os funcionários** (ligada ao departamento raiz), porque o pedido de férias e ausências volta a ser gravado no app:
+- Com "Adicionar", a pessoa cria o próprio pedido.
+- Com "Editar: Próprios", ela cancela o pedido enquanto ele está em andamento.
+- Com "Ler", ela acompanha os próprios pedidos. "Próprios" funciona porque a pessoa é a responsável pelo pedido.
+- Sem a função, o app avisa que falta a permissão e oferece mandar o pedido só por e-mail.
+- Em "Feriados", a leitura mostra o calendário do RH; sem ela, a pessoa vê a lista oficial.
+
+A Liderança confirma pedidos da equipe, por isso precisa de **Editar** nesta tabela, além de Ler. Use "Departamento e subdepartamentos" para cobrir quem chefia uma área com setores abaixo.
 
 **O RH precisa de "Todos" mesmo.** O app lê os registros com o login de quem usa. Com "Do departamento", a pessoa do RH só enxerga o próprio setor, e em "Ver como outra pessoa" a equipe da liderança escolhida aparece vazia. Foi o que aconteceu em 28/10/2026. Desde 29/10/2026 o app avisa o RH e o administrador no topo da tela quando a permissão esconde registros: ele compara o que o login leu com o total do processo, contado no servidor por `api/contagem.js`, com o mesmo `BITRIX_WEBHOOK_URL` e `GP_AVISAR_IDS`.
 
@@ -303,17 +312,37 @@ O relatório da reunião (`Relatório.docx`) mudou o escopo do app. O que precis
 Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Ausências Programadas" do RH. As regras ficam em `src/js/53-ferias.js`.
 
 1. **Estrutura:** dois processos novos, "Gestão de Pessoas · Férias e ausências" e "Gestão de Pessoas · Feriados". Um administrador cria pelo app: Configuração → "Criar ou completar a estrutura". Até lá, o app mostra o aviso no topo e a tela de férias diz o que falta. Depois, dê as permissões da seção 4. A função "Membros" para todos os funcionários é opcional.
-2. **Férias e ausências:** decisão do usuário de 04/11/2026: a comunicação é feita por e-mail, e o app serve para acompanhar quem está fora em cada dia.
+2. **Férias e ausências:** desde 05/11/2026, o pedido e a aprovação ficam no app. O usuário pediu: "não apenas no e-mail, mas no app, principalmente para a liderança e o RH aprovarem e ficar registrado para o RH quais colaboradores estarão ausentes". De 04/11 a 05/11 tudo ficava no e-mail, e o RH registrava a ausência aprovada.
    - **Pedir (qualquer pessoa):** em "Pedir férias ou ausência", a pessoa escolhe o tipo, lê as regras e marca que leu. O app confere o pedido com a política: antecedência, segunda-feira, partes de 23, 15 ou 8 dias, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. O que não bate não trava: vira "ponto fora da política", e a pessoa justifica.
-   - O app escreve o e-mail que a política pede (para hr@amorimlawfirm.com, com cópia para a liderança direta), e a pessoa pode ajustar o texto. **"Enviar pelo e-mail do Bitrix"** manda pela caixa do Bitrix de quem pede (a Amorim usa o e-mail do Bitrix, pedido do usuário de 04/11/2026), e o e-mail fica nos enviados dela. Nada é gravado no app: o pedido e a resposta do RH e da liderança ficam no e-mail.
+   - **"Enviar o pedido"** grava o pedido na tabela "Férias e ausências", na etapa "Aguardando o RH", com a pessoa como responsável. O pedido leva a liderança direta, as regras lidas, a cobertura, a justificativa e os pontos fora da política. O RH e a liderança direta recebem o aviso no Bitrix e no sino.
+   - **A ordem é a da política: o RH analisa primeiro, e depois a liderança confirma.**
+     - O RH aprova ou recusa em até 3 dias úteis (5 na pausa contratual). Aprovado, o pedido vai para "Aguardando a liderança".
+     - A liderança confirma ou recusa em até 2 dias úteis (5 na pausa). Confirmado, o pedido vai para "Aprovada" e entra na Agenda da equipe.
+     - Na recusa, o comentário é obrigatório e vai para quem pediu.
+     - Sem liderança direta, ou quando a liderança direta é a própria pessoa do RH que aprova, a aprovação do RH já fecha o pedido.
+     - O prazo vencido fica em vermelho.
+     - O número no menu "Férias e ausências" é o que espera quem está vendo: os pedidos aguardando o RH, para o RH, e os aguardando a confirmação, para a liderança. A fila do RH, no Início, também lista os pedidos.
+   - Quem pediu cancela enquanto o pedido está em andamento, e o RH e a liderança recebem o aviso.
+   - Depois de gravar, o app mostra o e-mail que a política pede (para hr@amorimlawfirm.com, com cópia para a liderança direta), já com a frase de que o pedido está no app. É um complemento: a pessoa pode ajustar o texto, enviar e fechar.
+     - **"Enviar pelo e-mail do Bitrix"** manda pela caixa do Bitrix de quem pede (a Amorim usa o e-mail do Bitrix, pedido do usuário de 04/11/2026). O e-mail fica nos enviados dela, e o pedido guarda "E-mail ao RH enviado em".
+     - Sem a permissão de gravar na tabela (função "Membros", seção 4), o app explica e oferece mandar o pedido só por e-mail.
    - O envio usa o REST 3.0 (`mail.mailbox.senders` e `mail.message.send`, chamados por `fetch` em `/rest/api/` com o token da sessão; o portal responde com CORS aberto). **O aplicativo precisa do escopo `mail`**: em Desenvolvedores → Outros → aplicativo local Gestão de Pessoas, marque "E-mail (mail)" e salve. Sem o escopo, sem caixa conectada ou com recusa do Bitrix, o app explica, e **"Abrir o e-mail do Bitrix"** copia o texto e abre a tela de escrever do Bitrix (`/mail/message/new`) sobre o app. "Copiar" continua como reserva. O Gmail e o e-mail do computador saíram.
-   - **Registrar (o RH):** aprovado o pedido, o RH usa "Registrar ausência" (pessoa, tipo, primeiro e último dia, observação). O item nasce direto na etapa "Aprovada", com a pessoa como responsável. A pessoa e a liderança direta recebem o aviso. O RH também edita e exclui, e a exclusão avisa as duas.
-   - **Acompanhar:** o RH vê todas as ausências; a liderança e a coordenação, as da equipe; o membro, as suas. A Agenda da equipe mostra quem está fora em cada dia.
+   - **Registrar direto (o RH):** para uma ausência combinada fora do app, o RH usa "Registrar ausência" (pessoa, tipo, primeiro e último dia, observação).
+     - O item nasce direto na etapa "Aprovada", com a pessoa como responsável, e a pessoa e a liderança direta recebem o aviso.
+     - O RH também edita esse registro.
+     - O RH exclui qualquer item, pedido ou registro, e a exclusão avisa as duas.
+     - O app separa o pedido do registro direto pelo campo "Regras lidas em": só o pedido feito no app tem esse campo.
+   - **Acompanhar:**
+     - O RH vê todos os pedidos e todas as ausências.
+     - A liderança e a coordenação veem os da equipe.
+     - O membro vê os seus.
+     - Só a etapa "Aprovada" entra na Agenda da equipe.
    - Não há saldo de dias por pessoa: o direito muda por contrato, e quem confere é o RH.
-   - Saíram do app em 04/11/2026: as aprovações do RH e da liderança, os prazos de resposta, o "Já enviei" e o contador do menu. As etapas "Aguardando o RH" e "Aguardando a liderança" e os campos da decisão da liderança ficaram na tabela do CRM, sem uso. Um item fora da etapa "Aprovada" não aparece no app.
+   - O Gmail, o e-mail do computador e o "Já enviei" não voltaram: o e-mail sai pela caixa do Bitrix e o envio fica anotado sozinho.
 3. **Feriados:** o RH cadastra o calendário de cada ano em Agenda da equipe → Editar feriados. O cadastro começa pela lista oficial (nacionais da lei, mais os locais de SP e Salvador da Configuração). Depois o RH marca o que não vale ("não considerar", vira dia útil), exclui ou acrescenta (recesso, por exemplo), para todos ou só para quem segue SP ou Salvador. Um ano cadastrado substitui a lista oficial naquele ano, nos prazos do app, nos pedidos de day off e na agenda. O calendário do Bitrix não é lido.
 4. **Notificações:** o sino no topo do menu mostra os pedidos e os registros dos últimos 30 dias para quem vê:
-   - as ausências registradas pelo RH (a própria pessoa e a liderança direta);
+   - os pedidos de férias e ausências e cada decisão: o pedido avisa o RH e a liderança direta; a aprovação do RH avisa a liderança (que confirma) e quem pediu; a confirmação avisa o RH e quem pediu (05/11/2026);
+   - as ausências registradas direto pelo RH (a própria pessoa e a liderança direta);
    - solicitações de vaga (RH e coordenação do setor) e de encerramento de contrato (RH);
    - finalistas para avaliar e o calendário de feriados atualizado.
 
