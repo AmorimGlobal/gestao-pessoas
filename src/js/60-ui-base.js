@@ -485,7 +485,8 @@
 
   function render() {
     const app = document.getElementById("app");
-    if (estado.carregando) { app.innerHTML = '<div class="carregando"><div class="spinner"></div>Carregando o Gestão de Pessoas…</div>'; return; }
+    // o símbolo da Amorim pulsando (pedido de 05/11/2026); sem a logo, o círculo girando
+    if (estado.carregando) { app.innerHTML = '<div class="carregando">' + (GP.marca && GP.marca.logoBranco ? '<span class="simbolo-carregando" role="img" aria-label="Amorim"></span>' : '<div class="spinner"></div>') + "Carregando o Gestão de Pessoas…</div>"; return; }
     if (estado.erro) {
       app.innerHTML = '<div class="conteudo"><div class="card"><h3>Não foi possível abrir o app</h3><div class="aviso-erro">' + esc(estado.erro) +
         '</div><p class="muted">Recarregue a página. Se o erro continuar, mostre esta mensagem ao TI.</p></div></div>';

@@ -385,6 +385,15 @@ details.modelos .modelo b { color: var(--navy); }
 .carregando { min-height: 60vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; color: var(--muted); }
 .spinner { width: 28px; height: 28px; border: 3px solid var(--borda); border-top-color: var(--botao); border-radius: 50%; animation: girar 0.8s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
+/* Só o símbolo da logo (05/11/2026): a mesma máscara da .logo, recortada no símbolo. No PNG de 922×170 ele ocupa
+   as colunas 25 a 155 e as linhas 14 a 151 (131×138); --h é a altura do símbolo na tela. */
+.simbolo-carregando { --h: 46px; display: block; height: var(--h); width: calc(var(--h) * 131 / 138); background: var(--marca);
+  -webkit-mask: var(--logo) no-repeat; mask: var(--logo) no-repeat;
+  -webkit-mask-size: calc(var(--h) * 922 / 138) calc(var(--h) * 170 / 138); mask-size: calc(var(--h) * 922 / 138) calc(var(--h) * 170 / 138);
+  -webkit-mask-position: calc(var(--h) * -25 / 138) calc(var(--h) * -14 / 138); mask-position: calc(var(--h) * -25 / 138) calc(var(--h) * -14 / 138);
+  animation: pulsar 1.2s ease-in-out infinite; }
+@keyframes pulsar { 0%, 100% { transform: scale(0.9); opacity: 0.45; } 50% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .simbolo-carregando { animation: none; } }
 @media print {
   .lateral, .faixa-demo, .nao-imprimir, .painel-lateral, .fundo-painel { display: none !important; }
   body { background: #fff; }
