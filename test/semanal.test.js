@@ -232,3 +232,29 @@ test("botão Buscar agora: só o RH e os administradores, com a sessão do Bitri
   assert.equal(rh.corpo.guardadas, 0, "o RH busca de novo: já estava tudo guardado");
   assert.equal(rh.corpo.semMudanca, 2);
 });
+
+test("Início e sino da liderança: a semana mais recente da equipe, quem respondeu e quem não (05/11/2026)", () => {
+  const { dadosDemo } = require("../src/js/45-demo.js");
+  const dom = require("../src/js/50-dominio.js");
+  const N = require("../src/js/54-notificacoes.js");
+  const d = dadosDemo();
+  const ctx = dom.indexar({ hoje: "2026-10-08", eu: { id: "3" }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros, vagas: d.vagas, offboarding: d.offboarding });
+  const equipe = dom.equipeDe(ctx, "3");
+  const r = S.daEquipe(ctx, equipe);
+  assert.equal(r.semana, "2026-10-02");
+  assert.deepEqual(r.revisoes.map((x) => x.membroId).sort(), ["1", "2"]);
+  assert.deepEqual(r.semRevisao.map((m) => m.id).sort(), ["3", "4", "5", "6"]);
+  assert.equal(r.semanasAntes, 1);
+  // equipe sem revisão nenhuma: nada a mostrar
+  assert.equal(S.daEquipe(ctx, dom.equipeDe(ctx, "4")), null);
+  // o sino da Carla: um aviso por semana, com quem respondeu; a revisão descartada não conta
+  const sino = N.notificacoesDe(ctx, "3", { visto: "" }).filter((n) => /Alinhamento semanal/.test(n.titulo));
+  assert.deepEqual(sino.map((n) => n.titulo), ["Alinhamento semanal: 2 pessoas da sua equipe responderam", "Alinhamento semanal: 1 pessoa da sua equipe respondeu"]);
+  assert.equal(sino[0].texto, "Semana de 28/09 a 02/10: Ana Ribeiro, Bruno Teixeira.");
+  assert.equal(sino[0].rota, "#/inicio");
+  // quem não lidera a equipe (o Marcos, a própria Ana) não recebe
+  assert.equal(N.notificacoesDe(ctx, "4", { visto: "" }).filter((n) => /Alinhamento semanal/.test(n.titulo)).length, 0);
+  assert.equal(N.notificacoesDe(ctx, "100", { visto: "" }).filter((n) => /Alinhamento semanal/.test(n.titulo)).length, 0);
+  ctx.registros.semanal.forEach((x) => { if (x.membroId === "2") x.estagio = "FAIL"; });
+  assert.equal(N.notificacoesDe(ctx, "3", { visto: "" }).filter((n) => /Alinhamento semanal/.test(n.titulo))[0].titulo, "Alinhamento semanal: 1 pessoa da sua equipe respondeu");
+});

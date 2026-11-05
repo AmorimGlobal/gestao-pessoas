@@ -9,11 +9,11 @@
   const E = () => ui.estado;
 
   /** Topo das telas de entrada (Início, Painéis, Meu setor), no visual da referência de 30/10/2026: data, título,
-      "ao vivo", a ação principal e o quadro de números. o = { titulo, sub, numeros: [{ valor, rotulo, tom }], links, acao } */
+      a ação principal e o quadro de números (o "Ao vivo" saiu em 05/11/2026, a pedido do usuário). o = { titulo, sub, numeros: [{ valor, rotulo, tom }], links, acao } */
   function faixa(o) {
     return '<header class="topo-tela"><div class="texto">' + c.sobre() + '<h1 class="titulo-pagina">' + esc(o.titulo) + "</h1>" +
       (o.sub ? '<div class="sub">' + esc(o.sub) + "</div>" : "") + "</div>" +
-      '<div class="acoes">' + c.vivo() + (o.acao || "") + "</div></header>" +
+      '<div class="acoes">' + (o.acao || "") + "</div></header>" +
       (o.numeros ? c.kpis(o.numeros) : "") + (o.links ? '<div class="links-topo">' + o.links + "</div>" : "");
   }
   function saudacao() {
@@ -50,6 +50,8 @@
     if (E().visao === "coordenacao") h += atalhosCoordenacao();
     if (E().visao === "rh") h += atalhosRH();
     h += proximos14();
+    // a liderança vê o alinhamento semanal da própria equipe direta (WhatsApp)
+    if (equipe.length && visao !== "rh") h += semanalDaEquipe(equipe);
     h += '<div class="card"><div class="destinos">' +
       destino("equipe", "equipe", "Minha equipe", "Card de cada membro, com o histórico") +
       destino("recrutamento", "recrutamento", "Recrutamento", "Solicitar vaga e acompanhar") +
@@ -65,6 +67,31 @@
       "</div></div>";
     return h;
   };
+  /** Alinhamento semanal pelo WhatsApp (05/11/2026): a semana mais recente da equipe, quem respondeu (as respostas
+      abrem na própria linha) e quem não tem resposta guardada nela. Nada guardado ainda: o cartão não aparece. */
+  function semanalDaEquipe(equipe) {
+    const ctx = E().ctx, S = GP.semanal;
+    if (!S || (ctx.recursos && ctx.recursos.semanal === false)) return "";
+    const r = S.daEquipe(ctx, equipe);
+    if (!r) return "";
+    const membroDe = (it) => dom.infoMembro(ctx, ctx.idx.membro[it.membroId] || { responsavel: it.responsavel });
+    const revs = r.revisoes.map((it) => ({ it, m: membroDe(it) })).sort((a, b) => a.m.nome.localeCompare(b.m.nome, "pt-BR"));
+    const linha = (x) => {
+      const qs = S.lerRespostas(x.it.respostas);
+      return '<details class="semanal-equipe"><summary>' + c.avatar(x.m, 30) + '<div class="principal-item"><div class="t">' + esc(x.m.nome) + '</div><div class="d">' +
+        esc(plural(qs.length, "pergunta respondida", "perguntas respondidas")) + (x.it.papel === "Liderança" ? " · respondeu como liderança" : "") + "</div></div>" +
+        '<span class="abre"><span class="fechado">Ver respostas</span><span class="aberto">Fechar</span></span></summary><div class="respostas">' +
+        qs.map((q) => '<div class="resposta-semanal"><div class="k">' + esc(q.titulo || q.pergunta) + "</div>" + (q.titulo ? '<div class="muted pergunta">' + esc(q.pergunta) + "</div>" : "") +
+          '<div class="texto-registro">' + esc(q.resposta) + "</div></div>").join("") +
+        '<p class="muted" style="font-size:12px;margin:8px 0 0"><a href="#/membro/' + esc(x.m.id) + '/semanal">Todas as semanas de ' + esc(primeiroNome(x.m.nome)) + " →</a></p></div></details>";
+    };
+    const faltam = r.semRevisao.map((m) => dom.infoMembro(ctx, m)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    return '<div class="card"><h3>Alinhamento semanal pelo WhatsApp<span class="extra muted">semana de ' + esc(S.rotuloSemana(r.semana)) + "</span></h3>" +
+      '<p class="muted" style="margin:0 0 6px;font-size:13px">' + esc(revs.length + " de " + equipe.length + (equipe.length === 1 ? " pessoa da equipe respondeu." : " pessoas da equipe responderam.")) +
+      " As respostas ficam guardadas no card de cada um, na aba Semanal.</p>" +
+      "<div>" + revs.map(linha).join("") + "</div>" +
+      (faltam.length ? '<p class="muted" style="font-size:12px;margin:10px 0 0">Sem resposta guardada nesta semana: ' + faltam.map((m) => '<a href="#/membro/' + esc(m.id) + '">' + esc(m.nome) + "</a>").join(", ") + ".</p>" : "") + "</div>";
+  }
   function destino(rota, ic, t, d) {
     return '<a href="#/' + rota + '"><span class="ic">' + icone(ic, 18) + '</span><span><span class="t">' + esc(t) + '</span><br><span class="d">' + esc(d) + "</span></span></a>";
   }

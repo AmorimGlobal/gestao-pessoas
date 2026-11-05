@@ -12,6 +12,7 @@
      anterior que espera aprovação avisa a coordenação.
    - Finalistas: a avaliação nova avisa a liderança que avalia.
    - Feriados: o calendário mudado pelo RH avisa todo mundo.
+   - Alinhamento semanal (WhatsApp, 05/11/2026): as respostas guardadas da equipe direta avisam a liderança, uma vez por semana.
    O "lido" é de cada pessoa: a data em que ela abriu o sino pela última vez (BX24.userOption).
    Cada evento também sai como aviso do Bitrix (GP.app.avisar), para quem está fora do app.
    Só entra o que o login de quem vê consegue ler. Funções puras: test/notificacoes.test.js.
@@ -86,6 +87,24 @@
           texto: x.rhDecisao === D.aprovada ? (x.nivel ? x.nivel + (x.vigencia ? " a partir de " + calc.fmtDataAno(x.vigencia) : "") + ". " : "") + "A conversa com a pessoa fica com a liderança." : x.rhObs });
       }
     });
+
+    /* Alinhamento semanal pelo WhatsApp (05/11/2026): a liderança recebe um aviso por semana com quem da equipe
+       direta respondeu. Leva ao Início, onde fica o cartão com as respostas. */
+    const equipe = dom.equipeDe(ctx, id);
+    if (equipe.length) {
+      const daEquipe = {};
+      equipe.forEach((m) => { daEquipe[m.id] = m; });
+      const porSemana = {};
+      ((ctx.registros && ctx.registros.semanal) || []).filter((x) => daEquipe[x.membroId] && x.estagio !== "FAIL" && x.semana)
+        .forEach((x) => { (porSemana[x.semana] = porSemana[x.semana] || []).push(x); });
+      Object.keys(porSemana).forEach((sem) => {
+        const lista = porSemana[sem];
+        const quando = lista.map((x) => x.guardadaEm || x.criadoEm || "").sort().pop();
+        add({ id: "semanal-" + sem, quando, area: "Minha equipe", rota: "#/inicio",
+          titulo: "Alinhamento semanal: " + (lista.length === 1 ? "1 pessoa da sua equipe respondeu" : lista.length + " pessoas da sua equipe responderam"),
+          texto: "Semana de " + calc.fmtData(calc.addDias(sem, -4)) + " a " + calc.fmtData(sem) + ": " + lista.map((x) => nome((ctx.idx.membro[x.membroId] || {}).responsavel || x.responsavel)).sort().join(", ") + "." });
+      });
+    }
 
     /* Encerramento de contrato: a esteira (só o RH lê) e o fluxo anterior do app */
     if (p.rh) {

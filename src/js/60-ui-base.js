@@ -106,10 +106,6 @@
   c.sobre = function () {
     return '<div class="sobre">' + esc(calc.fmtDataLonga(estado.ctx ? estado.ctx.hoje : calc.hojeISO())) + "</div>";
   };
-  /** "Ao vivo": os números saem do Bitrix na hora. Na demonstração, deixa claro que não são reais. */
-  c.vivo = function () {
-    return estado.repo && estado.repo.modo === "demo" ? '<span class="vivo demo"><i></i>Demonstração</span>' : '<span class="vivo"><i></i>Ao vivo</span>';
-  };
   /** Quadro de números: [{ valor, rotulo, tom: azul|ambar|roxo|vermelho|verde|cinza, rota?, nota? }].
       O número e o rótulo saem na cor do tom; zero fica esmaecido e "sem dado" vira "—". */
   c.kpis = function (lista) {

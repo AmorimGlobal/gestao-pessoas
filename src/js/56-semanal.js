@@ -146,5 +146,19 @@
       .sort((a, b) => (a.semana < b.semana ? 1 : a.semana > b.semana ? -1 : 0));
   }
 
-  return { PAPEL, chaveFone, chaveNome, casarPessoa, semanaDasRespostas, rotuloSemana, formatarRespostas, lerRespostas, chaveOrigem, planejar, doMembro };
+  /** A semana mais recente em que alguém da equipe respondeu (pedido de 05/11/2026: "aparecer pro gestor no painel"):
+      as revisões dela e quem da equipe não tem revisão guardada nela. equipe = itens do Membros. Sem revisão: null. */
+  function daEquipe(ctx, equipe) {
+    const ids = {};
+    (equipe || []).forEach((m) => { ids[m.id] = true; });
+    const revs = ((ctx.registros && ctx.registros.semanal) || []).filter((x) => ids[x.membroId] && x.estagio !== "FAIL" && x.semana);
+    if (!revs.length) return null;
+    const semana = revs.map((x) => x.semana).sort().pop();
+    const revisoes = revs.filter((x) => x.semana === semana);
+    const responderam = {};
+    revisoes.forEach((x) => { responderam[x.membroId] = true; });
+    return { semana, revisoes, semRevisao: (equipe || []).filter((m) => !responderam[m.id]), semanasAntes: new Set(revs.filter((x) => x.semana < semana).map((x) => x.semana)).size };
+  }
+
+  return { PAPEL, chaveFone, chaveNome, casarPessoa, semanaDasRespostas, rotuloSemana, formatarRespostas, lerRespostas, chaveOrigem, planejar, doMembro, daEquipe };
 });
