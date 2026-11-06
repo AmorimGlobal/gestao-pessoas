@@ -528,3 +528,25 @@ details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy)
 .rv-media { display: inline-block; width: 90px; height: 8px; border-radius: 4px; background: var(--sutil); overflow: hidden; }
 .rv-media > span { display: block; height: 100%; background: var(--botao); }
 @media (max-width: 560px) { .rv-etapa { flex-direction: column; gap: 4px; } .rv-nota { flex-wrap: wrap; } .rv-nota-v { min-width: 0; } }
+
+/* ---------- Agenda de férias e formulário pelo ciclo (protótipo do RH, 06/11/2026) ---------- */
+.rv-reservas { margin: 0; padding-left: 18px; font-size: 12.5px; }
+.fa-tempo { display: flex; flex-direction: column; overflow-x: auto; }
+.fa-linha { display: grid; grid-template-columns: 170px minmax(520px, 1fr); align-items: center; min-height: 28px; }
+.fa-nome { font-size: 12.5px; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-faixa { position: relative; height: 22px; border-bottom: 1px solid var(--divisor); }
+.fa-meses .fa-faixa { height: 20px; border-bottom: 1px solid var(--borda); }
+.fa-mes { position: absolute; top: 2px; font-size: 11px; color: var(--suave); border-left: 1px solid var(--divisor); padding-left: 4px; height: 18px; }
+.fa-equipe { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--suave); margin: 12px 0 2px; }
+.fa-barra { position: absolute; top: 5px; height: 12px; border-radius: 4px; display: block; }
+.fa-barra.aprovada { background: var(--verde); }
+.fa-barra.lideranca { background: var(--ambar-forte); }
+.fa-barra.rh { background: var(--azul); }
+.fa-barra.coletiva { background: var(--muted); opacity: .7; }
+.fa-col { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(45deg, var(--sutil), var(--sutil) 4px, transparent 4px, transparent 8px); }
+.fa-hoje { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--vermelho); }
+.fa-legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 12px; }
+.fa-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.fa-legenda .fa-barra { position: static; width: 18px; height: 10px; display: inline-block; }
+.fa-col-leg { display: inline-block; width: 18px; height: 10px; background: repeating-linear-gradient(45deg, var(--borda), var(--borda) 3px, transparent 3px, transparent 6px); }
+.fa-hoje-leg { display: inline-block; width: 2px; height: 12px; background: var(--vermelho); }

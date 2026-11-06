@@ -53,43 +53,107 @@ test("feriados: o calendário do RH substitui o ano inteiro; o que a empresa nã
   assert.ok(!ag.feriadosNacionais.some((f) => f.data === "2026-11-20"));
 });
 
-test("férias: pedido dentro da política (segunda-feira, 60 dias, 15 dias, mais de 12 meses de contrato)", () => {
-  const ctx = contexto("101");
-  const r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-01-11", fim: "2027-01-25", cobertura: "Ana cobre." }, pessoa(ctx, "101"));
-  assert.deepEqual(r.erros, []);
+test("férias pela política (PJ e associação): 23 dias em qualquer dia da semana, depois dos 12 meses e dos 60 dias, sem conflito na equipe", () => {
+  const ctx = contexto("101"); // Bruno: associado desde 02/05/2023
+  const r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-02-06", fim: "2027-02-28" }, pessoa(ctx, "101")); // sábado
+  assert.deepEqual(r.erros, [], r.erros.join(" | "));
   assert.deepEqual(r.fora, []);
-  assert.equal(r.dias, 15);
-  assert.ok(r.ok.some((x) => /segunda-feira/.test(x)) && r.ok.some((x) => /12 meses/.test(x)));
+  assert.equal(r.dias, 23);
+  assert.ok(r.ok.some((x) => /Contrato desde 02\/05\/2023/.test(x)) && r.ok.some((x) => /Sem conflito na equipe/.test(x)) && r.ok.some((x) => /os 23 dias de uma vez/.test(x)));
+  assert.ok(!r.ok.concat(r.fora, r.erros).some((x) => /segunda-feira/.test(x)), "as férias começam em qualquer dia da semana (06/11/2026)");
+  // a cobertura vira observação opcional: a regra da equipe cobre o período
+  assert.ok(!r.erros.some((x) => /cobertas/.test(x)));
 });
 
-test("férias: o que foge da política vira ponto a justificar, sem travar", () => {
+test("férias pela política: o que não pode trava o pedido (60 dias, ciclo, divisão, equipe, semana coletiva)", () => {
   const ctx = contexto("101");
-  const p = { tipo: "Férias", inicio: "2026-10-28", fim: "2026-11-06", cobertura: "Ana cobre." }; // quarta, 20 dias antes, 10 dias
-  let r = F.conferirPedido(ctx, p, pessoa(ctx, "101"));
-  assert.equal(r.fora.length, 3, r.fora.join(" | "));
-  assert.ok(r.fora.some((x) => /segundas-feiras/.test(x)) && r.fora.some((x) => /20 dias de antecedência/.test(x)) && r.fora.some((x) => /10 dias corridos/.test(x)));
-  // o day off do Bruno em 13/11 cruza um período que o inclua
-  assert.ok(F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-11-09", fim: "2026-11-23", cobertura: "x" }, pessoa(ctx, "101")).fora.some((x) => /Já há um pedido seu em andamento nesse período \(day off, 13\/11\)/.test(x)));
-  assert.deepEqual(r.erros, ["Explique na justificativa os pontos fora da política."]);
-  r = F.conferirPedido(ctx, Object.assign({ justificativa: "Viagem de família marcada." }, p), pessoa(ctx, "101"));
+  const bruno = pessoa(ctx, "101");
+  let r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-10-28", fim: "2026-11-06" }, bruno); // 20 dias antes, 10 dias, passa de outubro
+  assert.equal(r.erros.length, 3, r.erros.join(" | "));
+  assert.ok(r.erros.some((x) => /60 dias de antecedência: a primeira data possível é 07\/12\/2026/.test(x)));
+  assert.ok(r.erros.some((x) => /passa do fim do ciclo \(31\/10\/2026\)/.test(x)));
+  assert.ok(r.erros.some((x) => /10 dias corridos: a política aceita 23 dias de uma vez, ou 7 \+ 16, ou 8 \+ 15/.test(x)));
+  assert.deepEqual(r.fora, [], "nada vira ponto a justificar: o pedido não sai");
+  // a equipe: as férias da Ana (07/12 a 21/12, aguardando o RH) ocupam a data
+  r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-12-10", fim: "2027-01-01" }, bruno);
+  assert.deepEqual(r.erros, ["Já reservado na sua equipe: 07/12 a 21/12 (aguardando o RH). A data fica com quem pediu primeiro."]);
+  // as datas da equipe vindas do servidor valem no lugar das que o login lê
+  r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-03-01", fim: "2027-03-23" }, bruno, { reservas: [{ inicio: "2027-03-20", fim: "2027-03-27", situacao: "Aprovada" }] });
+  assert.match(r.erros[0], /Já reservado na sua equipe: 20\/03 a 27\/03 \(aprovada\)/);
+  // a semana coletiva escolhida no mesmo pedido não pode cair no período
+  r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-02-06", fim: "2027-02-28" }, bruno, { junto: [{ coletiva: true, inicio: "2027-02-08", fim: "2027-02-12" }] });
+  assert.ok(r.erros.some((x) => /cai na sua semana de férias coletivas/.test(x)));
+  // a semana coletiva: uma das duas do ciclo, sem antecedência nem regra da equipe
+  r = F.conferirPedido(ctx, { tipo: "Férias", coletiva: true, inicio: "2026-12-28", fim: "2027-01-01" }, bruno);
   assert.deepEqual(r.erros, []);
-  // cobertura é obrigatória nas férias
-  assert.match(F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-01-11", fim: "2027-01-25" }, pessoa(ctx, "101")).erros[0], /cobertas/);
+  assert.match(r.ok[0], /fora dos 23 dias e da regra da equipe/);
+  r = F.conferirPedido(ctx, { tipo: "Férias", coletiva: true, inicio: "2026-12-22", fim: "2026-12-26" }, bruno);
+  assert.deepEqual(r.erros, ["A semana de férias coletivas é de 21/12 a 25/12 ou de 28/12 a 01/01."]);
 });
 
-test("férias: cada pedido nas partes de 23, 15 ou 8 dias, sem saldo do ano; estágio segue a lei; a semana coletiva do fim de ano", () => {
-  const ctx = contexto("100"); // Ana pediu 15 dias de férias em dezembro de 2026 (aguardando o RH)
-  assert.equal(F.saldoFerias, undefined, "sem saldo por pessoa (04/11/2026): o RH confere o direito");
-  let r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-12-07", fim: "2026-12-14", cobertura: "x" }, pessoa(ctx, "100"));
-  assert.ok(r.fora.some((x) => /Já há um pedido seu em andamento nesse período \(férias, 07\/12 a 21\/12\)/.test(x)), "sobrepõe o pedido de dezembro, ainda em andamento");
-  r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2026-12-28", fim: "2027-01-11", cobertura: "x", justificativa: "x" }, pessoa(ctx, "100"));
-  assert.ok(r.fora.some((x) => /férias coletivas entre o Natal de 2026/.test(x)));
-  assert.ok(r.ok.some((x) => /15 dias corridos: uma das duas partes/.test(x)), "cada pedido é conferido sozinho, sem somar o ano");
-  assert.ok(!r.fora.some((x) => /Somando/.test(x)));
-  // estágio: sem a regra da segunda-feira e das partes
+test("férias: o ciclo de novembro a outubro, as semanas coletivas, a abertura aos 10 meses e o que falta no ciclo", () => {
+  assert.deepEqual(F.cicloDe("2026-10-08"), { ano: 2025, inicio: "2025-11-01", fim: "2026-10-31", rotulo: "nov/2025 a out/2026" });
+  assert.equal(F.proximoCiclo(F.cicloDe("2026-10-08")).rotulo, "nov/2026 a out/2027");
+  assert.deepEqual(F.semanasColetivas(F.cicloDe("2026-12-01")).map((s) => s.inicio + "/" + s.fim), ["2026-12-21/2026-12-25", "2026-12-28/2027-01-01"]);
+  assert.deepEqual(F.semanasColetivas(F.cicloDe("2027-12-01")).map((s) => s.inicio + "/" + s.fim), ["2027-12-20/2027-12-24", "2027-12-27/2027-12-31"], "Natal num sábado");
+  assert.equal(F.addMeses("2026-01-31", 1), "2026-02-28");
+  // o protótipo: contrato em 10/12/2025 → primeira data 11/12/2026; contrato em 01/05/2026 → abre em 01/03/2027
+  assert.equal(F.liberacao({ ingresso: "2025-12-10" }, "2026-11-05").primeiraData, "2027-01-04", "60 dias depois de hoje, que vem depois dos 12 meses");
+  assert.equal(F.liberacao({ ingresso: "2025-12-10" }, "2026-08-01").primeiraData, "2026-12-11", "o dia seguinte aos 12 meses");
+  const nova = F.liberacao({ ingresso: "2026-05-01" }, "2026-11-05");
+  assert.deepEqual([nova.aberta, nova.abreEm, nova.completa12], [false, "2027-03-01", "2027-05-01"]);
+  const ctx = contexto("100"); // Ana pediu 15 dias em dezembro de 2026 (aguardando o RH)
+  const ana = pessoa(ctx, "100");
+  let r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-03-01", fim: "2027-03-23" }, ana);
+  assert.deepEqual(r.erros, ["Neste ciclo falta o período de 8 dias (você já pediu 15)."]);
+  r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-03-01", fim: "2027-03-08" }, ana);
+  assert.deepEqual(r.erros, []);
+  assert.ok(r.ok.some((x) => /a parte que faltava do ciclo/.test(x)));
+  // abre aos 10 meses
+  r = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-06-01", fim: "2027-06-23" }, Object.assign({}, ana, { ingresso: "2026-05-01" }));
+  assert.ok(r.erros.some((x) => /abre em 01\/03\/2027, quando você completa 10 meses de contrato/.test(x)));
+  // 7 + 16 pedidos juntos: cada parte confere com a outra
+  const bruno = pessoa(ctx, "101");
+  const p7 = { tipo: "Férias", inicio: "2027-03-01", fim: "2027-03-07" }, p16 = { tipo: "Férias", inicio: "2027-05-01", fim: "2027-05-16" };
+  assert.deepEqual(F.conferirPedido(ctx, p7, bruno, { junto: [p16] }).erros, []);
+  assert.deepEqual(F.conferirPedido(ctx, p16, bruno, { junto: [p7] }).erros, []);
+  assert.deepEqual(F.conferirPedido(ctx, p7, bruno, { junto: [{ tipo: "Férias", inicio: "2027-05-01", fim: "2027-05-15" }] }).erros, ["Neste ciclo falta o período de 8 dias (você já pediu 15)."]);
+  // o que resta no ciclo
+  assert.equal(F.restanteDoCiclo([]).modalidades.length, 3);
+  assert.equal(F.restanteDoCiclo([{ dias: 16 }]).falta, 7);
+  assert.equal(F.restanteDoCiclo([{ dias: 7 }, { dias: 16 }]).completo, true);
+  assert.equal(F.restanteDoCiclo([{ dias: 10 }]).foraDaRegra, true, "parte antiga fora da regra: o RH confere");
+  // estágio e CLT: a lei vale para a duração e a divisão
   const fer = F.conferirPedido(ctx, { tipo: "Férias", inicio: "2027-02-03", fim: "2027-02-12", cobertura: "x" }, pessoa(ctx, "104"));
   assert.deepEqual(fer.fora, []);
-  assert.ok(fer.ok.some((x) => /Estágio/.test(x)));
+  assert.ok(fer.ok.some((x) => /Estágio: vale a legislação/.test(x)));
+  assert.equal(F.segueALei({ contrato: "CLT" }), true);
+  assert.equal(F.segueALei({ contrato: "" }), false, "sem contrato no cadastro, vale a política");
+});
+
+test("férias: as datas de início do formulário e as datas da equipe (quem pediu primeiro fica com a data)", () => {
+  const ctx = contexto("101");
+  const bruno = pessoa(ctx, "101");
+  // a equipe do Bruno (liderança: Carla): as férias da Ana e do Gustavo, sem nomes
+  assert.deepEqual(F.reservasDaEquipe(ctx, "101"), [{ inicio: "2026-12-07", fim: "2026-12-21", situacao: "Aguardando o RH" }, { inicio: "2026-12-28", fim: "2027-01-05", situacao: "Aprovada" }]);
+  assert.deepEqual(F.reservasDaEquipe(ctx, "100").map((r) => r.inicio), ["2026-12-28"], "o próprio pedido não conta");
+  assert.deepEqual(F.reservasDaEquipe(ctx, "3"), [], "a Carla: ninguém mais com a liderança dela (Livia)");
+  const ciclo = F.cicloDe("2026-12-01");
+  const ops = F.opcoesDeInicio(ctx, ciclo, 23, { pessoa: bruno, reservas: F.reservasDaEquipe(ctx, "101"), coletiva: F.semanasColetivas(ciclo)[1], outros: F.pedidosDe(ctx, "101") });
+  assert.equal(ops[0].inicio, "2026-12-07", "a primeira data possível (hoje + 60 dias)");
+  assert.equal(ops[ops.length - 1].fim, "2027-10-31", "o último período termina no fim do ciclo");
+  assert.equal(ops.find((o) => o.inicio === "2026-12-07").bloqueio, "sua semana de férias coletivas");
+  assert.equal(ops.find((o) => o.inicio === "2027-01-02").bloqueio, "já reservado na equipe");
+  assert.equal(ops.find((o) => o.inicio === "2027-02-06").bloqueio, "", "sábado livre");
+  // a conferência de quem decide: o pedido de depois cruza com o de antes, e o RH vê com quem
+  ctx.registros.ferias.push({ id: "390", titulo: "Férias · Bruno Teixeira", responsavel: "101", lideranca: "3", autor: "101", tipo: "Férias", inicio: "2026-12-14", fim: "2026-12-29", dias: 16,
+    estagio: "NEW", regrasLidasEm: "2026-10-08T09:00:00-03:00", criadoEm: "2026-10-08T09:00:00-03:00" });
+  dom.indexar(ctx);
+  const doBruno = F.conferenciaParaDecidir(ctx, ctx.idx.porId.ferias["390"]).map((x) => (x.ok ? "ok " : "! ") + x.texto);
+  assert.ok(doBruno.some((x) => /^! Cruza com Ana Ribeiro \(07\/12 a 21\/12, aguardando o RH\), pedido antes deste: a data fica com essa pessoa/.test(x)), doBruno.join(" | "));
+  const daAna = F.conferenciaParaDecidir(ctx, ctx.idx.porId.ferias["300"]).map((x) => x.texto);
+  assert.ok(daAna.some((x) => /Cruza com Bruno Teixeira .*pedido depois deste: a data fica com este pedido/.test(x)), daAna.join(" | "));
+  assert.ok(daAna.indexOf("Início após 12 meses de contrato") >= 0);
 });
 
 test("day off: mês do aniversário, longe de feriado e das férias", () => {
@@ -156,8 +220,8 @@ test("pedidos no app (05/11/2026): o RH analisa, depois a liderança confirma, c
   assert.equal(F.situacao(ctx, p("303")).texto, "Cancelado");
   assert.equal(F.situacao(ctx, p("302")).texto, "Registrada pelo RH");
   assert.equal(F.situacao(ctx, Object.assign({}, p("301"), { estagio: "SUCCESS", liderancaDecisao: "Aprovada" })).texto, "Aprovado");
-  assert.equal(F.situacao(ctx, Object.assign({}, p("301"), { estagio: "FAIL", liderancaDecisao: "Recusada" })).texto, "Recusado pela liderança");
-  assert.equal(F.situacao(ctx, Object.assign({}, p("300"), { estagio: "FAIL", rhDecisao: "Recusada" })).texto, "Recusado pelo RH");
+  assert.equal(F.situacao(ctx, Object.assign({}, p("301"), { estagio: "FAIL", liderancaDecisao: "Recusada" })).texto, "Devolvido pela liderança");
+  assert.equal(F.situacao(ctx, Object.assign({}, p("300"), { estagio: "FAIL", rhDecisao: "Recusada" })).texto, "Devolvido pelo RH");
   // quem espera quem
   assert.deepEqual(F.paraRH(ctx).map((x) => x.id), ["300"]);
   assert.deepEqual(F.paraLideranca(ctx, "3").map((x) => x.id), ["301"]);
@@ -205,7 +269,10 @@ test("e-mail do pedido: para o RH, com cópia para a liderança, pronto para sai
   assert.match(e.corpo, /Cobertura das atividades: Bruno acompanha/);
   assert.match(e.corpo, /- Pedido com 30 dias de antecedência/);
   assert.doesNotMatch(e.corpo, /registrad/i, "sem o pedido gravado (só o e-mail), o texto não fala do app");
-  assert.match(F.emailDoPedido(ctx, ana, pessoa(ctx, "100"), { registrado: true }).corpo, /O pedido também está registrado no app Gestão de Pessoas, onde o RH e a liderança aprovam\./);
+  assert.match(F.emailDoPedido(ctx, ana, pessoa(ctx, "100"), { registrado: true }).corpo, /O pedido também está registrado no app Gestão de Pessoas, onde o RH autoriza e a liderança valida\./);
+  // o pedido com a semana coletiva e um período junto: os dois no mesmo e-mail
+  const junto = F.emailDoPedido(ctx, { tipo: "Férias", coletiva: true, inicio: "2026-12-28", fim: "2027-01-01" }, pessoa(ctx, "100"), { junto: [{ tipo: "Férias", inicio: "2027-03-01", fim: "2027-03-08" }] });
+  assert.match(junto.corpo, /Períodos:\n- de segunda, 28\/12\/2026 a sexta, 01\/01\/2027 \(5 dias corridos\) \(semana de férias coletivas\)\n- de segunda, 01\/03\/2027 a segunda, 08\/03\/2027 \(8 dias corridos\)/);
   assert.equal(F.emailDaDecisao, undefined, "a decisão é dada no app, e o aviso sai pelo Bitrix");
   assert.equal(F.linkGmail, undefined, "a Amorim usa o e-mail do Bitrix: sem Gmail nem mailto");
   // o corpo vai em HTML simples: texto escapado, quebras de linha em <br>
@@ -221,7 +288,7 @@ test("notificações: o pedido avisa o RH e a liderança; cada decisão avisa qu
   const rh = N.notificacoesDe(contexto("6"), "6");
   const t = rh.map((n) => n.titulo);
   const ana = rh.find((n) => n.titulo === "Ana Ribeiro pediu férias (07/12 a 21/12)");
-  assert.ok(ana && ana.acao === true && /O RH analisa primeiro, até 13\/10/.test(ana.texto), t.join(" | "));
+  assert.ok(ana && ana.acao === true && /O RH autoriza primeiro, até 13\/10/.test(ana.texto), t.join(" | "));
   assert.equal(rh.find((n) => n.titulo === "Bruno Teixeira pediu day off (13/11)").acao, false, "já aprovado pelo RH: agora é a liderança");
   assert.ok(t.includes("Júlia Freitas cancelou o pedido de pausa contratual (23/11 a 27/11)"));
   assert.ok(!t.some((x) => /registrou/.test(x)), "quem registrou não é avisado do próprio registro");
@@ -232,14 +299,14 @@ test("notificações: o pedido avisa o RH e a liderança; cada decisão avisa qu
   const carla = N.notificacoesDe(contexto("3"), "3");
   const tc = carla.map((n) => n.titulo);
   assert.ok(tc.includes("Ana Ribeiro pediu férias (07/12 a 21/12)"), tc.join(" | "));
-  const bruno = carla.find((n) => n.titulo === "O RH aprovou o pedido de Bruno Teixeira: falta a sua confirmação");
-  assert.ok(bruno && bruno.acao === true && /Confirme até 09\/10/.test(bruno.texto));
+  const bruno = carla.find((n) => n.titulo === "O RH autorizou o pedido de Bruno Teixeira: falta a sua validação");
+  assert.ok(bruno && bruno.acao === true && /Valide até 09\/10/.test(bruno.texto));
   assert.equal(bruno.rota, "#/ferias/301");
   assert.ok(tc.includes("Avalie a finalista Paula Nunes"));
   assert.ok(!tc.some((x) => /vaga/i.test(x)), "a liderança não é avisada das vagas que não pediu");
   // só as de férias: a demonstração também tem um ciclo da Revisão de Progresso aberto (avisos testados em test/revisao.test.js)
   const deFerias = (uid) => N.notificacoesDe(contexto(uid), uid).filter((n) => n.area !== "Revisão de Progresso");
-  assert.deepEqual(deFerias("101").map((n) => n.titulo), ["O RH aprovou o seu pedido de day off (13/11)"]);
+  assert.deepEqual(deFerias("101").map((n) => n.titulo), ["O RH autorizou o seu pedido de day off (13/11)"]);
   assert.deepEqual(deFerias("100"), [], "o próprio pedido, ainda sem decisão, não avisa quem pediu");
   assert.deepEqual(deFerias("110"), [], "registrada há mais de 30 dias: fora do sino");
   assert.deepEqual(deFerias("111"), [], "o próprio cancelamento não avisa quem cancelou");
@@ -253,7 +320,7 @@ test("notificações: o pedido avisa o RH e a liderança; cada decisão avisa qu
   const ctx2 = contexto("6");
   Object.assign(ctx2.registros.ferias.find((x) => x.id === "301"), { estagio: "SUCCESS", liderancaDecisao: "Aprovada", liderancaEm: "2026-10-08T10:00:00-03:00" });
   dom.indexar(ctx2);
-  assert.ok(N.notificacoesDe(ctx2, "6").some((n) => n.titulo === "Carla Mendes confirmou o pedido de Bruno Teixeira"));
+  assert.ok(N.notificacoesDe(ctx2, "6").some((n) => n.titulo === "Carla Mendes validou o pedido de Bruno Teixeira"));
   assert.ok(N.notificacoesDe(ctx2, "101").some((n) => n.titulo === "Aprovado: day off (13/11)"));
   // a coordenação é avisada das vagas das lideranças do setor
   assert.ok(N.notificacoesDe(contexto("2"), "2").some((n) => n.titulo === "Nova solicitação de vaga: Analista Tributário Júnior"));
@@ -268,4 +335,35 @@ test("notificações: o lido é de cada pessoa, e o calendário mudado pelo RH a
   dom.indexar(ctx);
   assert.ok(N.notificacoesDe(ctx, "100").some((n) => n.titulo === "O RH atualizou o calendário de feriados"));
   assert.ok(!N.notificacoesDe(ctx, "6").some((n) => /calendário de feriados/.test(n.titulo)), "o próprio RH não precisa do aviso");
+});
+
+test("api/ferias-equipe: as datas da equipe pelo webhook, sem nomes; sem token, 401", async () => {
+  const { criarBitrixFalso } = require("./fake-bitrix.js");
+  const { provisionar } = require("../src/js/30-provision.js");
+  const { abrirPortal } = require("../lib/bitrix-servidor.js");
+  const handler = require("../api/ferias-equipe.js");
+  const bx = criarBitrixFalso({
+    usuarios: [{ ID: "3", NAME: "Carla", LAST_NAME: "Mendes", UF_DEPARTMENT: [11] }, { ID: "100", NAME: "Ana", LAST_NAME: "Ribeiro", UF_DEPARTMENT: [11] },
+      { ID: "101", NAME: "Bruno", LAST_NAME: "Teixeira", UF_DEPARTMENT: [11] }, { ID: "4", NAME: "Marcos", LAST_NAME: "Lima", UF_DEPARTMENT: [12] }, { ID: "110", NAME: "Igor", LAST_NAME: "Santos", UF_DEPARTMENT: [12] }],
+    departamentos: [{ ID: "10", NAME: "Soluções", PARENT: "", UF_HEAD: "" }, { ID: "11", NAME: "Imigração", PARENT: "10", UF_HEAD: "3" }, { ID: "12", NAME: "Tributário", PARENT: "10", UF_HEAD: "4" }],
+  });
+  await provisionar({ chamar: bx.chamar });
+  const portal = await abrirPortal(bx.chamar, ["ferias"]);
+  const f = (resp, lid, tipo, inicio, fim, estagio, extra) => portal.criar("ferias", Object.assign({ titulo: tipo + " · " + resp, responsavel: resp, lideranca: lid, tipo, inicio, fim, estagio, justificativa: "Viagem com a família" }, extra || {}));
+  await f("100", "3", "Férias", "2027-01-11", "2027-01-25", "SUCCESS");
+  await f("100", "3", "Férias", "2026-12-28", "2027-01-01", "NEW", { coletiva: true });
+  await f("100", "3", "Day off", "2026-11-20", "2026-11-20", "SUCCESS");
+  await f("110", "4", "Férias", "2027-02-01", "2027-02-15", "NEW");
+  await f("100", "3", "Férias", "2027-03-01", "2027-03-23", "FAIL");
+  const res = () => ({ statusCode: 0, cab: {}, corpo: "", setHeader(k, v) { this.cab[k] = v; }, end(x) { this.corpo = x; } });
+  const env = { BITRIX_WEBHOOK_URL: "https://portal.exemplo/rest/1/x/" };
+  const r1 = res();
+  await handler({ method: "POST", body: {} }, r1, { env, chamar: bx.chamar });
+  assert.equal(r1.statusCode, 401);
+  const r2 = res();
+  await handler({ method: "POST", body: { auth: "tk" } }, r2, { env, chamar: bx.chamar, usuarioDoToken: async () => "101", agora: new Date("2026-11-06T12:00:00Z") });
+  assert.equal(r2.statusCode, 200, r2.corpo);
+  // só as férias aprovadas ou em andamento da mesma liderança; sem a semana coletiva, o day off, o devolvido e a outra equipe
+  assert.deepEqual(JSON.parse(r2.corpo), { ok: true, reservas: [{ inicio: "2027-01-11", fim: "2027-01-25", situacao: "Aprovada" }] });
+  assert.ok(!/Ana|Viagem|100/.test(r2.corpo), "sem nome, motivo nem ID");
 });

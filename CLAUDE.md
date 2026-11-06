@@ -28,6 +28,8 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
   - `api/ficha.js`: manda a Ficha do onboarding ao membro por e-mail (SMTP, `lib/email.js`).
   - `api/semanal.js` (e a rotina das 6h): copia as respostas do alinhamento semanal pelo WhatsApp (app-gestao-semanal) para a tabela "Revisões semanais" (`lib/semanal-servidor.js`).
   - `api/revisao360.js`: grava a resposta da avaliação 360° da Revisão de Progresso pelo webhook, sem ligar a quem respondeu (`lib/revisao360.js`). É a única gravação do app que não sai do navegador.
+  - `api/ferias-equipe.js`: as datas de férias já reservadas pela equipe de quem pede, sem nomes (`lib/ferias-equipe.js`). O membro só lê os próprios pedidos no CRM.
+  - São 11 funções em `api/`, e o plano Hobby da Vercel aceita até 12. Antes de criar outra, junte numa que já exista.
   - Os e-mails a quem pede nos funis 77 e 79 saíram do app em 30/10/2026: são regras de automação de cada funil no Bitrix.
   
   Todos calculam com as mesmas regras do navegador (`src/js/50-dominio.js`, `35-registros.js`). Variáveis e passo a passo: `docs/configuracao-bitrix.md`.
@@ -65,6 +67,7 @@ src/js/57-revisao-matriz.js  GERADO por tools/revisao-matriz.js a partir do prot
 src/js/58-revisao.js  Revisão de Progresso: ciclo e regras, quem participa, o que falta no formulário, mínimo das competências, ajustes, quem avalia quem na 360°, relatório com os mínimos, avisos do sino  [Node + navegador]
 src/js/69-ui-revisao.js telas da Revisão de Progresso (#/revisao…): início, abertura do ciclo, revisão de um membro (avaliação, calibração, devolutiva), autoavaliação, 360°, retornos, relatório 360°, matrizes
 lib/revisao360.js     a 360° no servidor: confere ciclo, liberação, relação e escala, e grava pelo webhook sem autor
+lib/ferias-equipe.js  as datas de férias reservadas pela equipe de quem pede, sem nomes (a regra "quem pediu primeiro fica com a data")
 tools/revisao-matriz.js gera 57-revisao-matriz.js do HTML do protótipo
 src/js/60-ui-base.js  estado, rotas (hash), layout, componentes, painel lateral, eventos
 src/js/60-ui-formulario.js formulário a partir da definição (seções, condicionais, grade de níveis) e enviarCard (cria o card, histórico, passa ao RH)
@@ -154,6 +157,17 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - O RH ainda registra direto, já em "Aprovada".
   - Pedido do app = tem `regrasLidasEm` (`ferias.ehPedido`); sem ele, é registro direto do RH. O sino e a tela usam isso.
   - A função "Membros" do CRM passou a ser necessária, para cada pessoa criar o próprio pedido. A Liderança precisa de Editar na tabela.
+- **06/11/2026, férias pelo protótipo do RH (`Solicitacao_Ferias_Amorim.html`, docs seção 11, item 8):** o usuário aprovou o que muda o PDF: 7 + 16, início em qualquer dia e a semana de férias coletivas escolhida por pessoa, exceção à regra da equipe.
+  - Para PJ e associação (`F.segueALei` separa CLT e estágio, que seguem a lei como antes):
+    - ciclo de novembro a outubro (`cicloDe`);
+    - o pedido abre com 10 meses de contrato; a primeira data é a mais tardia entre 12 meses + 1 dia e hoje + 60 (`liberacao`);
+    - 23, 7 + 16 ou 8 + 15 por ciclo (`restanteDoCiclo`);
+    - a regra da equipe (`reservasDaEquipe`, pelo campo `lideranca` do pedido).
+  - Essas regras **travam** o pedido (erros), em vez de virar "ponto fora da política".
+  - A semana coletiva é um item com `coletiva = true` (campo novo). `ehColetiva` a tira dos 23 dias e da regra da equipe.
+  - O formulário redesenha o bloco a cada escolha, com o estado em `f._st`. As datas da equipe vêm de `repo.reservasEquipe()` (`api/ferias-equipe.js`, sem nomes).
+  - Autorizar/Validar/Devolver são só palavras: o valor gravado continua "Aprovada" ou "Recusada".
+  - A Agenda de férias é `#/ferias/agenda`.
 - **05/11/2026, Revisão de Progresso (pedido do usuário: "implemente o Revisao_de_Progresso_Prototipo.html", docs seção 14):**
   - O usuário escolheu seguir sem a planilha dos nomes dos cargos e fazer as 3 visões de uma vez. O RH dá nome aos cargos em Configuração (`config.revisao.cargos`; `NOMES_DO_PROTOTIPO` cobre C04, C05 e C06). O cargo de cada membro é `cargoMatriz` no Membros.
   - São 5 tabelas (`revCiclos`, `revAvaliacoes`, `revAutoavaliacoes`, `rev360`, `revRetornos`). As respostas longas ficam em JSON, com as chaves dos `name` do protótipo.

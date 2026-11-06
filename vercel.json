@@ -9,7 +9,8 @@
     "api/ficha.js": { "maxDuration": 30 },
     "api/contagem.js": { "maxDuration": 30 },
     "api/semanal.js": { "maxDuration": 60 },
-    "api/revisao360.js": { "maxDuration": 30 }
+    "api/revisao360.js": { "maxDuration": 30 },
+    "api/ferias-equipe.js": { "maxDuration": 30 }
   },
   "crons": [
     { "path": "/api/sincronizar", "schedule": "0 9 * * *" },

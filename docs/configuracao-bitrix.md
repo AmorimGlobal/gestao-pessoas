@@ -315,12 +315,15 @@ Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Aus�
 
 1. **Estrutura:** dois processos novos, "Gestão de Pessoas · Férias e ausências" e "Gestão de Pessoas · Feriados". Um administrador cria pelo app: Configuração → "Criar ou completar a estrutura". Até lá, o app mostra o aviso no topo e a tela de férias diz o que falta. Depois, dê as permissões da seção 4. A função "Membros" para todos os funcionários é opcional.
 2. **Férias e ausências:** desde 05/11/2026, o pedido e a aprovação ficam no app. O usuário pediu: "não apenas no e-mail, mas no app, principalmente para a liderança e o RH aprovarem e ficar registrado para o RH quais colaboradores estarão ausentes". De 04/11 a 05/11 tudo ficava no e-mail, e o RH registrava a ausência aprovada.
-   - **Pedir (qualquer pessoa):** em "Pedir férias ou ausência", a pessoa escolhe o tipo, lê as regras e marca que leu. O app confere o pedido com a política: antecedência, segunda-feira, partes de 23, 15 ou 8 dias, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. O que não bate não trava: vira "ponto fora da política", e a pessoa justifica.
+   - **Pedir (qualquer pessoa):** em "Pedir férias ou ausência", a pessoa escolhe o tipo, lê as regras e marca que leu.
+     - **Férias de PJ e associação:** seguem o protótipo do RH (item 8).
+     - **Day off, pausa contratual e férias de CLT e estágio:** o app confere o pedido com a política: antecedência, 12 meses de contrato, day off no mês do aniversário e longe de feriado e das férias, pausa de até 7 dias. Nas férias de CLT e estágio, a duração e a divisão seguem a lei, e o RH confere. O que não bate não trava: vira "ponto fora da política", e a pessoa justifica.
    - **"Enviar o pedido"** grava o pedido na tabela "Férias e ausências", na etapa "Aguardando o RH", com a pessoa como responsável. O pedido leva a liderança direta, as regras lidas, a cobertura, a justificativa e os pontos fora da política. O RH e a liderança direta recebem o aviso no Bitrix e no sino.
-   - **A ordem é a da política: o RH analisa primeiro, e depois a liderança confirma.**
-     - O RH aprova ou recusa em até 3 dias úteis (5 na pausa contratual). Aprovado, o pedido vai para "Aguardando a liderança".
-     - A liderança confirma ou recusa em até 2 dias úteis (5 na pausa). Confirmado, o pedido vai para "Aprovada" e entra na Agenda da equipe.
-     - Na recusa, o comentário é obrigatório e vai para quem pediu.
+   - **A ordem é a da política: o RH autoriza primeiro, e depois a liderança valida** (as palavras do protótipo do RH, desde 06/11/2026).
+     - O RH autoriza ou devolve em até 3 dias úteis (5 na pausa contratual). Autorizado, o pedido vai para "Aguardando a liderança".
+     - A liderança valida ou devolve em até 2 dias úteis (5 na pausa). Validado, o pedido vai para "Aprovada" e entra na Agenda da equipe.
+     - Na devolução, o motivo é obrigatório e vai para quem pediu. A data volta a ficar livre na equipe.
+     - Nas férias, o RH e a liderança veem uma conferência antes de decidir: contrato desde quando, início depois dos 12 meses, conflito com outro pedido da equipe (com o nome e quem pediu antes) e a autorização do RH.
      - Sem liderança direta, ou quando a liderança direta é a própria pessoa do RH que aprova, a aprovação do RH já fecha o pedido.
      - O prazo vencido fica em vermelho.
      - O número no menu "Férias e ausências" é o que espera quem está vendo: os pedidos aguardando o RH, para o RH, e os aguardando a confirmação, para a liderança. A fila do RH, no Início, também lista os pedidos.
@@ -339,11 +342,11 @@ Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Aus�
      - A liderança e a coordenação veem os da equipe.
      - O membro vê os seus.
      - Só a etapa "Aprovada" entra na Agenda da equipe.
-   - Não há saldo de dias por pessoa: o direito muda por contrato, e quem confere é o RH.
+   - Não há saldo de dias por ano corrido. Desde 06/11/2026, as férias de PJ e associação contam os 23 dias por ciclo (item 8).
    - O Gmail, o e-mail do computador e o "Já enviei" não voltaram: o e-mail sai pela caixa do Bitrix e o envio fica anotado sozinho.
 3. **Feriados:** o RH cadastra o calendário de cada ano em Agenda da equipe → Editar feriados. O cadastro começa pela lista oficial (nacionais da lei, mais os locais de SP e Salvador da Configuração). Depois o RH marca o que não vale ("não considerar", vira dia útil), exclui ou acrescenta (recesso, por exemplo), para todos ou só para quem segue SP ou Salvador. Um ano cadastrado substitui a lista oficial naquele ano, nos prazos do app, nos pedidos de day off e na agenda. O calendário do Bitrix não é lido.
 4. **Notificações:** o sino no topo do menu mostra os pedidos e os registros dos últimos 30 dias para quem vê:
-   - os pedidos de férias e ausências e cada decisão: o pedido avisa o RH e a liderança direta; a aprovação do RH avisa a liderança (que confirma) e quem pediu; a confirmação avisa o RH e quem pediu (05/11/2026);
+   - os pedidos de férias e ausências e cada decisão: o pedido avisa o RH e a liderança direta; a autorização do RH avisa a liderança (que valida) e quem pediu; a validação avisa o RH e quem pediu; a devolução avisa quem pediu (05/11/2026, palavras de 06/11);
    - as ausências registradas direto pelo RH (a própria pessoa e a liderança direta);
    - solicitações de vaga (RH e coordenação do setor) e de encerramento de contrato (RH);
    - finalistas para avaliar e o calendário de feriados atualizado.
@@ -352,6 +355,36 @@ Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Aus�
 5. **Link do card depois de enviar (vaga e encerramento):** quem pede entra como observador do card. Ao enviar, o app mostra o link do card na pipe (abrir ou copiar), e o mesmo link vai no aviso do Bitrix para quem pediu, para o RH e para a coordenação. Na aba Recrutamento, cada vaga da lista abre o card. Com "Ler: Próprios" no funil, o observador abre o card mesmo depois que ele passa ao RH (a ajuda do Bitrix diz que o observador vê o card quando a função tem leitura); confira no primeiro envio real.
 6. **Altura do app dentro do Bitrix:** o app cresce até a altura do conteúdo e encolhe quando a página é menor. O menu termina logo depois dos itens, o painel lateral ocupa a área visível da tela, com os botões à vista, e o aviso rápido aparece perto do clique (`modoBitrix` e `ajustarAltura` em `60-ui-base.js`).
 7. **Aniversário:** cada pessoa cadastra o seu em Perfil, na Agenda ou na tela de férias. A data vem preenchida quando o perfil do Bitrix já tem. Ela é gravada no próprio perfil do Bitrix (`user.update`, escopo `user`), de onde a agenda já lia. O app mostra só o dia e o mês.
+8. **Férias pelo protótipo do RH (06/11/2026).** O protótipo é `Solicitacao_Ferias_Amorim.html`. O usuário aprovou estes pontos, inclusive os que mudam o PDF: a divisão 7 + 16, o início em qualquer dia da semana e a escolha da semana de férias coletivas por pessoa.
+   - **Para quem:** contratos PJ e de associação, e quem não tem contrato no cadastro. CLT e estágio seguem a lei, como antes.
+   - **Ciclo:** de novembro a outubro. O formulário mostra o ciclo em que ainda dá para pedir, e os dois quando os dois servem.
+   - **Abertura:** o pedido abre com **10 meses de contrato**. A primeira data possível é a mais tardia entre o dia seguinte aos **12 meses** e **hoje + 60 dias**.
+     - A data do contrato é o "Ingresso" do cadastro do membro. Sem ele, vale a data de cadastro no Bitrix.
+     - Confira o ingresso de cada membro: com a data errada, a pessoa é barrada.
+   - **Os 23 dias:** de uma vez, 7 + 16 ou 8 + 15, escolhidos no pedido.
+     - Dá para pedir um período agora e o outro depois. O app sabe o que falta: quem pediu 8 tem os 15 pela frente.
+     - Pedidos devolvidos ou cancelados não contam.
+     - Cada período fica dentro do ciclo.
+   - **Datas:** a pessoa escolhe o início numa lista, e o fim sai sozinho.
+     - Os períodos começam em **qualquer dia da semana**.
+     - A lista já marca o que não pode: a semana de férias coletivas da pessoa, outro pedido dela e o que a equipe já reservou.
+   - **Semana de férias coletivas:** são duas semanas de segunda a sexta, a do Natal e a seguinte, a do Ano Novo (no ciclo 2026/27, 21/12 a 25/12 e 28/12 a 01/01).
+     - Cada pessoa escolhe a sua no pedido: metade da equipe tira cada semana.
+     - A escolha vira um item da tabela, com o campo "Semana de férias coletivas" marcado, e passa pela mesma autorização e validação.
+     - Não conta nos 23 dias e é **exceção à regra da equipe**.
+   - **Regra da equipe:** duas pessoas com a mesma liderança direta não tiram férias ao mesmo tempo, e a data fica com quem pediu primeiro.
+     - O membro só lê os próprios pedidos no CRM. Por isso o formulário busca as datas da equipe em **`api/ferias-equipe.js`**, que lê pelo webhook e devolve só os períodos e a situação, sem nomes.
+     - Antes de gravar, o app lê as datas de novo. Se o servidor não responder, usa o que o login enxerga e avisa que o RH confere.
+     - Se dois pedidos cruzarem mesmo assim, a conferência do RH mostra quem pediu antes.
+   - **Agenda de férias** (Férias e ausências → "Agenda de férias", para o RH e as lideranças): mostra o ciclo inteiro.
+     - Números: fora nos próximos 14 dias, aguardando o RH, aguardando a liderança e aprovadas.
+     - Filtro por equipe (o setor principal no Bitrix).
+     - Linha do tempo por pessoa, com as semanas coletivas marcadas.
+     - A lista de todas as solicitações.
+   - **Para ligar:**
+     - Rode "Criar ou completar a estrutura": ela cria o campo "Semana de férias coletivas". Sem o campo, a escolha da semana fica desligada, com o aviso.
+     - Na Vercel não entra variável nova: a rota usa o `BITRIX_WEBHOOK_URL` (escopos crm, user e department).
+     - O projeto passa a ter 11 funções em `api/`. O plano Hobby da Vercel aceita até 12.
 
 
 ## 12. Revisões semanais: o alinhamento pelo WhatsApp no card do membro (04/11/2026)

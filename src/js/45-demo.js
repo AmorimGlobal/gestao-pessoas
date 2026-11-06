@@ -618,6 +618,14 @@
         return D.resumoPainel(D.painelGeral(ctx));
       },
       statusServidor: async () => null, // fora do Bitrix não há servidor para conferir
+      /** Férias: as datas reservadas pela equipe, sem nomes (o mesmo que api/ferias-equipe.js devolve) */
+      reservasEquipe: async function () {
+        await atraso();
+        const D = (typeof window !== "undefined" && window.GP && window.GP.dominio) || require("./50-dominio.js");
+        const FE = (typeof window !== "undefined" && window.GP && window.GP.ferias) || require("./53-ferias.js");
+        const ctx = D.indexar({ hoje, eu: { id: euId }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros });
+        return FE.reservasDaEquipe(ctx, euId).filter((r) => r.fim >= hoje).map((r) => ({ inicio: r.inicio, fim: r.fim, situacao: r.situacao }));
+      },
       /** Revisão de Progresso: as mesmas conferências de api/revisao360.js, e a resposta entra sem autor */
       enviar360: async function (dados) {
         await atraso();

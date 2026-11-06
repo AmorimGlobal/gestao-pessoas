@@ -42,6 +42,7 @@ O que não pode rodar no navegador de quem abre o app fica em funções da Verce
 | `api/painel.js` | Quando a CEO abre o app | Números do painel geral, sem ela ter leitura nos processos |
 | `api/status.js` | Tela de Configuração | Diz quais rotinas estão ligadas, sem mostrar valores |
 | `api/revisao360.js` | A cada resposta da avaliação 360° | Grava a resposta da Revisão de Progresso pelo webhook, sem guardar quem respondeu |
+| `api/ferias-equipe.js` | Quando alguém abre o pedido de férias | Devolve as datas que a equipe já reservou, sem nomes, para a regra "quem pediu primeiro fica com a data" |
 
 Cada uma liga quando as variáveis dela estão gravadas na Vercel. Sem elas, responde 503. A lista das variáveis e o passo a passo estão em [docs/configuracao-bitrix.md](docs/configuracao-bitrix.md). No app, **Configuração → Rotinas no servidor** mostra o que já está ligado.
 

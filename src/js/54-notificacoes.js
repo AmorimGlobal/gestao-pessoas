@@ -48,7 +48,7 @@
     /* Férias e ausências */
     ((ctx.registros && ctx.registros.ferias) || []).forEach((f) => {
       const meu = String(f.responsavel) === id, souLid = String(f.lideranca) === id;
-      const oque = ferias.NOME_TIPO[f.tipo] + " (" + ferias.periodoCurto(f) + ")";
+      const oque = ferias.nomeDoPedido(f) + " (" + ferias.periodoCurto(f) + ")";
       const rota = "#/ferias/" + f.id;
       // registrada direto pelo RH (combinada fora do app): avisa a liderança direta e a própria pessoa
       if (!ferias.ehPedido(f)) {
@@ -62,24 +62,24 @@
       const quem = nome(f.responsavel);
       if (!meu && (p.rh || souLid)) {
         add({ id: "ferias-pedido-" + f.id, quando: f.criadoEm, area: "Férias e ausências", rota,
-          titulo: quem + " pediu " + oque, texto: p.rh ? "O RH analisa primeiro, até " + calc.fmtData(ferias.prazoRH(ctx, f)) + "." : "O RH analisa primeiro; depois é a sua vez de confirmar.",
+          titulo: quem + " pediu " + oque, texto: p.rh ? "O RH autoriza primeiro, até " + calc.fmtData(ferias.prazoRH(ctx, f)) + "." : "O RH autoriza primeiro; depois é a sua vez de validar.",
           acao: p.rh && f.estagio === "NEW" });
       }
       if (f.rhEm && f.rhDecisao) {
         const aprovou = f.rhDecisao === "Aprovada";
         if (souLid && !meu && f.liderancaComentario !== ferias.CONFIRMADO_PELO_RH) add({ id: "ferias-rh-" + f.id, quando: f.rhEm, area: "Férias e ausências", rota, acao: f.estagio === "AG_LIDERANCA",
-          titulo: aprovou ? "O RH aprovou o pedido de " + quem + ": falta a sua confirmação" : "O RH recusou o pedido de " + quem,
-          texto: aprovou ? oque + (f.estagio === "AG_LIDERANCA" ? ". Confirme até " + calc.fmtData(ferias.prazoLideranca(ctx, f)) + "." : ".") : oque + "." });
+          titulo: aprovou ? "O RH autorizou o pedido de " + quem + ": falta a sua validação" : "O RH devolveu o pedido de " + quem,
+          texto: aprovou ? oque + (f.estagio === "AG_LIDERANCA" ? ". Valide até " + calc.fmtData(ferias.prazoLideranca(ctx, f)) + "." : ".") : oque + "." });
         if (meu) add({ id: "ferias-rh-" + f.id, quando: f.rhEm, area: "Férias e ausências", rota,
-          titulo: aprovou ? (f.estagio === "SUCCESS" && !f.liderancaEm ? "Aprovado: " + oque : "O RH aprovou o seu pedido de " + oque) : "O RH não aprovou o seu pedido de " + oque,
-          texto: aprovou ? (f.estagio === "AG_LIDERANCA" ? "Agora a sua liderança confirma." : "") : (f.rhComentario || "") });
+          titulo: aprovou ? (f.estagio === "SUCCESS" && !f.liderancaEm ? "Aprovado: " + oque : "O RH autorizou o seu pedido de " + oque) : "O RH devolveu o seu pedido de " + oque,
+          texto: aprovou ? (f.estagio === "AG_LIDERANCA" ? "Agora a sua liderança valida." : "") : (f.rhComentario || "") });
       }
       if (f.liderancaEm && f.liderancaDecisao && f.liderancaComentario !== ferias.CONFIRMADO_PELO_RH) {
         const confirmou = f.liderancaDecisao === "Aprovada";
         if (p.rh && !meu) add({ id: "ferias-lid-" + f.id, quando: f.liderancaEm, area: "Férias e ausências", rota,
-          titulo: nome(f.lideranca) + (confirmou ? " confirmou" : " recusou") + " o pedido de " + quem, texto: confirmou ? oque + ": aprovado, e já está na agenda da equipe." : oque + "." });
+          titulo: nome(f.lideranca) + (confirmou ? " validou" : " devolveu") + " o pedido de " + quem, texto: confirmou ? oque + ": aprovado, e já está na agenda da equipe." : oque + "." });
         if (meu) add({ id: "ferias-lid-" + f.id, quando: f.liderancaEm, area: "Férias e ausências", rota,
-          titulo: confirmou ? "Aprovado: " + oque : "A sua liderança não confirmou o pedido de " + oque, texto: confirmou ? "O RH e a sua liderança aprovaram. O período está na agenda da equipe." : (f.liderancaComentario || "") });
+          titulo: confirmou ? "Aprovado: " + oque : "A sua liderança devolveu o pedido de " + oque, texto: confirmou ? "O RH autorizou e a sua liderança validou. O período está na agenda da equipe." : (f.liderancaComentario || "") });
       }
       if (f.canceladaEm && !meu && (p.rh || souLid)) add({ id: "ferias-cancelado-" + f.id, quando: f.canceladaEm, area: "Férias e ausências", rota, titulo: quem + " cancelou o pedido de " + oque, texto: "" });
     });

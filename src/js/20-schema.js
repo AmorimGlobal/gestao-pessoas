@@ -393,6 +393,8 @@
         c("inicio", "INICIO", "data", "Primeiro dia"),
         c("fim", "FIM", "data", "Último dia"),
         c("dias", "DIAS", "numero", "Dias corridos"),
+        // protótipo do RH (06/11/2026): cada pessoa escolhe uma das duas semanas de férias coletivas do fim de ano
+        c("coletiva", "COLETIVA", "simNao", "Semana de férias coletivas", { ajuda: "A semana do fim de ano que a pessoa escolheu (a do Natal ou a do Ano Novo). Não conta nos 23 dias nem na regra da equipe." }),
         c("cobertura", "COBERTURA", "textoLongo", "Cobertura das atividades no período"),
         c("justificativa", "JUSTIFICATIVA", "textoLongo", "Justificativa"),
         c("foraDaPolitica", "FORA_POLITICA", "textoLongo", "Pontos fora da política", { ajuda: "O que o app apontou na hora do pedido. A justificativa de quem pediu explica cada um." }),

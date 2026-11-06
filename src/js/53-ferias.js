@@ -32,24 +32,32 @@
     "Pausa contratual": { antecedencia: 30, rh: 5, lideranca: 5 },
   };
   const FERIAS_ANO = 23; // 30 dias por ano, menos a semana de férias coletivas entre o Natal e o Ano Novo
-  const PARCELAS = [23, 15, 8];
+  // Protótipo do RH "Solicitacao_Ferias_Amorim.html" (06/11/2026, aprovado pelo usuário): 23 dias de uma vez, 7 + 16 ou 8 + 15
+  const MODALIDADES = [
+    { id: "23", partes: [23], rotulo: "23 dias de uma vez" },
+    { id: "7+16", partes: [7, 16], rotulo: "7 + 16 dias, em dois períodos" },
+    { id: "8+15", partes: [8, 15], rotulo: "8 + 15 dias, em dois períodos" },
+  ];
+  const PARCELAS = [23, 16, 15, 8, 7];
+  const MESES_PARA_PEDIR = 10; // a solicitação abre com 10 meses de contrato...
+  const MESES_PARA_SAIR = 12;  // ...para sair depois dos 12 (o que a política pede)
   const PAUSA_MAX = 7;
 
   /** A política, como o RH escreveu (a pessoa lê antes de pedir) */
   const POLITICA = {
     fluxo: [
       ["Abrir a solicitação", "Peça aqui no app, com o tipo de solicitação, o período desejado e a justificativa, quando necessário. O pedido vai para o RH e para a sua liderança direta. O e-mail para " + EMAIL_RH + " com cópia para a liderança, que a política pede, sai pronto para enviar pela sua caixa do Bitrix."],
-      ["O RH analisa", "O RH verifica se você tem direito ao período solicitado e se o time tem cobertura para essa data."],
-      ["A liderança avalia", "A sua liderança considera o impacto nas entregas e nos prazos do time."],
-      ["Você recebe o retorno", "O RH e a liderança decidem no app, e você recebe o aviso no Bitrix. Aprovado, o período entra na Agenda da equipe."],
+      ["O RH autoriza", "O RH verifica se você tem direito ao período solicitado e se o time tem cobertura para essa data."],
+      ["A liderança valida", "A sua liderança considera o impacto nas entregas e nos prazos do time."],
+      ["Você recebe o retorno", "O RH e a liderança decidem no app, e você recebe o aviso no Bitrix. Validado, o período entra na Agenda da equipe. Devolvido, a data volta a ficar livre."],
     ],
     "Férias": [
-      "Contratos PJ e de associação têm 30 dias corridos de pausa remunerada por ano. Membros CLT e estagiários seguem a legislação brasileira.",
-      "Para pedir: pelo menos 12 meses de contrato, aprovação do RH e da sua liderança, e as atividades do time com cobertura no período.",
-      "Todo ano há uma semana de férias coletivas entre o Natal e o Ano Novo, descontada dos 30 dias.",
-      "Ficam 23 dias para usar quando quiser: de uma vez ou em até duas partes, uma de pelo menos 15 dias corridos e outra de 8 dias corridos. Outras divisões não são permitidas.",
-      "As férias começam sempre às segundas-feiras.",
-      "Peça com pelo menos 60 dias de antecedência. O RH responde em até 3 dias úteis, e a liderança confirma em até 2 dias úteis depois da aprovação do RH.",
+      "Contratos PJ e de associação têm 30 dias corridos de pausa remunerada por ciclo, de novembro a outubro. Membros CLT e estagiários seguem a legislação brasileira: para eles, o RH confere a duração e a divisão.",
+      "Você solicita a partir de 10 meses de contrato, para sair depois de completar 12 meses. Precisa da autorização do RH e da validação da sua liderança.",
+      "Todo ano há uma semana de férias coletivas entre o Natal e o Ano Novo, descontada dos 30 dias. Metade da equipe tira a semana do Natal e metade a do Ano Novo: você escolhe a sua no pedido.",
+      "Ficam 23 dias: de uma vez ou em dois períodos, de 7 + 16 ou de 8 + 15 dias corridos. Outras divisões não são permitidas. Os períodos podem começar em qualquer dia da semana.",
+      "Duas pessoas da mesma equipe (mesma liderança direta) não tiram férias ao mesmo tempo: a data fica com quem pediu primeiro. Pedido devolvido ou cancelado libera a data. A semana de férias coletivas é exceção.",
+      "Peça com pelo menos 60 dias de antecedência. O RH autoriza em até 3 dias úteis, e a liderança valida em até 2 dias úteis depois da autorização do RH.",
     ],
     "Day off": [
       "Um dia de folga remunerada: no mês do seu aniversário, por desempenho (metas superadas ou contribuições de alto impacto, validadas pelo RH depois da avaliação anual) ou em campanhas institucionais.",
@@ -89,6 +97,98 @@
   }
   function periodoCurto(p) { const fim = fimDe(p); return fim === p.inicio ? calc.fmtData(p.inicio) : calc.fmtData(p.inicio) + " a " + calc.fmtData(fim); }
   const NOME_TIPO = { "Férias": "férias", "Day off": "day off", "Pausa contratual": "pausa contratual" };
+  /** A semana de férias coletivas que a pessoa escolheu (fora dos 23 dias e da regra da equipe) */
+  const ehColetiva = (p) => !!(p && p.coletiva);
+  /** "férias", "day off", "semana de férias coletivas"... */
+  const nomeDoPedido = (p) => (ehColetiva(p) ? "semana de férias coletivas" : NOME_TIPO[p.tipo] || String(p.tipo || "").toLowerCase());
+
+  /* ---------------- o ciclo de férias e as regras do protótipo do RH (06/11/2026) ---------------- */
+  /** O ciclo de férias que contém a data: de 1º de novembro a 31 de outubro */
+  function cicloDe(data) {
+    const a = Number(String(data).slice(0, 4)), m = Number(String(data).slice(5, 7));
+    const ano = m >= 11 ? a : a - 1;
+    return { ano, inicio: ano + "-11-01", fim: (ano + 1) + "-10-31", rotulo: "nov/" + ano + " a out/" + (ano + 1) };
+  }
+  const proximoCiclo = (c) => cicloDe((c.ano + 1) + "-11-01");
+  /** As duas semanas de férias coletivas do ciclo, de segunda a sexta: a do Natal e a seguinte, a do Ano Novo.
+      Cada pessoa tira uma das duas (o usuário, 06/11/2026: "tem pessoas que tiram de 21 até 25, outras 28 a 01"). */
+  function semanasColetivas(ciclo) {
+    const natal = ciclo.ano + "-12-25";
+    const seg = calc.addDias(natal, -((calc.diaSemana(natal) + 6) % 7));
+    return [{ n: 1, inicio: seg, fim: calc.addDias(seg, 4), rotulo: "a do Natal" }, { n: 2, inicio: calc.addDias(seg, 7), fim: calc.addDias(seg, 11), rotulo: "a do Ano Novo" }];
+  }
+  /** Soma meses a uma data (o dia 31 vira o último dia do mês, quando falta) */
+  function addMeses(iso, n) {
+    const a = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - 1 + n, d = Number(iso.slice(8, 10));
+    const ano = a + Math.floor(m / 12), mes = ((m % 12) + 12) % 12;
+    const ultimo = new Date(Date.UTC(ano, mes + 1, 0)).getUTCDate();
+    return ano + "-" + String(mes + 1).padStart(2, "0") + "-" + String(Math.min(d, ultimo)).padStart(2, "0");
+  }
+  /** CLT e estágio seguem a lei (o RH confere a duração e a divisão); PJ, associação e contrato não informado seguem a política */
+  const segueALei = (pessoa) => /clt|est[áa]gi/i.test(String((pessoa && pessoa.contrato) || ""));
+  /** Quando a pessoa pode pedir e a primeira data possível: o pedido abre com 10 meses de contrato; o início vem
+      depois dos 12 meses e com 60 dias de antecedência. Sem a data do contrato, só a antecedência vale. */
+  function liberacao(pessoa, hoje) {
+    const minimo = calc.addDias(hoje, PRAZOS["Férias"].antecedencia);
+    const ref = (pessoa && (pessoa.ingresso || pessoa.registro)) || "";
+    if (!ref) return { ref: "", abreEm: "", completa12: "", primeiraData: minimo, aberta: true, pelo: "" };
+    const abreEm = addMeses(ref, MESES_PARA_PEDIR), completa12 = addMeses(ref, MESES_PARA_SAIR);
+    const depois12 = calc.addDias(completa12, 1);
+    return { ref, abreEm, completa12, primeiraData: depois12 > minimo ? depois12 : minimo, aberta: hoje >= abreEm, pelo: pessoa.ingresso ? "ingresso" : "cadastro" };
+  }
+  const dentroDoCiclo = (ciclo) => (p) => p.inicio >= ciclo.inicio && p.inicio <= ciclo.fim;
+  /** As partes dos 23 dias que a pessoa já pediu no ciclo (em andamento ou aprovadas) */
+  function partesDoCiclo(ctx, uid, ciclo, excetoId) {
+    return pedidosDe(ctx, uid, excetoId).filter((p) => p.tipo === "Férias" && !ehColetiva(p)).filter(dentroDoCiclo(ciclo));
+  }
+  /** A semana de férias coletivas que a pessoa escolheu no ciclo, se já escolheu */
+  function coletivaDoCiclo(ctx, uid, ciclo, excetoId) {
+    return pedidosDe(ctx, uid, excetoId).filter((p) => p.tipo === "Férias" && ehColetiva(p)).find(dentroDoCiclo(ciclo)) || null;
+  }
+  const diasDe = (p) => Number(p.dias) || (p.inicio ? diasCorridos(p.inicio, fimDe(p)) : 0);
+  /** O que ainda dá para pedir no ciclo pelas partes já pedidas: as modalidades (nada pedido), a parte que falta
+      (pediu 7, faltam 16) ou nada (os 23 já pedidos, ou partes fora da regra, que o RH confere) */
+  function restanteDoCiclo(partes) {
+    const dias = partes.map(diasDe).sort((a, b) => a - b);
+    if (!dias.length) return { modalidades: MODALIDADES, falta: 0, completo: false, dias };
+    if (dias.length === 1) {
+      const m = MODALIDADES.find((x) => x.partes.length === 2 && x.partes.indexOf(dias[0]) >= 0);
+      if (m) return { modalidades: [], falta: m.partes.find((x) => x !== dias[0]), modalidade: m, completo: false, dias };
+    }
+    const fecha = MODALIDADES.some((x) => x.partes.slice().sort((a, b) => a - b).join("+") === dias.join("+"));
+    return { modalidades: [], falta: 0, completo: true, foraDaRegra: !fecha, dias };
+  }
+  const SITUACAO_CURTA = { NEW: "Aguardando o RH", AG_LIDERANCA: "Aguardando a liderança", SUCCESS: "Aprovada" };
+  const minuscula = (s) => { const t = String(s || ""); return t.charAt(0).toLowerCase() + t.slice(1); };
+  /** As férias da equipe que ocupam datas: pedidos em andamento e aprovados de quem tem a mesma liderança direta.
+      A semana de férias coletivas fica de fora (metade da equipe sai junto). Sem nomes, a não ser com comNomes (RH e liderança). */
+  function reservasDaEquipe(ctx, uid, opcoes) {
+    const o = opcoes || {};
+    const lid = dadosDaPessoa(ctx, uid).lideranca;
+    if (!lid) return [];
+    return ((ctx.registros && ctx.registros.ferias) || [])
+      .filter((p) => p.tipo === "Férias" && !ehColetiva(p) && p.estagio !== "FAIL" && p.inicio && String(p.responsavel) !== String(uid) && String(p.lideranca) === String(lid))
+      .map((p) => Object.assign({ inicio: p.inicio, fim: fimDe(p), situacao: SITUACAO_CURTA[p.estagio] || p.estagio }, o.comNomes ? { id: p.id, responsavel: String(p.responsavel), criadoEm: p.criadoEm } : {}))
+      .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
+  }
+  const cruzam = (a, b) => a.inicio <= b.fim && b.inicio <= a.fim;
+  /** As datas de início de um período de N dias no ciclo, cada uma com o fim e, quando não dá, o motivo (como no protótipo).
+      o = { pessoa, reservas, coletiva: {inicio, fim} (a semana da pessoa), outros: os pedidos dela, evitar: [{inicio, fim}] (o outro período do mesmo pedido) } */
+  function opcoesDeInicio(ctx, ciclo, dias, o) {
+    const lib = liberacao(o.pessoa, ctx.hoje);
+    const lista = [];
+    const ultimo = calc.addDias(ciclo.fim, -(dias - 1));
+    for (let d = lib.primeiraData > ciclo.inicio ? lib.primeiraData : ciclo.inicio; d <= ultimo; d = calc.addDias(d, 1)) {
+      const per = { inicio: d, fim: calc.addDias(d, dias - 1) };
+      let bloqueio = "";
+      if (o.coletiva && cruzam(per, o.coletiva)) bloqueio = "sua semana de férias coletivas";
+      else if ((o.outros || []).some((x) => cruzam(per, { inicio: x.inicio, fim: fimDe(x) }))) bloqueio = "você já tem um pedido nesse período";
+      else if ((o.evitar || []).some((x) => cruzam(per, x))) bloqueio = "cruza o outro período";
+      else if ((o.reservas || []).some((x) => cruzam(per, x))) bloqueio = "já reservado na equipe";
+      lista.push(Object.assign(per, { bloqueio }));
+    }
+    return lista;
+  }
 
   /** Os pedidos e as ausências que contam de uma pessoa (aguardando ou aprovados), menos o que está sendo conferido ou editado */
   function pedidosDe(ctx, uid, excetoId) {
@@ -123,7 +223,9 @@
     if (inicio && fim && fim < inicio) erros.push("O último dia vem antes do primeiro.");
     if (inicio && inicio < ctx.hoje) erros.push("O período não pode começar no passado.");
     if (p.tipo === "Day off" && !p.motivoDayOff) erros.push("Escolha o motivo do day off.");
-    if (p.tipo !== "Day off" && !texto(p.cobertura)) erros.push("Conte como as suas atividades ficam cobertas no período.");
+    // férias pela política (PJ e associação): a regra da equipe cobre o período, e a cobertura vira observação opcional
+    const pelaPolitica = p.tipo === "Férias" && !segueALei(pessoa);
+    if (p.tipo !== "Day off" && !pelaPolitica && !ehColetiva(p) && !texto(p.cobertura)) erros.push("Conte como as suas atividades ficam cobertas no período.");
     if (p.tipo === "Pausa contratual" && !texto(p.justificativa)) erros.push("A pausa contratual pede justificativa por escrito.");
     const dias = inicio && fim && fim >= inicio ? diasCorridos(inicio, fim) : 0;
     if (erros.length) return { erros, fora, ok, dias };
@@ -133,27 +235,62 @@
     const estagio = /est[áa]gi/i.test(contrato);
     const ano = inicio.slice(0, 4);
     const antecedencia = calc.diffDias(ctx.hoje, inicio);
+    const per = { inicio, fim };
+
+    if (p.tipo === "Férias" && ehColetiva(p)) {
+      // a semana de férias coletivas: uma das duas do ciclo, uma vez por ciclo; fora dos 23 dias, da antecedência e da regra da equipe
+      const ciclo = cicloDe(inicio);
+      const semanas = semanasColetivas(ciclo);
+      if (!semanas.some((s) => s.inicio === inicio && s.fim === fim)) erros.push("A semana de férias coletivas é de " + periodoCurto(semanas[0]) + " ou de " + periodoCurto(semanas[1]) + ".");
+      else ok.push("Semana de férias coletivas (" + periodoCurto(per) + "): fora dos 23 dias e da regra da equipe.");
+      const ja = coletivaDoCiclo(ctx, pessoa.id, ciclo, o.excetoId);
+      if (ja) erros.push("Você já escolheu a sua semana de férias coletivas deste ciclo (" + periodoCurto(ja) + ").");
+      const cruza = outros.find((x) => !ehColetiva(x) && cruzam(per, { inicio: x.inicio, fim: fimDe(x) })) || (o.junto || []).find((x) => cruzam(per, x));
+      if (cruza) erros.push("Essa semana cai num período de férias seu (" + periodoCurto(cruza) + ").");
+      return { erros, fora, ok, dias };
+    }
+
+    if (pelaPolitica) {
+      // as regras do protótipo do RH (06/11/2026): travam o pedido, em vez de virar ponto a justificar
+      const lib = liberacao(pessoa, ctx.hoje);
+      const ciclo = cicloDe(inicio);
+      if (lib.ref) ok.push("Contrato desde " + calc.fmtDataAno(lib.ref) + (lib.pelo === "cadastro" ? " (pelo cadastro no Bitrix)" : "") + ".");
+      if (!lib.aberta) erros.push("A sua solicitação de férias abre em " + calc.fmtDataAno(lib.abreEm) + ", quando você completa 10 meses de contrato.");
+      else if (inicio < lib.primeiraData) {
+        erros.push(lib.completa12 && inicio <= lib.completa12 ? "As férias começam depois de completar 12 meses de contrato (" + calc.fmtDataAno(lib.completa12) + "): a primeira data possível é " + calc.fmtDataAno(lib.primeiraData) + "."
+          : "Peça com pelo menos 60 dias de antecedência: a primeira data possível é " + calc.fmtDataAno(lib.primeiraData) + ".");
+      } else ok.push("Início depois dos 12 meses de contrato e com " + antecedencia + " dias de antecedência.");
+      if (fim > ciclo.fim) erros.push("O período passa do fim do ciclo (" + calc.fmtDataAno(ciclo.fim) + "): cada período fica dentro de um ciclo, de novembro a outubro.");
+      // a parte dentro do que falta no ciclo (as outras partes já pedidas e a do mesmo pedido)
+      const rest = restanteDoCiclo(partesDoCiclo(ctx, pessoa.id, ciclo, o.excetoId).concat((o.junto || []).filter((x) => !x.coletiva)));
+      if (rest.completo) erros.push("Você já pediu os 23 dias deste ciclo (" + rest.dias.join(" + ") + " dias).");
+      else if (rest.falta && dias !== rest.falta) erros.push("Neste ciclo falta o período de " + rest.falta + " dias (você já pediu " + rest.dias[0] + ").");
+      else if (!rest.falta && PARCELAS.indexOf(dias) < 0) erros.push(dias + " dias corridos: a política aceita 23 dias de uma vez, ou 7 + 16, ou 8 + 15.");
+      else ok.push(dias + " dias corridos: " + (dias === FERIAS_ANO ? "os 23 dias de uma vez." : rest.falta ? "a parte que faltava do ciclo." : "uma das partes (7 + 16 ou 8 + 15)."));
+      // a semana coletiva da pessoa (a já escolhida ou a deste pedido)
+      const col = coletivaDoCiclo(ctx, pessoa.id, ciclo) || (o.junto || []).find((x) => x.coletiva) || null;
+      if (col && cruzam(per, { inicio: col.inicio, fim: fimDe(col) })) erros.push("O período cai na sua semana de férias coletivas (" + periodoCurto(col) + ").");
+      // a equipe: quem pediu primeiro fica com a data
+      const reservas = o.reservas || reservasDaEquipe(ctx, pessoa.id);
+      const choque = reservas.find((x) => cruzam(per, x));
+      if (choque) erros.push("Já reservado na sua equipe: " + periodoCurto(choque) + " (" + minuscula(choque.situacao) + "). A data fica com quem pediu primeiro.");
+      else ok.push("Sem conflito na equipe.");
+      const meu = outros.find((x) => cruzam(per, { inicio: x.inicio, fim: fimDe(x) }));
+      if (meu) erros.push("Você já tem " + (meu.estagio === "SUCCESS" ? "uma ausência aprovada" : "um pedido em andamento") + " nesse período (" + nomeDoPedido(meu) + ", " + periodoCurto(meu) + ").");
+      return { erros, fora, ok, dias };
+    }
+
     if (antecedencia >= prazos.antecedencia) ok.push("Pedido com " + antecedencia + " dias de antecedência (o mínimo é " + prazos.antecedencia + ").");
     else fora.push("Pedido com " + antecedencia + (antecedencia === 1 ? " dia" : " dias") + " de antecedência: a política pede pelo menos " + prazos.antecedencia + ".");
 
     if (p.tipo === "Férias") {
-      if (estagio) ok.push("Estágio: vale a legislação (recesso de 30 dias por ano), sem a divisão em 15 e 8 dias.");
-      else {
-        if (calc.diaSemana(inicio) === 1) ok.push("Começa numa segunda-feira.");
-        else fora.push("As férias começam sempre às segundas-feiras, e " + calc.fmtDataAno(inicio) + " é " + calc.fmtDiaSemana(inicio) + ".");
-        if (PARCELAS.indexOf(dias) >= 0) ok.push(dias + " dias corridos: " + (dias === FERIAS_ANO ? "os 23 dias de uma vez." : "uma das duas partes (15 e 8 dias)."));
-        else fora.push(dias + " dias corridos: a política aceita os 23 dias de uma vez ou duas partes, de 15 e de 8 dias.");
-        const ref = pessoa.ingresso || pessoa.registro;
-        if (ref) {
-          if (calc.diffDias(ref, inicio) >= 365) ok.push("Mais de 12 meses de contrato no início das férias.");
-          else fora.push("Menos de 12 meses de contrato em " + calc.fmtDataAno(inicio) + " (desde " + calc.fmtDataAno(ref) + (pessoa.ingresso ? "" : ", pelo cadastro no Bitrix") + ").");
-        }
+      // CLT e estágio: a lei vale para a duração e a divisão; o app confere só os 12 meses e as datas
+      ok.push((estagio ? "Estágio" : "CLT") + ": vale a legislação para a duração e a divisão, e o RH confere.");
+      const ref = pessoa.ingresso || pessoa.registro;
+      if (ref) {
+        if (calc.diffDias(ref, inicio) >= 365) ok.push("Mais de 12 meses de contrato no início das férias.");
+        else fora.push("Menos de 12 meses de contrato em " + calc.fmtDataAno(inicio) + " (desde " + calc.fmtDataAno(ref) + (pessoa.ingresso ? "" : ", pelo cadastro no Bitrix") + ").");
       }
-      // a semana de férias coletivas (Natal ao Ano Novo) já é de férias para todos
-      [Number(ano) - 1, Number(ano)].forEach((y) => {
-        const natal = y + "-12-25", anoNovo = (y + 1) + "-01-01";
-        if (inicio <= anoNovo && fim >= natal) fora.push("O período cruza a semana de férias coletivas entre o Natal de " + y + " e o Ano Novo, que já é de férias para todos.");
-      });
     }
 
     if (p.tipo === "Day off") {
@@ -181,7 +318,7 @@
     }
 
     const junto = outros.find((x) => x.inicio && x.inicio <= fim && fimDe(x) >= inicio);
-    if (junto) fora.push("Já há " + (junto.estagio === "SUCCESS" ? "uma ausência sua aprovada" : "um pedido seu em andamento") + " nesse período (" + NOME_TIPO[junto.tipo] + ", " + periodoCurto(junto) + ").");
+    if (junto) fora.push("Já há " + (junto.estagio === "SUCCESS" ? "uma ausência sua aprovada" : "um pedido seu em andamento") + " nesse período (" + nomeDoPedido(junto) + ", " + periodoCurto(junto) + ").");
     if (fora.length && !texto(p.justificativa)) erros.push("Explique na justificativa os pontos fora da política.");
     return { erros, fora, ok, dias };
   }
@@ -217,7 +354,7 @@
   /** A situação para a tela: texto, cor e, enquanto aguarda, o prazo de quem decide */
   function situacao(ctx, p) {
     if (p.estagio === "SUCCESS") return { texto: ehPedido(p) ? "Aprovado" : "Registrada pelo RH", cor: "verde" };
-    if (p.estagio === "FAIL") return p.canceladaEm ? { texto: "Cancelado", cor: "cinza" } : { texto: p.liderancaDecisao === "Recusada" ? "Recusado pela liderança" : "Recusado pelo RH", cor: "cinza" };
+    if (p.estagio === "FAIL") return p.canceladaEm ? { texto: "Cancelado", cor: "cinza" } : { texto: p.liderancaDecisao === "Recusada" ? "Devolvido pela liderança" : "Devolvido pelo RH", cor: "cinza" };
     if (p.estagio === "AG_LIDERANCA") { const pz = prazoLideranca(ctx, p); return { texto: "Aguardando a liderança", cor: pz && calc.atrasado(pz, ctx.hoje) ? "vermelho" : "ambar", prazo: pz }; }
     const pz = prazoRH(ctx, p);
     return { texto: "Aguardando o RH", cor: calc.atrasado(pz, ctx.hoje) ? "vermelho" : "azul", prazo: pz };
@@ -247,6 +384,34 @@
     return "";
   }
 
+  /** A conferência que o RH e a liderança veem no pedido de férias (como no protótipo): contrato, 12 meses, equipe e
+      a autorização do RH. Os conflitos trazem o nome e quem pediu antes: só quem decide vê. [{ok, texto}] */
+  function conferenciaParaDecidir(ctx, p) {
+    const itens = [];
+    if (!p || p.tipo !== "Férias") return itens;
+    const pessoa = dadosDaPessoa(ctx, p.responsavel);
+    const ref = pessoa.ingresso || pessoa.registro;
+    if (ref) itens.push({ ok: true, texto: "Contrato desde " + calc.fmtDataAno(ref) + (pessoa.ingresso ? "" : " (cadastro no Bitrix)") });
+    if (ehColetiva(p)) {
+      itens.push({ ok: true, texto: "Semana de férias coletivas: fora dos 23 dias e da regra da equipe" });
+    } else {
+      if (segueALei(pessoa)) itens.push({ ok: true, texto: pessoa.contrato + ": vale a legislação; o RH confere a duração e a divisão" });
+      if (ref) {
+        const c12 = addMeses(ref, MESES_PARA_SAIR);
+        itens.push(p.inicio > c12 ? { ok: true, texto: "Início após 12 meses de contrato" } : { ok: false, texto: "Início antes de completar 12 meses de contrato (" + calc.fmtDataAno(c12) + ")" });
+      }
+      const conflitos = ((ctx.registros && ctx.registros.ferias) || []).filter((x) => x.id !== p.id && x.tipo === "Férias" && !ehColetiva(x) && x.estagio !== "FAIL" && x.inicio &&
+        String(x.responsavel) !== String(p.responsavel) && p.lideranca && String(x.lideranca) === String(p.lideranca) && cruzam({ inicio: p.inicio, fim: fimDe(p) }, { inicio: x.inicio, fim: fimDe(x) }));
+      if (!conflitos.length) itens.push({ ok: true, texto: "Sem conflito na equipe" });
+      conflitos.forEach((x) => {
+        const antes = String(x.criadoEm || "") < String(p.criadoEm || "");
+        itens.push({ ok: false, texto: "Cruza com " + dom.pessoa(ctx, x.responsavel).nome + " (" + periodoCurto(x) + ", " + minuscula(SITUACAO_CURTA[x.estagio] || x.estagio) + "), pedido " + (antes ? "antes deste: a data fica com essa pessoa" : "depois deste: a data fica com este pedido") });
+      });
+    }
+    if (p.rhDecisao === "Aprovada") itens.push({ ok: true, texto: "Autorizada pelo RH" });
+    return itens;
+  }
+
   /* ---------------- e-mails ---------------- */
   /** O e-mail que abre a solicitação: para o RH, com cópia para a liderança direta (fluxo da política) */
   function emailDoPedido(ctx, p, pessoa, opcoes) {
@@ -255,14 +420,17 @@
       "Olá, RH" + (lid ? " e " + primeiroNome(lid.nome) : "") + ",", "",
       "Solicito " + { "Férias": "férias", "Day off": "um day off", "Pausa contratual": "uma pausa contratual" }[p.tipo] + ", conforme as Políticas de Férias e Ausências.", "",
       "Tipo: " + p.tipo + (p.tipo === "Day off" && p.motivoDayOff ? " (" + p.motivoDayOff.toLowerCase() + ")" : ""),
-      "Período: " + periodo(p),
     ];
+    // o pedido de férias pode levar a semana de férias coletivas e os dois períodos juntos (06/11/2026)
+    const todos = [p].concat((opcoes && opcoes.junto) || []);
+    if (todos.length === 1) corpo.push("Período: " + periodo(p) + (ehColetiva(p) ? " (semana de férias coletivas)" : ""));
+    else { corpo.push("Períodos:"); todos.forEach((x) => corpo.push("- " + periodo(x) + (ehColetiva(x) ? " (semana de férias coletivas)" : ""))); }
     if (String(p.cobertura || "").trim()) corpo.push("Cobertura das atividades: " + String(p.cobertura).trim());
     if (String(p.justificativa || "").trim()) corpo.push("Justificativa: " + String(p.justificativa).trim());
     const fora = String(p.foraDaPolitica || "").split("\n").filter(Boolean);
     if (fora.length) corpo.push("", "Pontos fora da política, apontados pelo app:", ...fora.map((f) => "- " + f));
     // o pedido gravado no app (05/11/2026): o e-mail avisa que dá para decidir por lá
-    if (opcoes && opcoes.registrado) corpo.push("", "O pedido também está registrado no app Gestão de Pessoas, onde o RH e a liderança aprovam.");
+    if (opcoes && opcoes.registrado) corpo.push("", "O pedido também está registrado no app Gestão de Pessoas, onde o RH autoriza e a liderança valida.");
     corpo.push("", "Obrigado(a),", pessoa.nome);
     return { para: EMAIL_RH, cc: lid && lid.email ? [lid.email] : [], assunto: "Solicitação de " + NOME_TIPO[p.tipo] + " · " + pessoa.nome + " · " + periodoCurto(p), corpo: corpo.join("\n") };
   }
@@ -281,8 +449,10 @@
   }
 
   return {
-    EMAIL_RH, TIPOS, PRAZOS, FERIAS_ANO, PARCELAS, PAUSA_MAX, POLITICA, NOME_TIPO,
-    diasCorridos, periodo, periodoCurto, pedidosDe, dadosDaPessoa, conferirPedido,
+    EMAIL_RH, TIPOS, PRAZOS, FERIAS_ANO, PARCELAS, MODALIDADES, MESES_PARA_PEDIR, MESES_PARA_SAIR, PAUSA_MAX, POLITICA, NOME_TIPO, SITUACAO_CURTA,
+    diasCorridos, periodo, periodoCurto, pedidosDe, dadosDaPessoa, conferirPedido, ehColetiva, nomeDoPedido,
+    cicloDe, proximoCiclo, semanasColetivas, addMeses, segueALei, liberacao, partesDoCiclo, coletivaDoCiclo, restanteDoCiclo,
+    reservasDaEquipe, opcoesDeInicio, conferenciaParaDecidir, fimDe,
     registradas, visiveisPara, proximas,
     ehPedido, CONFIRMADO_PELO_RH, prazoRH, prazoLideranca, situacao, paraRH, paraLideranca, pedidosVisiveis, decisorDoPedido,
     emailDoPedido, textoDoEmail, corpoHtml, escolherRemetente,
