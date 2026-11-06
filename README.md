@@ -1,6 +1,6 @@
 # Gestão de Pessoas · Amorim
 
-App do Bitrix24 em que cada liderança cuida das rotinas da sua equipe. Os módulos são Minha equipe, Agenda, Recrutamento (com a solicitação de vaga e, desde 05/11/2026, a de promoção), Onboarding, Rotinas (1:1 e feedbacks SCI), Desempenho e Offboarding, além do Painel. O app segue a especificação do RH de 08/10/2026, com a revisão de arquitetura de 13/10.
+App do Bitrix24 em que cada liderança cuida das rotinas da sua equipe. Os módulos são Minha equipe, Agenda, Recrutamento (com a solicitação de vaga e, desde 05/11/2026, a de promoção), Onboarding, Rotinas (1:1 e feedbacks SCI), Revisão de Progresso (ciclos do RH com autoavaliação, avaliação da liderança, 360°, calibração e devolutiva, desde 05/11/2026), Férias e ausências e Offboarding, além do Painel. O app segue a especificação do RH de 08/10/2026, com a revisão de arquitetura de 13/10.
 
 - **Dados:** ficam em processos inteligentes nativos do Bitrix, agrupados no menu "Gestão de Pessoas".
 - **Acesso:** o app roda dentro do Bitrix com o login de quem abre, então as permissões do CRM valem sozinhas.
@@ -41,6 +41,7 @@ O que não pode rodar no navegador de quem abre o app fica em funções da Verce
 | `api/eventos.js` | A cada item criado ou alterado (webhook de saída) | Trava do encerramento no servidor (4.1), qualquer que seja a origem da solicitação |
 | `api/painel.js` | Quando a CEO abre o app | Números do painel geral, sem ela ter leitura nos processos |
 | `api/status.js` | Tela de Configuração | Diz quais rotinas estão ligadas, sem mostrar valores |
+| `api/revisao360.js` | A cada resposta da avaliação 360° | Grava a resposta da Revisão de Progresso pelo webhook, sem guardar quem respondeu |
 
 Cada uma liga quando as variáveis dela estão gravadas na Vercel. Sem elas, responde 503. A lista das variáveis e o passo a passo estão em [docs/configuracao-bitrix.md](docs/configuracao-bitrix.md). No app, **Configuração → Rotinas no servidor** mostra o que já está ligado.
 

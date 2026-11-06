@@ -140,6 +140,8 @@ Configure em CRM → Configurações → Permissões. Para cada um dos 11 proces
 
 Quem tem mais de uma função soma as permissões, então a liderança continua com as dela nas outras tabelas.
 
+**Revisão de Progresso (05/11/2026):** as 5 tabelas "Revisão · …" têm permissões próprias, mais fechadas que as dos outros registros. Estão na seção 14, item 3.
+
 **Desde 05/11/2026, a função "Membros" é necessária para todos os funcionários** (ligada ao departamento raiz), porque o pedido de férias e ausências volta a ser gravado no app:
 - Com "Adicionar", a pessoa cria o próprio pedido.
 - Com "Editar: Próprios", ela cancela o pedido enquanto ele está em andamento.
@@ -437,3 +439,148 @@ Pedido do usuário: "aqui devia ter algo de solicitar promoção também, já qu
      - Sem os campos, o formulário avisa e não envia.
    - Ajuste as permissões do funil 77 (seção 4).
    - Os robôs de e-mail do funil 77 usam `UF_CRM_RV_EMAIL`, que fica vazio no card de promoção, então não mandam e-mail sobre promoções. Já um robô de notificação ao RH na entrada avisa também das promoções.
+
+## 14. Revisão de Progresso (05/11/2026)
+
+Pedido do usuário: "implemente o Revisao_de_Progresso_Prototipo.html". É o protótipo do RH, com as matrizes v1.2 de 04/11/2026. A avaliação acontece em ciclos que o RH abre em junho e novembro, nesta ordem:
+
+1. autoavaliação do membro;
+2. avaliação da liderança direta e avaliação 360°;
+3. calibração do RH;
+4. devolutiva da liderança;
+5. retornos do RH.
+
+O protótipo traz a matriz inteira de 40 cargos (KPIs e competências). Os nomes dos cargos estão na planilha `Template_Revisao_de_Progresso_v1.2.xlsx`, que não veio junto. Por decisão do usuário, o app segue sem a planilha: o RH dá nome aos cargos em Configuração.
+
+### 1. Para ligar
+
+1. Um administrador abre Configuração → **"Criar ou completar a estrutura"**. Isso cria:
+   - as 5 tabelas do CRM do item 2;
+   - o campo "Cargo na matriz da Revisão de Progresso" no Membros.
+2. Em Configuração → **"Revisão de Progresso: nomes dos cargos"**, dê nome aos 40 códigos (C01 a C40).
+   - Três já vêm com o nome do protótipo: C04 Estágio em SDR, C05 SDR e C06 Analista de Pós-vendas.
+   - Para reconhecer cada cargo, veja os KPIs em Revisão de Progresso → **Matrizes dos cargos**.
+   - Os nomes ficam na configuração do app, que só um administrador do Bitrix grava.
+3. No cadastro de cada membro (Minha equipe → membro → **Editar cadastro**), escolha o **cargo na matriz**. Membro sem cargo fica fora do ciclo, e a tela do RH mostra quem está nessa situação.
+4. Dê as permissões do item 3.
+5. Na Vercel não entra variável nova. A 360° usa as variáveis que já existem:
+   - `BITRIX_WEBHOOK_URL`, com os escopos crm, user e department;
+   - `GP_AVISAR_IDS`: o primeiro ID vira o responsável pelas respostas;
+   - `GP_CEO_IDS` e `GP_EXCECOES_IDS`: a CEO e quem está fora do app não entram na 360°.
+
+   A rota nova é `api/revisao360.js`.
+6. O RH prepara e abre o ciclo em Revisão de Progresso → **"Preparar a abertura do ciclo"**. O botão "Abrir ciclo" só libera com as 3 conferências marcadas. A última delas é a demonstração do anonimato pela TI (item 5).
+
+### 2. As tabelas
+
+| Tabela do CRM | O que guarda | Responsável pelo item |
+|---|---|---|
+| Revisão · Ciclos | período, prazos de cada etapa, quem participa, regras da 360° e dos retornos, mensagem às lideranças | o RH |
+| Revisão · Avaliações da liderança (filha de Membros) | KPIs e competências do cargo, ajustes, itens novos, conclusão, perguntas de decisão, calibração do RH, PDI e promoção | **a liderança que avalia**: o membro nunca é dono do item |
+| Revisão · Autoavaliações (filha de Membros) | as 5 respostas do membro | o membro |
+| Revisão · Respostas 360° (sem vínculo com ninguém) | as 8 afirmações, os textos, a relação (Superior ou Par), o modo e a área da pessoa avaliada | o RH; gravada pelo webhook |
+| Revisão · Retornos (filha de Membros) | o que chega ao membro: a devolutiva, as metas, a ciência, o retorno do RH sobre os pares e a data da conversa sobre os liderados | o membro |
+
+As respostas longas ficam em JSON num campo de texto. O formulário muda com o cargo e não cabe em campos fixos. As chaves do JSON são os nomes dos campos do protótipo (`kpi_1_nivel`, `comp_2_evidencia`, `pdi_1_acao`…).
+
+### 3. Permissões (CRM → Configurações → Permissões)
+
+| Tabela do CRM | Membros | Liderança | Coordenação | RH |
+|---|---|---|---|---|
+| Revisão · Ciclos | Ler: Todos | Ler: Todos | Ler: Todos | Todos |
+| Revisão · Avaliações da liderança | **Nenhum** | Ler, Adicionar e Editar: Próprios | Ler: Departamento e subdepartamentos. Adicionar e Editar: Próprios | Todos |
+| Revisão · Autoavaliações | Ler, Adicionar e Editar: Próprios | Ler: Departamento e subdepartamentos | Ler: Departamento e subdepartamentos | Todos |
+| Revisão · Respostas 360° | **Nenhum** | **Nenhum** | **Nenhum** | Ler e Editar: Todos. **Sem Adicionar** |
+| Revisão · Retornos | Ler e Editar: Próprios | Ler, Adicionar e Editar: Departamento e subdepartamentos | Ler, Adicionar e Editar: Departamento e subdepartamentos | Todos |
+
+Regras que valem para as 5 tabelas:
+
+- **Exportar e Importar: Nenhum para todas as funções**, inclusive o RH. O protótipo pede a exportação bruta bloqueada, e o app não tem exportação da Revisão.
+- **Respostas 360°:** só o webhook grava, e o RH só lê e descarta (etapa "Descartada", para uma resposta de teste). Ninguém mais tem acesso.
+- **Membros:** recomendamos dar "Ler: Próprios" também na tabela Membros. Assim o app sabe o cargo da pessoa e se ela participa. Sem isso, o app deixa a pessoa responder a autoavaliação mesmo assim, e a liderança acha a resposta pelo responsável.
+
+O CRM não tem um nível "só liderados diretos". Por isso:
+
+- O app mostra a cada liderança só a equipe direta.
+- O app só mostra a autoavaliação à liderança **depois** que ela envia a própria avaliação.
+- O rascunho de fora do ciclo não aparece para o RH.
+
+Quem tem "Departamento e subdepartamentos" ou "Todos" ainda consegue abrir esses itens direto no CRM. Esse limite é do Bitrix, não do app.
+
+### 4. Como funciona no app (menu → Revisão de Progresso)
+
+- **RH:**
+  - **Abertura do ciclo:** ciclo e período, prazos de cada etapa, quem participa (todos, sem estágios ou áreas escolhidas, e os membros fora deste ciclo), as regras da 360° e dos retornos, as 3 conferências e a mensagem às lideranças.
+    - A tela lista cada membro com o cargo e a liderança direta, para a conferência.
+    - Ao abrir, quem participa e as lideranças recebem um aviso no Bitrix.
+  - **Calibração:** para cada avaliação enviada, o RH registra se houve ajuste de nível, a data, o motivo e a evidência. A liderança recebe o aviso para fazer a devolutiva. O RH também pode **devolver** a avaliação para revisão, com o motivo.
+  - **Retornos:** na tela de cada membro, o RH escreve o retorno sobre os pares, em temas, e registra a data da conversa sobre os liderados. O membro lê em "Seus retornos".
+  - **Relatório 360°:** traz as médias de cada afirmação por pessoa avaliada e relação.
+    - Só aparecem grupos com o mínimo de respostas definido na abertura.
+    - Abaixo do mínimo, o grupo entra junto na área ou fica de fora, conforme a regra escolhida.
+    - Os comentários só aparecem com o mínimo de comentários, em ordem alfabética, sem autor.
+    - **Cada abertura do relatório fica registrada** no histórico do item do ciclo (quem e quando).
+  - **Encerrar o ciclo:** depois disso, a liderança não envia mais avaliações e a 360° fecha.
+- **Liderança direta:** na lista da equipe, clique no liderado.
+  - **Etapa 1, avaliação:** com o ciclo fechado, só dá para salvar rascunho. Com o ciclo aberto, o rascunho entra no ciclo e o envio ao RH fica liberado.
+    - O contador no rodapé mostra o que falta.
+    - Cada KPI e cada competência tem "Ajustar" e "Não se aplica neste ciclo". Dá para incluir até 2 KPIs e 2 competências.
+    - O RH recebe o registro do que mudou.
+    - A situação frente ao nível mínimo aparece sozinha.
+  - **Etapa 2:** a autoavaliação do membro, liberada só depois do envio da etapa 1.
+  - **Etapa 3, devolutiva:** liberada depois da calibração.
+    - A conversa (pontos fortes e de desenvolvimento) e as metas vão para o membro.
+    - O PDI (até 3 ações) e a indicação de promoção ficam só com o RH.
+    - O membro recebe o aviso para confirmar a ciência.
+- **Coordenação:** acompanha as equipes que coordena. Lê as avaliações enviadas, mas não as perguntas de decisão nem o PDI, e não edita.
+- **Todos que participam**, inclusive o membro, que agora vê "Revisão de Progresso" no menu:
+  - a **autoavaliação**: 5 perguntas, rascunho e envio. Depois de enviada, não se edita mais.
+  - a **360°** dos superiores e dos pares:
+    - superiores: o imediato e, quando ele é uma supervisão, quem está acima dela (cargo com "supervis" no Bitrix);
+    - pares: a mesma liderança direta, inclusive entre lideranças;
+    - liderados diretos: só o link para a Revisão formal;
+    - a resposta é anônima ou identificada. Dá para pular uma pessoa. O app avisa quando o grupo é pequeno.
+  - **"Seus retornos":** a devolutiva com a confirmação de ciência ("ciência, não concordância"), o retorno do RH sobre os pares e, para quem lidera, a conversa sobre os liderados.
+- **Avisos** pelo Bitrix e pelo sino:
+  - a abertura do ciclo;
+  - as avaliações a enviar;
+  - a calibração concluída, com a devolutiva a fazer;
+  - a devolutiva registrada, com a ciência a confirmar;
+  - a ciência confirmada;
+  - a avaliação enviada ao RH.
+
+  Os avisos nunca levam o conteúdo das avaliações.
+- **Robôs:** não precisa de nenhum.
+
+### 5. Anonimato da 360°: como funciona e como a TI demonstra
+
+- O navegador nunca grava na tabela "Revisão · Respostas 360°", e as pessoas nem têm acesso a ela. A resposta vai para `api/revisao360.js`, que:
+  - confere quem responde pelo token da sessão;
+  - confere se o ciclo está aberto, se a parte da 360° foi liberada e se a relação existe na estrutura do Bitrix;
+  - confere os valores da escala;
+  - **grava pelo webhook**.
+- No item gravado:
+  - O Bitrix registra como autor o **dono do webhook**, e o responsável é o RH.
+  - "Quem respondeu" só é preenchido na resposta **identificada**.
+  - O item não tem vínculo com o card de ninguém.
+- A rota não escreve nos logs da Vercel quem respondeu, nem quando dá erro.
+- O "já respondi" fica guardado com a própria pessoa (preferência do usuário no Bitrix, `gp_360_<ciclo>`), só com os IDs de quem ela já avaliou ou pulou, sem o conteúdo.
+- O rascunho da 360° ("Salvar para depois") fica só no navegador da pessoa e é apagado no envio.
+- **Demonstração da TI** (conferência 3 da abertura):
+  1. Com um ciclo de teste aberto, responda uma 360° anônima.
+  2. Abra o item em CRM → "Revisão · Respostas 360°" e confira que o autor é o dono do webhook e que "Quem respondeu" está vazio.
+  3. Abra o Relatório 360° no app e confira o comentário "Relatório 360° aberto…" no histórico do item do ciclo.
+  4. Tente exportar a tabela pelo CRM: deve estar bloqueado.
+  5. Mova a resposta de teste para "Descartada".
+- **Limites conhecidos:**
+  - O servidor sabe quem chama no momento da gravação, para conferir a relação, mas não guarda.
+  - Quem tiver acesso aos registros de chamadas da Vercel e do Bitrix poderia, em tese, cruzar horários.
+  - Quem apagar as próprias preferências pode responder a mesma pessoa de novo.
+  - Em grupos pequenos, o app avisa quem responde e não mostra o grupo sozinho no relatório.
+
+### 6. Pendências do protótipo
+
+- **Estágios:** o formato da avaliação segue pendente de validação jurídica (Lei 11.788/2008). Na abertura, o RH pode escolher "Todos, exceto estágios".
+- **Nomes dos cargos:** quando a planilha v1.2 chegar, basta preencher os nomes em Configuração. Se a matriz mudar, rode `node tools/revisao-matriz.js <protótipo.html>` para gerar `src/js/57-revisao-matriz.js` de novo.
+- **Promoção:** a Revisão só **indica** a elegibilidade. A promoção em si segue pela solicitação da seção 13, no funil 77, como o protótipo pede ("liga ao pipeline do Plano de Carreira · decisão da CEO").
+- **Retorno à CEO e ao RH:** fica registrado nas regras do ciclo (consultoria externa, ou a CEO dá ao RH e a consultoria dá à CEO). Esse retorno acontece fora do app.

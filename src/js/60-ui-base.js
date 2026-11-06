@@ -45,8 +45,8 @@
   const VISOES = {
     lideranca: "Liderança", coordenacao: "Coordenação", rh: "RH", ceo: "CEO", membro: "Membro",
   };
-  // Quem não lidera ninguém entra como membro (04/11/2026): só Férias e ausências e o Perfil
-  const ROTAS_MEMBRO = ["ferias", "perfil", "config"];
+  // Quem não lidera ninguém entra como membro (04/11/2026): Férias e ausências, a Revisão de Progresso (05/11/2026) e o Perfil
+  const ROTAS_MEMBRO = ["ferias", "revisao", "perfil", "config"];
   function visoesDisponiveis(p) {
     const v = [];
     if (p.coordenacao) v.push("coordenacao");
@@ -345,7 +345,15 @@
     const naFila = F ? (estado.visao === "rh" ? F.paraRH(estado.ctx).filter((p) => String(p.responsavel) !== String(estado.eu.id)).length : 0) +
       F.paraLideranca(estado.ctx, estado.eu.id).filter((p) => String(p.responsavel) !== String(estado.eu.id)).length : 0;
     const itemFerias = item("ferias", "ferias", "Férias e ausências", naFila, "Pedidos aguardando você");
-    if (estado.visao === "membro") return itemFerias + item("perfil", "perfil", "Perfil") + (estado.eu.admin ? item("config", "config", "Configuração") : "");
+    // Revisão de Progresso (05/11/2026): o número é o que espera esta pessoa (o RH calibra; a liderança envia e faz a devolutiva)
+    const RV = GP.revisao, cicloRev = RV ? RV.cicloAberto(estado.ctx) : null;
+    let naRevisao = 0;
+    if (cicloRev) {
+      naRevisao = RV.equipeNoCiclo(estado.ctx, estado.eu.id, cicloRev).filter((m) => { const a = RV.avaliacaoDo(estado.ctx, m.id, cicloRev); return !a || a.estagio === "NEW" || a.estagio === "CALIBRADA"; }).length;
+      if (estado.visao === "rh") naRevisao += (estado.ctx.registros.revAvaliacoes || []).filter((a) => String(a.cicloId) === String(cicloRev.id) && a.estagio === "ENVIADA").length;
+    }
+    const itemRevisao = item("revisao", "desempenho", "Revisão de Progresso", naRevisao, "Avaliações aguardando você");
+    if (estado.visao === "membro") return itemFerias + itemRevisao + item("perfil", "perfil", "Perfil") + (estado.eu.admin ? item("config", "config", "Configuração") : "");
     const atrasadas = dom.pendenciasDe(estado.ctx, minhaEquipe(), { uid: estado.eu.id }).filter((p) => p.atrasado).length;
     const links = (estado.config && estado.config.links) || {};
     // Alerta vermelho nos módulos em que o RH recebe demandas novas (reunião de 29/10/2026)
@@ -353,7 +361,7 @@
     const novas = "Solicitações novas aguardando o RH";
     let h = item("inicio", "inicio", "Início") + item("painel", "painel", "Painel", atrasadas) + item("equipe", "equipe", "Minha equipe") + item("agenda", "agenda", "Agenda da equipe") +
       '<div class="grupo">Módulos</div>' + item("recrutamento", "recrutamento", "Recrutamento", dem.recrutamento, novas) + item("onboarding", "onboarding", "Onboarding") +
-      item("rotinas", "rotinas", "Feedbacks") + (dom.DESEMPENHO_ATIVO ? item("desempenho", "desempenho", "Desempenho") : "") + item("offboarding", "offboarding", "Offboarding", dem.offboarding, novas) +
+      item("rotinas", "rotinas", "Feedbacks") + (dom.DESEMPENHO_ATIVO ? item("desempenho", "desempenho", "Desempenho") : "") + itemRevisao + item("offboarding", "offboarding", "Offboarding", dem.offboarding, novas) +
       itemFerias +
       '<div class="grupo">Para consultar</div>' +
       (links.manual ? '<a href="' + esc(links.manual) + '" target="_blank" rel="noopener">' + icone("manual", 17) + "<span>Manual da liderança</span></a>" : "") +

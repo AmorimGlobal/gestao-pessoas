@@ -28,6 +28,8 @@
     offboarding: { categoria: 79, responsavel: "" },
     // glossário de competências comportamentais do RH (Configuração → Cadastros)
     competencias: [],
+    // Revisão de Progresso: o nome de cada cargo da matriz (C01 a C40), dado pelo RH em Configuração
+    revisao: { cargos: {} },
   };
 
   function emIframe() {
@@ -61,6 +63,7 @@
     c.recrutamento = Object.assign({}, CONFIG_PADRAO.recrutamento, (cfg && cfg.recrutamento) || {});
     c.offboarding = Object.assign({}, CONFIG_PADRAO.offboarding, (cfg && cfg.offboarding) || {});
     c.competencias = Array.isArray(cfg && cfg.competencias) ? cfg.competencias : [];
+    c.revisao = Object.assign({ cargos: {} }, (cfg && cfg.revisao) || {});
     c.feriadosLocais = Object.assign({}, CONFIG_PADRAO.feriadosLocais, (cfg && cfg.feriadosLocais) || {});
     return c;
   }
@@ -124,6 +127,8 @@
           ferias: repo.temProcesso ? repo.temProcesso("ferias") : true,
           feriados: repo.temProcesso ? repo.temProcesso("feriados") : true,
           semanal: repo.temProcesso ? repo.temProcesso("semanal") : true,
+          // Revisão de Progresso (05/11/2026): as 5 tabelas são criadas juntas
+          revisao: repo.temProcesso ? ["revCiclos", "revAvaliacoes", "revAutoavaliacoes", "rev360", "revRetornos"].every((k) => repo.temProcesso(k)) : true,
         },
       });
       const papeis = dom.papeis(ctx, eu.id);

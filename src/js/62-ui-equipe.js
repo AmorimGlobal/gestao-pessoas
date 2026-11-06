@@ -117,7 +117,8 @@
       (m.ingresso ? c.tag("Na Amorim desde " + calc.fmtDataAno(m.ingresso), "cinza") : "") + "</div></div>" +
       '<div style="display:flex;gap:8px;flex-wrap:wrap" class="nao-imprimir">' + acoes + "</div></div>" +
       c.dados([["Liderança direta", lid.nome], ["Coordenação responsável", coord.nome], ["Modelo de contrato", m.contrato], ["Nível", m.nivel],
-        ["Senioridade", m.senioridade], ["Cidade de referência", m.cidade], ["E-mail", m.email]]) + "</div>";
+        ["Senioridade", m.senioridade], ["Cidade de referência", m.cidade], ["E-mail", m.email],
+        GP.revisao && m.cargoMatriz ? ["Cargo na Revisão de Progresso", GP.revisao.rotuloCargo(E().config, GP.revisao.cargoDo(m))] : null]) + "</div>";
     const abas = [
       { chave: "resumo", rotulo: "Histórico", rota: "#/membro/" + m.id },
       { chave: "feedbacks", rotulo: "Feedbacks SCI", rota: "#/membro/" + m.id + "/feedbacks", qt: fbs.length },
@@ -234,6 +235,9 @@
       c.campo({ nome: "contrato", rotulo: "Modelo de contrato", tipo: "lista", opcoes: op.contrato, valor: v.contrato }) + "</div>" +
       '<div class="linha-campos">' + (niveis.length ? c.campo({ nome: "nivel", rotulo: "Nível", tipo: "lista", opcoes: niveis, valor: v.nivel }) : c.campo({ nome: "nivel", rotulo: "Nível", valor: v.nivel })) +
       c.campo({ nome: "senioridade", rotulo: "Senioridade", tipo: "lista", opcoes: op.senioridade, valor: v.senioridade }) + "</div>" +
+      (GP.revisao ? c.campo({ nome: "cargoMatriz", rotulo: "Cargo na matriz da Revisão de Progresso", tipo: "lista", valor: v.cargoMatriz, opcional: true,
+        opcoes: GP.revisao.CODIGOS.map((x) => ({ valor: x, rotulo: GP.revisao.rotuloCargo(E().config, x) })),
+        ajuda: "Os KPIs e as competências que a liderança avalia. Os nomes dos cargos ficam em Configuração; os KPIs de cada um, em Revisão de Progresso → Matrizes dos cargos." }) : "") +
       c.campo({ nome: "cidade", rotulo: "Cidade de referência para feriados", tipo: "escolha", opcoes: op.cidade, valor: v.cidade || "São Paulo (SP)", ajuda: "Salvador (BA) para quem mora na Bahia. São Paulo (SP) para todos os outros." }) +
       (m ? c.campo({ nome: "estagio", rotulo: "Estágio", tipo: "lista", opcoes: GP.schema.processo("membros").estagios.map((e) => ({ valor: e.codigo, rotulo: e.nome })), valor: v.estagio }) : "") +
       c.campo({ nome: "ocultarAniversario", rotulo: "Agenda da equipe", tipo: "simNao", valor: v.ocultarAniversario, textoCheck: "Ocultar o aniversário (a pessoa pediu ao RH)" }) +
@@ -252,6 +256,7 @@
     if (!ui.validar(f, id ? ["lideranca", "coordenacao", "ingresso", "senioridade", "cidade"] : ["responsavel", "lideranca", "coordenacao", "ingresso", "senioridade", "cidade"])) return;
     const d = ui.lerForm(f);
     const dados = { lideranca: d.lideranca, coordenacao: d.coordenacao, funcao: d.funcao, ingresso: d.ingresso, contrato: d.contrato, nivel: d.nivel, senioridade: d.senioridade, cidade: d.cidade, ocultarAniversario: d.ocultarAniversario, carreira: d.carreira };
+    if ("cargoMatriz" in d) dados.cargoMatriz = d.cargoMatriz;
     if (id) {
       if (d.estagio) dados.estagio = d.estagio;
       ui.salvar(el, () => ui.atualizar("membros", id, dados), { mensagem: "Cadastro atualizado." });

@@ -330,6 +330,82 @@
     });
 
 
+    /* ---------- Revisão de Progresso (protótipo do RH, 05/11/2026): um ciclo aberto, uma avaliação em cada etapa ---------- */
+    // 57-revisao-matriz.js carrega depois deste arquivo: no navegador já está em GP na hora da chamada
+    const MZ = (typeof window !== "undefined" && window.GP && window.GP.revisaoMatriz) || require("./57-revisao-matriz.js");
+    // os 3 cargos que o protótipo nomeia: SDR (C05), Analista de Pós-vendas (C06) e Estágio em SDR (C04)
+    [["1", "C06"], ["2", "C05"], ["3", "C06"], ["4", "C05"], ["5", "C04"], ["6", "C06"]].forEach(([id, cg]) => { reg.membros.find((x) => x.id === id).cargoMatriz = cg; });
+    add("revCiclos", { id: "700", titulo: "Revisão de Progresso · Novembro 2026 · inaugural (anual)", estagio: "ABERTO", ciclo: "Novembro 2026 · inaugural (anual)",
+      periodoInicio: "2025-11-01", periodoFim: "2026-10-31", dataAbertura: "2026-10-01", prazoAuto: "2026-10-09", prazoLideranca: "2026-10-16",
+      prazoCalibracao: "2026-10-23", prazoDevolutiva: "2026-11-06", prazoRetornos: "2026-11-20", autor: "6", criadoEm: "2026-09-28T10:00:00-03:00",
+      regras: JSON.stringify({ publico: "todos", excluidos: [], excecoes: "", liberarLideranca: true, liberarPares: true, minimoNotas: 3, minimoComentarios: 5,
+        abaixoMinimo: "juntar_area", retornoLidPequeno: "diagnostico_area", retornoTopo: "consultoria", conferencias: { lista: true, matriz: true, anonimato: true } }),
+      mensagem: "Primeiro ciclo da Revisão de Progresso. Avaliem com evidência (SCI) e enviem até 16/10." });
+    /** Uma avaliação da liderança preenchida, no formato do formulário (as chaves são os "name" do protótipo) */
+    const avaliacaoDemo = (cargo, niveis, comps, extra) => {
+      const a = {}, C = MZ.CARGOS[cargo];
+      C.kpis.forEach((k, i) => {
+        const n = i + 1;
+        a["kpi_" + n + "_resultado"] = ["92%", "14 reuniões", "100%", "4,6 de 5", "3 dias"][i % 5];
+        a["kpi_" + n + "_nivel"] = niveis[i % niveis.length];
+        a["kpi_" + n + "_evidencia"] = "Relatório mensal do CRM de nov/2025 a out/2026; acompanhamento nas reuniões de 1:1.";
+        a["kpi_" + n + "_ajuste"] = "manter";
+      });
+      C.competencias.forEach((x, i) => {
+        const n = i + 1;
+        a["comp_" + n + "_nivel"] = String(comps[i % comps.length]);
+        a["comp_" + n + "_evidencia"] = "Situação: atendimento de um caso urgente em setembro. Comportamento: organizou a fila e avisou o cliente antes do prazo. Impacto: nenhuma reclamação e o caso fechou na data.";
+        a["comp_" + n + "_ajuste"] = "manter";
+      });
+      return JSON.stringify(Object.assign(a, {
+        conclusao_geral: "Entrega consistente no período, com evolução clara na organização da carteira. Precisa ganhar autonomia nos casos complexos.",
+        ponto_forte_1: "Organização da carteira", ponto_forte_2: "Relacionamento com o cliente", ponto_desenv_1: "Autonomia em casos complexos",
+        decisao_equipe: "Concordo totalmente", decisao_risco: "Não",
+      }, extra || {}));
+    };
+    // responsável = a liderança que avalia (o membro nunca é dono do item: não lê o formulário)
+    const avaliacao = (id, mid, uid, cargo, estagio, extra) => add("revAvaliacoes", Object.assign({ id, titulo: "Revisão · " + nomeDe(uid), membroId: mid, responsavel: "3", avaliador: "3", autor: "3",
+      cargo, cicloId: "700", estagio, criadoEm: "2026-09-20T10:00:00-03:00" }, extra));
+    avaliacao("710", "1", "100", "C06", "DEVOLUTIVA", { avaliacao: avaliacaoDemo("C06", ["Alcança", "Supera", "Alcança", "Alcança em parte"], [3, 4, 3, 2]), enviadaEm: "2026-10-02T17:00:00-03:00",
+      calibracao: JSON.stringify({ calib_ajuste: "Não", calib_data: "2026-10-05", calib_detalhe: "Sem ajuste: as evidências batem com as dos pares do cargo." }), calibradaEm: "2026-10-05T18:00:00-03:00",
+      pdi: JSON.stringify({ pdi_1_ligada: "Autonomia em casos complexos", pdi_1_acao: "Conduzir 2 casos complexos com revisão quinzenal da liderança", pdi_1_prazo: "2027-03-31",
+        pdi_1_sucesso: "Os 2 casos protocolados sem retrabalho", pdi_1_apoio: "Revisão quinzenal", pdi_1_resp: "Ana e Carla", promo_elegivel: "Não" }),
+      devolutivaEm: "2026-10-07" });
+    avaliacao("711", "2", "101", "C05", "CALIBRADA", { avaliacao: avaliacaoDemo("C05", ["Alcança", "Alcança em parte"], [3, 2, 3]), enviadaEm: "2026-10-03T16:00:00-03:00",
+      calibracao: JSON.stringify({ calib_ajuste: "Sim", calib_data: "2026-10-06", calib_detalhe: "KPI 2 de Supera para Alcança: a meta do período foi revista em julho." }), calibradaEm: "2026-10-06T18:00:00-03:00" });
+    avaliacao("712", "3", "102", "C06", "ENVIADA", { avaliacao: avaliacaoDemo("C06", ["Alcança"], [3, 3, 2]), enviadaEm: "2026-10-06T11:00:00-03:00" });
+    avaliacao("713", "4", "103", "C05", "NEW", { avaliacao: JSON.stringify({ kpi_1_resultado: "11 reuniões", kpi_1_nivel: "Alcança em parte", kpi_1_evidencia: "CRM, setembro." }) });
+    const auto = (id, mid, uid, estagio, enviadaEm) => add("revAutoavaliacoes", { id, titulo: "Autoavaliação · " + nomeDe(uid), membroId: mid, responsavel: uid, cicloId: "700", estagio, enviadaEm,
+      criadoPor: uid, auto1: "1) Reorganizei a carteira de 40 casos por prazo; 2) 12 processos protocolados sem pendência; 3) treinei a nova analista.",
+      auto2: "Os prazos do segundo semestre: nenhum caso atrasado desde julho.", auto3: estagio === "SUCCESS" ? "Casos complexos: ainda dependo de revisão. Faria checkpoints semanais com a liderança." : "",
+      auto4: estagio === "SUCCESS" ? "Acesso à base de pareceres antigos e uma revisão quinzenal." : "", auto5: estagio === "SUCCESS" ? "Análise de casos complexos e comunicação escrita." : "" });
+    auto("720", "1", "100", "SUCCESS", "2026-10-02T09:30:00-03:00");
+    auto("721", "2", "101", "SUCCESS", "2026-10-03T10:00:00-03:00");
+    auto("722", "3", "102", "SUCCESS", "2026-10-05T15:00:00-03:00");
+    auto("723", "4", "103", "NEW", "");
+    add("revRetornos", { id: "730", titulo: "Retornos · Ana Ribeiro", membroId: "1", responsavel: "100", cicloId: "700", estagio: "DEVOLUTIVA", criadoPor: "3", criadoEm: "2026-10-07T17:00:00-03:00",
+      devolutivaEm: "2026-10-07", fortes: "Organização da carteira e relacionamento com o cliente: nenhum caso atrasado desde julho.",
+      desenvolver: "Autonomia nos casos complexos: hoje a estratégia ainda depende da revisão da liderança.",
+      metas: JSON.stringify({ meta_1_tipo: "Resultado", meta_1_descricao: "Conduzir 2 casos complexos do início ao protocolo", meta_1_prazo: "2027-03-31", meta_1_indicador: "Casos protocolados sem retrabalho", meta_1_combinada: "Sim",
+        meta_2_tipo: "Aprendizado", meta_2_descricao: "Curso de redação jurídica", meta_2_prazo: "2027-02-28", meta_2_combinada: "Sim" }) });
+    // respostas da 360°: gravadas pelo servidor, sem autor (5 sobre a Carla, 3 sobre o Bruno, 2 sobre a Ana e 2 sobre a Daniela; 2 sobre o Marcos, abaixo do mínimo)
+    const r360 = (avaliado, relacao, notas, textos) => {
+      const pre = relacao === "Superior" ? "lid_" : "par_", resp = {};
+      notas.forEach((v, i) => { resp[pre + (i + 1)] = v; });
+      add("rev360", { titulo: "360° · " + relacao + " · " + nomeDe(avaliado), cicloId: "700", avaliado, relacao, modo: "Anônima", area: "Soluções", criadoPor: "", responsavel: "6",
+        criadoEm: "2026-10-04T12:00:00-03:00", respostas: JSON.stringify(Object.assign(resp, textos || {})) });
+    };
+    const C3 = "Concordo", CT = "Concordo totalmente", D2 = "Discordo";
+    r360("3", "Superior", [CT, C3, C3, CT, C3, CT, CT, D2], { continuar: "Explicar as prioridades da semana na segunda-feira.", comecar: "Avisar antes das mudanças de carteira." });
+    r360("3", "Superior", [C3, C3, D2, C3, C3, C3, CT, C3], { continuar: "Os feedbacks com exemplo.", comecar: "Ter um horário fixo para dúvidas." });
+    r360("3", "Superior", [CT, CT, C3, CT, CT, CT, CT, C3], { continuar: "A confiança na equipe." });
+    r360("3", "Superior", [C3, D2, C3, C3, C3, C3, C3, D2], { comecar: "Explicar o porquê das decisões de prioridade." });
+    r360("3", "Superior", [C3, C3, C3, CT, "Não sei avaliar", CT, C3, C3], { continuar: "Reconhecer as entregas na reunião da equipe." });
+    r360("101", "Par", [C3, C3, CT, C3, C3, C3, C3, C3]); r360("101", "Par", [CT, C3, C3, C3, CT, C3, C3, CT]); r360("101", "Par", [C3, D2, C3, C3, C3, C3, C3, C3]);
+    r360("100", "Par", [CT, CT, C3, CT, CT, C3, C3, C3]); r360("100", "Par", [C3, C3, C3, C3, C3, C3, C3, C3]);
+    r360("102", "Par", [C3, C3, D2, C3, C3, CT, C3, C3]); r360("102", "Par", [C3, C3, C3, C3, D2, C3, C3, C3]);
+    r360("4", "Superior", [C3, C3, C3, C3, C3, C3, C3, C3]); r360("4", "Superior", [D2, C3, C3, C3, C3, C3, C3, C3]);
+
     const vagas = {
       etapas: [
         { id: "C77:NEW", nome: "Nova solicitação", semantica: "" }, { id: "C77:PREPARATION", nome: "Em análise", semantica: "" },
@@ -542,6 +618,26 @@
         return D.resumoPainel(D.painelGeral(ctx));
       },
       statusServidor: async () => null, // fora do Bitrix não há servidor para conferir
+      /** Revisão de Progresso: as mesmas conferências de api/revisao360.js, e a resposta entra sem autor */
+      enviar360: async function (dados) {
+        await atraso();
+        const D = (typeof window !== "undefined" && window.GP && window.GP.dominio) || require("./50-dominio.js");
+        const RV = (typeof window !== "undefined" && window.GP && window.GP.revisao) || require("./58-revisao.js");
+        const ctx = D.indexar({ hoje, eu: { id: euId }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros });
+        const ciclo = (d.registros.revCiclos || []).find((x) => x.id === String(dados.cicloId));
+        if (!ciclo || ciclo.estagio !== "ABERTO") throw { descricao: "este ciclo da Revisão de Progresso não está aberto" };
+        const relacao = RV.relacaoCom(ctx, euId, String(dados.avaliado));
+        if (!relacao) throw { descricao: "pela estrutura, você não avalia esta pessoa na 360°" };
+        const regras = RV.regrasDo(ciclo);
+        if ((relacao === "Superior" && !regras.liberarLideranca) || (relacao === "Par" && !regras.liberarPares)) throw { descricao: "esta parte da 360° não foi liberada neste ciclo" };
+        const v = RV.validarResposta(relacao, dados.respostas);
+        if (!v.ok) throw { descricao: v.erros.join("; ") };
+        d.registros.rev360.push({ id: String(++seq), titulo: "360° · " + relacao + " · " + D.pessoa(ctx, dados.avaliado).nome, estagio: "NEW", estagioNome: "Recebida",
+          cicloId: String(ciclo.id), avaliado: String(dados.avaliado), relacao, modo: dados.modo === "Identificada" ? "Identificada" : "Anônima",
+          identificadoPor: dados.modo === "Identificada" ? euId : "", area: RV.areaDe(ctx, dados.avaliado).nome, respostas: JSON.stringify(v.respostas),
+          criadoEm: agora(), atualizadoEm: agora(), criadoPor: "", responsavel: "6", membroId: "" });
+        return true;
+      },
       comentarios: [],
       comentar: async function (chave, id, texto) { this.comentarios.push({ chave, id, texto }); },
       lerPreferencia: (nome) => { try { return localStorage.getItem("gp_demo_" + euId + "_" + nome); } catch (e) { return null; } },

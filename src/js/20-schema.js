@@ -68,6 +68,9 @@
     abrangenciaFeriado: ["Todos", "São Paulo (SP)", "Salvador (BA)"],
     // Revisões semanais (alinhamento pelo WhatsApp, 04/11/2026)
     papelSemanal: ["Membro", "Liderança"],
+    // Revisão de Progresso (protótipo do RH, 05/11/2026)
+    relacao360: ["Superior", "Par"],
+    modo360: ["Anônima", "Identificada"],
   };
 
   const PROCESSOS = [
@@ -96,6 +99,7 @@
         c("ocultarAniversario", "OCULTAR_ANIV", "simNao", "Ocultar aniversário na Agenda da equipe", { ajuda: "Marcado pelo RH quando a pessoa pede." }),
         c("planejamentoId", "PLANEJAMENTO_ID", "texto", "Planejamento da função (ID)"),
         c("carreira", "CARREIRA", "textoLongo", "Histórico de movimentações (Carreira)", { ajuda: "Uma linha por movimentação: data · de um nível para outro. Registrado pelo RH depois da calibração." }),
+        c("cargoMatriz", "CARGO_MATRIZ", "texto", "Cargo na matriz da Revisão de Progresso", { ajuda: "Código do cargo (C01 a C40) na matriz de KPIs e competências. O nome de cada cargo fica em Configuração → Revisão de Progresso." }),
       ],
     },
     /* ---------------- 3.3.2 Feedbacks SCI ---------------- */
@@ -437,6 +441,114 @@
         c("respondidas", "RESPONDIDAS", "numero", "Perguntas respondidas"),
         c("guardadaEm", "GUARDADA_EM", "dataHora", "Guardada em"),
         c("origem", "ORIGEM", "texto", "Chave no app semanal", { ajuda: "Quem respondeu e a semana: assim a rotina não guarda a mesma revisão duas vezes." }),
+      ],
+    },
+
+    /* ================= Revisão de Progresso (protótipo do RH "Revisao_de_Progresso_Prototipo.html", 05/11/2026) =================
+       Ciclos abertos pelo RH em junho e novembro. As respostas longas (KPIs, competências, ajustes, conclusão, PDI)
+       ficam em JSON num campo de texto: o formulário muda com o cargo e não cabe em campos fixos. */
+    {
+      chave: "revCiclos", nome: "Revisão · Ciclos", modulo: "Revisão de Progresso", pai: null,
+      descricao: "Os ciclos da Revisão de Progresso que o RH abre (junho e novembro): período avaliado, prazos de cada etapa, quem participa e as regras da 360° e do anonimato.",
+      estagios: [
+        { codigo: "NEW", nome: "Rascunho", cor: COR.cinza },
+        { codigo: "ABERTO", nome: "Aberto", cor: COR.azul },
+        { codigo: "SUCCESS", nome: "Encerrado", cor: COR.verde },
+        { codigo: "FAIL", nome: "Cancelado", cor: COR.cinza },
+      ],
+      campos: [
+        c("ciclo", "CICLO", "texto", "Ciclo", { ajuda: "Ex.: Novembro 2026 · inaugural (anual)." }),
+        c("periodoInicio", "PERIODO_INICIO", "data", "Início do período avaliado"),
+        c("periodoFim", "PERIODO_FIM", "data", "Fim do período avaliado"),
+        c("dataAbertura", "DATA_ABERTURA", "data", "Data de abertura"),
+        c("prazoAuto", "PRAZO_AUTO", "data", "Autoavaliação do membro até"),
+        c("prazoLideranca", "PRAZO_LIDERANCA", "data", "Avaliação da liderança até"),
+        c("prazoCalibracao", "PRAZO_CALIBRACAO", "data", "Calibração até"),
+        c("prazoDevolutiva", "PRAZO_DEVOLUTIVA", "data", "Devolutivas das lideranças até"),
+        c("prazoRetornos", "PRAZO_RETORNOS", "data", "Retornos do RH até"),
+        c("regras", "REGRAS", "textoLongo", "Regras do ciclo", { ajuda: "Gravado pelo app: público, exceções, 360° liberada, mínimos de respostas, regra abaixo do mínimo, retornos e conferências." }),
+        c("mensagem", "MENSAGEM", "textoLongo", "Mensagem para as lideranças"),
+        autor(),
+      ],
+    },
+    {
+      chave: "revAvaliacoes", nome: "Revisão · Avaliações da liderança", modulo: "Revisão de Progresso", pai: "membros",
+      descricao: "A avaliação da liderança direta para cada liderado (KPIs e competências do cargo, conclusão, perguntas de decisão), a calibração do RH e o PDI. Responsável = a liderança que avalia (o membro nunca é dono do item). Fica com a liderança e o RH: o membro não lê.",
+      estagios: [
+        { codigo: "NEW", nome: "Rascunho", cor: COR.cinza },
+        { codigo: "ENVIADA", nome: "Enviada ao RH", cor: COR.azul },
+        { codigo: "CALIBRADA", nome: "Calibrada", cor: COR.amarelo },
+        { codigo: "DEVOLUTIVA", nome: "Devolutiva feita", cor: COR.verde },
+        { codigo: "SUCCESS", nome: "Concluída", cor: COR.verde },
+        { codigo: "FAIL", nome: "Descartada", cor: COR.cinza },
+      ],
+      campos: [
+        c("cicloId", "CICLO_ID", "texto", "Ciclo (ID)", { ajuda: "Vazio enquanto é rascunho fora do ciclo." }),
+        c("cargo", "CARGO", "texto", "Cargo na matriz"),
+        c("avaliador", "AVALIADOR", "pessoa", "Liderança que avalia"),
+        c("avaliacao", "AVALIACAO", "textoLongo", "Avaliação da liderança", { ajuda: "Gravado pelo app: KPIs, competências, ajustes, itens novos, conclusão e perguntas de decisão." }),
+        c("enviadaEm", "ENVIADA_EM", "dataHora", "Enviada ao RH em"),
+        c("calibracao", "CALIBRACAO", "textoLongo", "Calibração (RH)", { ajuda: "Gravado pelo app: houve ajuste, data, detalhe." }),
+        c("calibradaEm", "CALIBRADA_EM", "dataHora", "Calibrada em"),
+        c("pdi", "PDI", "textoLongo", "PDI e promoção (só o RH)", { ajuda: "Gravado pelo app: até 3 ações do PDI e a indicação de elegibilidade para promoção." }),
+        c("devolutivaEm", "DEVOLUTIVA_EM", "data", "Data da devolutiva"),
+        autor(),
+      ],
+    },
+    {
+      chave: "revAutoavaliacoes", nome: "Revisão · Autoavaliações", modulo: "Revisão de Progresso", pai: "membros",
+      descricao: "A autoavaliação do membro (5 perguntas). Responsável = o membro. Quem lê: a liderança direta (só depois de enviar a própria avaliação) e o RH. Depois de enviada, o membro não edita mais.",
+      estagios: [
+        { codigo: "NEW", nome: "Rascunho", cor: COR.cinza },
+        { codigo: "SUCCESS", nome: "Enviada", cor: COR.verde },
+        { codigo: "FAIL", nome: "Descartada", cor: COR.cinza },
+      ],
+      campos: [
+        c("cicloId", "CICLO_ID", "texto", "Ciclo (ID)"),
+        c("auto1", "AUTO_1", "textoLongo", "Quais foram minhas 3 principais entregas do período, com evidência?"),
+        c("auto2", "AUTO_2", "textoLongo", "O que eu fiz melhor do que esperava?"),
+        c("auto3", "AUTO_3", "textoLongo", "Onde eu fiquei abaixo do combinado e por quê?"),
+        c("auto4", "AUTO_4", "textoLongo", "O que eu preciso da minha liderança ou da empresa para entregar mais?"),
+        c("auto5", "AUTO_5", "textoLongo", "O que eu quero desenvolver no próximo semestre?"),
+        c("enviadaEm", "ENVIADA_EM", "dataHora", "Enviada em"),
+      ],
+    },
+    {
+      chave: "rev360", nome: "Revisão · Respostas 360°", modulo: "Revisão de Progresso", pai: null,
+      descricao: "Respostas da avaliação 360° (superiores e pares). Só o RH lê. A resposta anônima é gravada pelo servidor (webhook), sem autor; na identificada, quem respondeu fica no campo próprio, visível só para o RH. Sem vínculo com quem respondeu nem com o controle de quem já respondeu.",
+      estagios: [
+        { codigo: "NEW", nome: "Recebida", cor: COR.azul },
+        { codigo: "FAIL", nome: "Descartada", cor: COR.cinza },
+      ],
+      campos: [
+        c("cicloId", "CICLO_ID", "texto", "Ciclo (ID)"),
+        c("avaliado", "AVALIADO", "pessoa", "Pessoa avaliada"),
+        c("relacao", "RELACAO", "lista", "Quem respondeu é", { opcoes: OPCOES.relacao360, ajuda: "Superior: liderado avaliando a liderança. Par: mesma liderança direta." }),
+        c("modo", "MODO", "lista", "Modo", { opcoes: OPCOES.modo360 }),
+        c("identificadoPor", "IDENTIFICADO_POR", "pessoa", "Quem respondeu (só na identificada)"),
+        c("area", "AREA", "texto", "Área da pessoa avaliada", { ajuda: "Para juntar grupos abaixo do mínimo de respostas." }),
+        c("respostas", "RESPOSTAS", "textoLongo", "Respostas", { ajuda: "Gravado pelo servidor: as 8 afirmações e os textos (continuar, começar, exemplo)." }),
+      ],
+    },
+    {
+      chave: "revRetornos", nome: "Revisão · Retornos", modulo: "Revisão de Progresso", pai: "membros",
+      descricao: "O que chega ao membro: a devolutiva da liderança (pontos em palavras e metas do próximo semestre), a ciência dele e o retorno do RH em temas. Responsável = o membro, que lê e confirma a ciência.",
+      estagios: [
+        { codigo: "NEW", nome: "Aguardando devolutiva", cor: COR.cinza },
+        { codigo: "DEVOLUTIVA", nome: "Devolutiva registrada", cor: COR.azul },
+        { codigo: "SUCCESS", nome: "Ciência confirmada", cor: COR.verde },
+        { codigo: "FAIL", nome: "Descartado", cor: COR.cinza },
+      ],
+      campos: [
+        c("cicloId", "CICLO_ID", "texto", "Ciclo (ID)"),
+        c("devolutivaEm", "DEVOLUTIVA_EM", "data", "Data da devolutiva"),
+        c("fortes", "FORTES", "textoLongo", "Pontos fortes combinados"),
+        c("desenvolver", "DESENVOLVER", "textoLongo", "Pontos de desenvolvimento combinados"),
+        c("metas", "METAS", "textoLongo", "Metas e entregas do próximo semestre", { ajuda: "Gravado pelo app: até 3 metas (tipo, descrição, prazo, indicador)." }),
+        c("cienciaEm", "CIENCIA_EM", "dataHora", "Ciência confirmada em", { ajuda: "Ciência, não concordância." }),
+        c("retornoPares", "RETORNO_PARES", "textoLongo", "Retorno do RH sobre os pares", { ajuda: "Resumo em temas, sem nomes e sem trechos literais. Só com respostas suficientes." }),
+        c("retornoParesEm", "RETORNO_PARES_EM", "data", "Retorno dos pares em"),
+        c("retornoLideradosEm", "RETORNO_LIDERADOS_EM", "data", "Conversa do RH sobre os liderados em"),
       ],
     },
   ];

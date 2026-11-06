@@ -27,6 +27,7 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
   - `api/contagem.js`: total de itens de cada processo, para o aviso do RH quando a permissão do CRM esconde registros.
   - `api/ficha.js`: manda a Ficha do onboarding ao membro por e-mail (SMTP, `lib/email.js`).
   - `api/semanal.js` (e a rotina das 6h): copia as respostas do alinhamento semanal pelo WhatsApp (app-gestao-semanal) para a tabela "Revisões semanais" (`lib/semanal-servidor.js`).
+  - `api/revisao360.js`: grava a resposta da avaliação 360° da Revisão de Progresso pelo webhook, sem ligar a quem respondeu (`lib/revisao360.js`). É a única gravação do app que não sai do navegador.
   - Os e-mails a quem pede nos funis 77 e 79 saíram do app em 30/10/2026: são regras de automação de cada funil no Bitrix.
   
   Todos calculam com as mesmas regras do navegador (`src/js/50-dominio.js`, `35-registros.js`). Variáveis e passo a passo: `docs/configuracao-bitrix.md`.
@@ -60,6 +61,11 @@ src/js/52-formularios.js as perguntas da Solicitação de Contratação, da Soli
 src/js/53-ferias.js  Políticas de Férias e Ausências: texto das regras, conferência de cada pedido (sem saldo por pessoa), e-mail pronto para a caixa do Bitrix (corpoHtml, escolherRemetente), ausências registradas pelo RH e quem vê cada uma  [Node + navegador]
 src/js/54-notificacoes.js o sino: notificações calculadas dos registros (pedidos e registros), lido por pessoa  [Node + navegador]
 src/js/56-semanal.js  revisões semanais do WhatsApp: quem é quem (telefone, nome), a semana pelo calendário do app semanal, o texto guardado e o plano (criar/atualizar sem duplicar)  [Node + navegador]
+src/js/57-revisao-matriz.js  GERADO por tools/revisao-matriz.js a partir do protótipo do RH: 40 cargos (KPIs e competências) e o glossário. Não edite à mão; não leia inteiro (179 KB)  [Node + navegador]
+src/js/58-revisao.js  Revisão de Progresso: ciclo e regras, quem participa, o que falta no formulário, mínimo das competências, ajustes, quem avalia quem na 360°, relatório com os mínimos, avisos do sino  [Node + navegador]
+src/js/69-ui-revisao.js telas da Revisão de Progresso (#/revisao…): início, abertura do ciclo, revisão de um membro (avaliação, calibração, devolutiva), autoavaliação, 360°, retornos, relatório 360°, matrizes
+lib/revisao360.js     a 360° no servidor: confere ciclo, liberação, relação e escala, e grava pelo webhook sem autor
+tools/revisao-matriz.js gera 57-revisao-matriz.js do HTML do protótipo
 src/js/60-ui-base.js  estado, rotas (hash), layout, componentes, painel lateral, eventos
 src/js/60-ui-formulario.js formulário a partir da definição (seções, condicionais, grade de níveis) e enviarCard (cria o card, histórico, passa ao RH)
 src/js/61..70-ui-*.js telas: início/painel, equipe/card do membro, feedbacks (63-ui-rotinas: SCI, 1:1 mensal, O2O), plano de melhoria (63-ui-planos), desempenho (fora até 2027), onboarding, offboarding, recrutamento, agenda (e o calendário de feriados do RH), férias e ausências (68-ui-ferias, com o "Meu aniversário"), exportar CSV do RH (69), configuração
@@ -148,6 +154,20 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - O RH ainda registra direto, já em "Aprovada".
   - Pedido do app = tem `regrasLidasEm` (`ferias.ehPedido`); sem ele, é registro direto do RH. O sino e a tela usam isso.
   - A função "Membros" do CRM passou a ser necessária, para cada pessoa criar o próprio pedido. A Liderança precisa de Editar na tabela.
+- **05/11/2026, Revisão de Progresso (pedido do usuário: "implemente o Revisao_de_Progresso_Prototipo.html", docs seção 14):**
+  - O usuário escolheu seguir sem a planilha dos nomes dos cargos e fazer as 3 visões de uma vez. O RH dá nome aos cargos em Configuração (`config.revisao.cargos`; `NOMES_DO_PROTOTIPO` cobre C04, C05 e C06). O cargo de cada membro é `cargoMatriz` no Membros.
+  - São 5 tabelas (`revCiclos`, `revAvaliacoes`, `revAutoavaliacoes`, `rev360`, `revRetornos`). As respostas longas ficam em JSON, com as chaves dos `name` do protótipo.
+  - Na avaliação, o responsável é **a liderança** (o membro nunca é dono). Na autoavaliação e nos retornos, o responsável é o membro. `autoavaliacaoDe` e `retornoDe` acham o item pelo responsável, porque o membro pode não ler o próprio item do Membros.
+  - Anonimato: `rev360` só é gravada por `api/revisao360.js`, sem autor, e o RH é o responsável. O "já respondi" fica em `userOption gp_360_<ciclo>` e o rascunho, no localStorage.
+    - `lib/contexto-servidor.js` não lê `rev360`.
+    - O relatório só traz textos de grupos com o mínimo (`relatorio360` devolve `textos: null` abaixo dele).
+    - A abertura do relatório vira comentário no item do ciclo.
+  - O que o CRM não fecha, o app fecha na tela:
+    - a liderança só lê a autoavaliação depois do envio (`avaliacaoEnviada`);
+    - o RH não vê rascunho;
+    - a coordenação não vê as perguntas de decisão nem o PDI.
+  - A 360° tira a CEO e quem está fora do app (Papéis no navegador; `GP_CEO_IDS` e `GP_EXCECOES_IDS` no servidor), e quem está em encerramento. Superior: a liderança efetiva; se o cargo dela tem "supervis", também quem está acima.
+  - A demonstração tem um ciclo aberto, com uma avaliação em cada etapa e 14 respostas 360°.
 - **05/11/2026, solicitação de promoção (pedido do usuário, docs seção 13):**
   - A liderança direta e a coordenação pedem (Recrutamento → "Solicitar promoção" e aba Carreira do membro). A coordenação e o RH aprovam no app.
   - O card cai no funil 77, o mesmo das vagas, com os campos `UF_CRM_PR_*` (`20-schema.js`, `CAMPOS_PROMOCAO`: texto, data ou pessoa, sem lista).

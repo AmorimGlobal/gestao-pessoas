@@ -15,6 +15,8 @@
    - Finalistas: a avaliação nova avisa a liderança que avalia.
    - Feriados: o calendário mudado pelo RH avisa todo mundo.
    - Alinhamento semanal (WhatsApp, 05/11/2026): as respostas guardadas da equipe direta avisam a liderança, uma vez por semana.
+   - Revisão de Progresso (05/11/2026): a abertura do ciclo avisa quem participa; as avaliações a enviar e as calibrações
+     concluídas avisam a liderança; a devolutiva avisa o membro (ciência); o envio ao RH avisa o RH (58-revisao.js).
    O "lido" é de cada pessoa: a data em que ela abriu o sino pela última vez (BX24.userOption).
    Cada evento também sai como aviso do Bitrix (GP.app.avisar), para quem está fora do app.
    Só entra o que o login de quem vê consegue ler. Funções puras: test/notificacoes.test.js.
@@ -158,6 +160,10 @@
       const ultimo = fer.map((f) => f.atualizadoEm || f.criadoEm).sort().pop();
       add({ id: "feriados-" + ultimo, quando: ultimo, area: "Agenda da equipe", rota: "#/agenda", titulo: "O RH atualizou o calendário de feriados", texto: "Confira na Agenda da equipe o que vale para você." });
     }
+
+    /* Revisão de Progresso (05/11/2026): as regras moram em 58-revisao.js, que carrega depois deste arquivo */
+    const RV = (typeof window !== "undefined" && window.GP && window.GP.revisao) || (typeof require === "function" ? require("./58-revisao.js") : null);
+    if (RV) RV.notificacoes(ctx, id).forEach(add);
 
     const desde = ms(calc.addDias(ctx.hoje, -JANELA_DIAS));
     const visto = ms(o.visto);

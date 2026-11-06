@@ -75,6 +75,7 @@
       (semTabela ? '<p class="muted" style="font-size:12px">Primeiro crie a tabela "Revisões semanais" com o botão "Criar ou completar a estrutura", acima, e dê as permissões da seção 4 do guia (as mesmas dos outros registros da equipe).</p>' : "") +
       '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-acao="semanal-buscar"' + (semTabela ? " disabled" : "") + ">Buscar agora</button></div>" +
       '<div id="semanal-resultado" style="margin-top:14px"></div></div>';
+    h += cargosRevisaoHtml(cfg);
     h += checagemHtml();
     h += servidorHtml(cfg);
     // Listas e textos
@@ -98,6 +99,33 @@
         ajuda: "Aparecem como caixas de marcar no planejamento da função e na Ficha do onboarding. A liderança ainda pode acrescentar outras." }) + "</div>" +
       '<button class="btn" data-acao="salvar-config">Salvar os cadastros</button></div></div>';
     return h;
+  };
+
+  /* ---------------- Revisão de Progresso: o nome de cada cargo da matriz (05/11/2026) ---------------- */
+  /** A matriz veio do protótipo do RH sem os nomes dos cargos (estão na planilha Template_Revisao_de_Progresso_v1.2.xlsx).
+      O RH dá nome a cada código aqui; o cargo de cada membro fica no cadastro dele. */
+  function cargosRevisaoHtml(cfg) {
+    const R = GP.revisao, MZ = GP.revisaoMatriz;
+    if (!R || !MZ) return "";
+    const usados = {};
+    dom.membrosAtivos(E().ctx.registros.membros || []).forEach((m) => { const x = R.cargoDo(m); if (x) usados[x] = (usados[x] || 0) + 1; });
+    const nomeados = R.CODIGOS.filter((x) => R.nomeCargo(cfg, x)).length;
+    return '<div class="card"><h3>Revisão de Progresso: nomes dos cargos<span class="extra">' + c.tag(nomeados + " de " + R.CODIGOS.length + " com nome", nomeados === R.CODIGOS.length ? "verde" : "ambar") + "</span></h3>" +
+      '<p class="muted" style="margin-top:0">A matriz de KPIs e competências (' + esc(MZ.VERSAO) + ") veio do protótipo do RH sem os nomes dos cargos: dê nome a cada código. O cargo de cada membro fica no cadastro dele (Minha equipe → membro → Editar cadastro). " +
+      'Para reconhecer o cargo, veja os KPIs em <a href="#/revisao/matriz">Revisão de Progresso → Matrizes dos cargos</a>.</p>' +
+      '<details class="modelos"><summary>Os ' + R.CODIGOS.length + ' cargos</summary><div class="modelo" id="form-cargos-revisao">' + R.CODIGOS.map((x) => {
+        const C = MZ.CARGOS[x];
+        return c.campo({ nome: "cargo_" + x, rotulo: x + " · " + plural(C.kpis.length, "KPI", "KPIs") + " · " + plural(C.competencias.length, "competência", "competências") + (usados[x] ? " · " + plural(usados[x], "membro", "membros") : ""),
+          valor: R.nomeCargo(cfg, x), opcional: true, ajuda: C.kpis[0] ? "1º objetivo: " + C.kpis[0].objetivo : "" });
+      }).join("") + '<button class="btn" data-acao="salvar-cargos-revisao">Salvar os nomes dos cargos</button></div></details></div>';
+  }
+  ui.acoes["salvar-cargos-revisao"] = function (el) {
+    const d = ui.lerForm(document.getElementById("form-cargos-revisao"));
+    const cfg = JSON.parse(JSON.stringify(E().config || {}));
+    const cargos = {};
+    GP.revisao.CODIGOS.forEach((x) => { const n = String(d["cargo_" + x] || "").trim(); if (n) cargos[x] = n; });
+    cfg.revisao = Object.assign({}, cfg.revisao || {}, { cargos });
+    gravarConfig(cfg, el, "Nomes dos cargos salvos.");
   };
 
   /* ---------------- setores sem chefe no Bitrix (1.1) ---------------- */

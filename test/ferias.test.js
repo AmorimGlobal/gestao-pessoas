@@ -237,10 +237,12 @@ test("notificações: o pedido avisa o RH e a liderança; cada decisão avisa qu
   assert.equal(bruno.rota, "#/ferias/301");
   assert.ok(tc.includes("Avalie a finalista Paula Nunes"));
   assert.ok(!tc.some((x) => /vaga/i.test(x)), "a liderança não é avisada das vagas que não pediu");
-  assert.deepEqual(N.notificacoesDe(contexto("101"), "101").map((n) => n.titulo), ["O RH aprovou o seu pedido de day off (13/11)"]);
-  assert.deepEqual(N.notificacoesDe(contexto("100"), "100"), [], "o próprio pedido, ainda sem decisão, não avisa quem pediu");
-  assert.deepEqual(N.notificacoesDe(contexto("110"), "110"), [], "registrada há mais de 30 dias: fora do sino");
-  assert.deepEqual(N.notificacoesDe(contexto("111"), "111"), [], "o próprio cancelamento não avisa quem cancelou");
+  // só as de férias: a demonstração também tem um ciclo da Revisão de Progresso aberto (avisos testados em test/revisao.test.js)
+  const deFerias = (uid) => N.notificacoesDe(contexto(uid), uid).filter((n) => n.area !== "Revisão de Progresso");
+  assert.deepEqual(deFerias("101").map((n) => n.titulo), ["O RH aprovou o seu pedido de day off (13/11)"]);
+  assert.deepEqual(deFerias("100"), [], "o próprio pedido, ainda sem decisão, não avisa quem pediu");
+  assert.deepEqual(deFerias("110"), [], "registrada há mais de 30 dias: fora do sino");
+  assert.deepEqual(deFerias("111"), [], "o próprio cancelamento não avisa quem cancelou");
   // a ausência que o RH registra direto avisa a liderança direta e a própria pessoa
   const ctx = contexto("3");
   ctx.registros.ferias.push({ id: "399", titulo: "Day off · Gustavo Pereira", responsavel: "105", lideranca: "3", autor: "6", estagio: "SUCCESS", tipo: "Day off", inicio: "2026-10-28", fim: "2026-10-28", criadoEm: "2026-10-08T08:00:00-03:00" });
