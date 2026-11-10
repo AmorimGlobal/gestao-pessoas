@@ -403,7 +403,7 @@
       return "<li><b>" + esc(r.titulo) + "</b>: o app usa a " + esc(r.usado) + ". Repetida: " + esc(outros.join(", ")) + ".</li>";
     });
     const avisoRepetidos = repetidos.length ? '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>Há tabela repetida no Bitrix</b>, com o mesmo nome de uma tabela do app:<ul>' + repetidos.join("") + "</ul>" +
-      "O app e as rotinas do servidor usam a mais antiga. Um administrador apaga a repetida na lista de processos inteligentes do CRM (endereço /crm/type/ do portal). Se ela tiver itens, mande ao TI antes.</div></div>" : "";
+      "O app e as rotinas do servidor usam a mais antiga. Um administrador apaga a repetida em Automação → Processos inteligentes (endereço /automation/type/ do portal): na linha dela, menu ☰ → Excluir. Se ela tiver itens, mande ao TI antes.</div></div>" : "";
     return avisoRepetidos + avisoPermissao();
   }
   function avisoPermissao() {

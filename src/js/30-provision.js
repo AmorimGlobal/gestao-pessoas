@@ -110,7 +110,7 @@
     // título repetido (05/11/2026: duas "Revisões semanais" no mesmo minuto): vale o mais antigo, como no servidor
     schema.processosRepetidos(tipos).forEach((r) => {
       log("ATENÇÃO: há mais de um processo \"" + r.titulo + "\" no portal (entityTypeId " + [r.usado].concat(r.outros).join(", ") + "). O app usa o " + r.usado +
-        ", o mesmo das rotinas do servidor. Um administrador apaga o outro, se estiver vazio, na lista de processos inteligentes do CRM.");
+        ", o mesmo das rotinas do servidor. Um administrador apaga o outro, se estiver vazio, em Automação → Processos inteligentes (/automation/type/).");
     });
 
     const config = { versao: 1, processos: {}, provisionadoEm: new Date().toISOString() };
