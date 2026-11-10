@@ -133,7 +133,7 @@
       });
       const papeis = dom.papeis(ctx, eu.id);
 
-      Object.assign(E, { eu, config, ctx, estrutura: { origem: est.origem, ausentes: est.ausentes || [], processosFaltando: est.processosFaltando || [] }, acessoNegado: repo.acessoNegado || [] });
+      Object.assign(E, { eu, config, ctx, estrutura: { origem: est.origem, ausentes: est.ausentes || [], processosFaltando: est.processosFaltando || [], repetidos: est.repetidos || [] }, acessoNegado: repo.acessoNegado || [] });
       if (papeis.ceo) carregarResumoCEO(repo, ctx);
       E.visoes = ui.visoesDisponiveis(papeis);
       let guardada = null;

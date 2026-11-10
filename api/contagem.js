@@ -66,7 +66,7 @@ module.exports = async function handler(req, res, injetado) {
       const contar = inj.totalDoProcesso || ((eti) => totalDoProcesso(env.BITRIX_WEBHOOK_URL, eti));
       const total = {};
       for (const p of schema.PROCESSOS) {
-        const t = tipos.find((x) => x.title === schema.tituloProcesso(p));
+        const t = schema.tipoPorTitulo(tipos, schema.tituloProcesso(p));
         if (t) total[p.chave] = await contar(t.entityTypeId);
       }
       cache = { em: agora, total };

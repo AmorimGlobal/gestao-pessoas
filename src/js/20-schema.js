@@ -624,9 +624,28 @@
   function codigoCampo(typeId, sufixo) { return camelDoCampo(nomeCampo(typeId, sufixo)); }
   function processo(chave) { return PROCESSOS.find((p) => p.chave === chave); }
   function tituloProcesso(p) { return PREFIXO_TITULO + p.nome; }
+  /** O processo inteligente de um título, na lista do crm.type.list. Com o título repetido no portal (em
+      05/11/2026 nasceram duas "Revisões semanais" no mesmo minuto), vale sempre o mais antigo, o de menor
+      entityTypeId: o navegador, o servidor e o "Criar ou completar a estrutura" escolhem o mesmo. */
+  function tipoPorTitulo(tipos, titulo) {
+    return (tipos || []).filter((t) => t && t.title === titulo)
+      .sort((a, b) => Number(a.entityTypeId) - Number(b.entityTypeId))[0] || null;
+  }
+  /** Os processos do app com o título repetido no portal -> [{ chave, titulo, usado, outros: [entityTypeId] }] */
+  function processosRepetidos(tipos) {
+    const saida = [];
+    PROCESSOS.forEach((p) => {
+      const titulo = tituloProcesso(p);
+      const iguais = (tipos || []).filter((t) => t && t.title === titulo);
+      if (iguais.length < 2) return;
+      const usado = tipoPorTitulo(tipos, titulo);
+      saida.push({ chave: p.chave, titulo, usado: usado.entityTypeId, outros: iguais.filter((t) => t !== usado).map((t) => t.entityTypeId) });
+    });
+    return saida;
+  }
 
   return {
     COR, PREFIXO_TITULO, SOLUCAO, OPCOES, PROCESSOS, ENTITY_TYPE_NEGOCIO, CAMPOS_PROMOCAO, SECOES_PROMOCAO,
-    nomeCampo, camelDoCampo, codigoCampo, processo, tituloProcesso,
+    nomeCampo, camelDoCampo, codigoCampo, processo, tituloProcesso, tipoPorTitulo, processosRepetidos,
   };
 });

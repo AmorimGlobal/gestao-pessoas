@@ -301,12 +301,18 @@
     cfg.papeis[el.dataset.papel] = (cfg.papeis[el.dataset.papel] || []).filter((x) => String(x.id) !== String(el.dataset.id));
     gravarConfig(cfg, null, "Papel atualizado.");
   };
+  // Uma execução por vez: duas ao mesmo tempo criam o mesmo processo duas vezes (05/11/2026, "Revisões semanais")
+  let provisionando = false;
   ui.acoes["provisionar"] = async function (el) {
+    if (provisionando) { window.alert("A estrutura já está sendo conferida. Espere terminar."); return; }
     const simular = !!el.dataset.simular;
-    if (!simular && !window.confirm("Criar ou completar no Bitrix os processos inteligentes, estágios e campos do app? Recomendado: rodar primeiro no ambiente de teste.")) return;
+    if (!simular && !window.confirm("Criar ou completar no Bitrix os processos inteligentes, estágios e campos do app? Clique uma vez só e espere terminar, sem abrir em outra janela.")) return;
     const log = document.getElementById("log-provisao");
     log.style.display = "block";
     log.textContent = (simular ? "SIMULAÇÃO — nada será gravado.\n" : "Gravando no Bitrix…\n");
+    provisionando = true;
+    const botoes = Array.prototype.slice.call(document.querySelectorAll('[data-acao="provisionar"]'));
+    botoes.forEach(function (b) { b.disabled = true; });
     el.disabled = true;
     try {
       const r = await E().repo.provisionar(simular, (m) => { log.textContent += m + "\n"; log.scrollTop = log.scrollHeight; });
@@ -326,7 +332,11 @@
       log.scrollTop = log.scrollHeight;
     } catch (e) {
       log.textContent += "\nFALHOU: " + (e.message || E().repo.mensagemErro(e)) + "\n";
-    } finally { el.disabled = false; }
+    } finally {
+      provisionando = false;
+      botoes.forEach(function (b) { b.disabled = false; });
+      el.disabled = false;
+    }
   };
   /* ---------------- sincronização com a estrutura ---------------- */
   function entradaSync() {

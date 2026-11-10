@@ -139,10 +139,10 @@
   async function descobrirEstrutura(listar, chaves) {
     const tipos = await listar("crm.type.list", {}, "types");
     const cfg = { versao: 1, processos: {}, descoberta: true };
-    const membrosT = tipos.find((t) => t.title === schema.tituloProcesso(schema.processo("membros")));
+    const membrosT = schema.tipoPorTitulo(tipos, schema.tituloProcesso(schema.processo("membros")));
     for (const p of schema.PROCESSOS) {
       if (chaves && chaves.indexOf(p.chave) < 0) continue;
-      const t = tipos.find((x) => x.title === schema.tituloProcesso(p));
+      const t = schema.tipoPorTitulo(tipos, schema.tituloProcesso(p));
       if (!t) continue;
       const cats = await listar("crm.category.list", { entityTypeId: t.entityTypeId }, "categories");
       const cat = cats.find((x) => x.isDefault === "Y" || x.isDefault === true) || cats[0];

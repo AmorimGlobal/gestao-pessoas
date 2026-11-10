@@ -193,24 +193,50 @@
       lerConfig: async function () {
         config = lerJSON(BX24.appOption.get(CHAVE_CONFIG), null);
         let origem = "gravada";
+        let repetidos = [];
         if (!config || !config.processos || !Object.keys(config.processos).length) {
           const descoberta = await descobrirEstrutura();
           config = Object.assign({}, config || {}, { processos: descoberta.processos });
           origem = Object.keys(descoberta.processos).length ? "descoberta" : "ausente";
         } else {
-          // Processo novo do app (ex.: "1:1 mensais", 29/10/2026) criado depois da configuração gravada: acha pelo título
-          const faltam = schema.PROCESSOS.map((p) => p.chave).filter((k) => !config.processos[k]);
-          if (faltam.length) {
-            try {
-              const d = await reg.descobrirEstrutura(bxTudo, faltam);
-              config = Object.assign({}, config, { processos: Object.assign({}, d.processos, config.processos) });
-            } catch (e) { console.warn("Processos novos não encontrados:", e); }
-          }
+          try {
+            const tipos = await bxTudo("crm.type.list", {}, "types");
+            const existe = {};
+            tipos.forEach(function (t) { existe[String(t.entityTypeId)] = t; });
+            const refazer = schema.PROCESSOS.filter(function (p) {
+              const c = config.processos[p.chave];
+              // processo novo do app (ex.: "1:1 mensais", 29/10/2026) criado depois da configuração gravada
+              if (!c) return true;
+              // A configuração aponta um processo apagado, ou um repetido que não é o mais antigo (05/11/2026: duas
+              // "Revisões semanais"; a gravada era a vazia, e o servidor guardava as respostas na outra). Vale o
+              // mesmo do servidor: o mais antigo com o título.
+              const titulo = schema.tituloProcesso(p);
+              const atual = existe[String(c.entityTypeId)];
+              const certo = schema.tipoPorTitulo(tipos, titulo);
+              return !!certo && (!atual || atual.title === titulo) && String(certo.entityTypeId) !== String(c.entityTypeId);
+            }).map(function (p) { return p.chave; });
+            if (refazer.length) {
+              const d = await reg.descobrirEstrutura(function (m, pr, k) { return m === "crm.type.list" ? Promise.resolve(tipos) : bxTudo(m, pr, k); }, refazer);
+              config = Object.assign({}, config, { processos: Object.assign({}, config.processos, d.processos) });
+            }
+            repetidos = schema.processosRepetidos(tipos);
+          } catch (e) { console.warn("Conferência dos processos pelo título:", e); }
         }
         montarEstrutura(config);
         const ausentes = Object.keys(estrutura).length ? await carregarMetadados() : [];
         const processosFaltando = schema.PROCESSOS.filter((p) => !estrutura[p.chave]).map((p) => p.chave);
-        return { config, origem, ausentes, processosFaltando };
+        // os repetidos que o app não usa estão vazios? (a 1ª página basta: o aviso só diz se dá para apagar)
+        if (repetidos.length) {
+          const cmds = {};
+          repetidos.forEach(function (r) { r.outros.forEach(function (eti) { cmds["n" + eti] = ["crm.item.list", { entityTypeId: eti, select: ["id"] }]; }); });
+          try {
+            const r = await bxLote(cmds);
+            repetidos.forEach(function (x) {
+              x.vazios = x.outros.map(function (eti) { const v = r["n" + eti]; return v && v.ok ? !((v.dados && v.dados.items) || []).length : null; });
+            });
+          } catch (e) { /* o aviso sai sem dizer se estão vazios */ }
+        }
+        return { config, origem, ausentes, processosFaltando, repetidos };
       },
       salvarConfig: function (cfg) {
         return new Promise(function (ok) {

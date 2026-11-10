@@ -105,8 +105,13 @@
     /* 1. tipos existentes */
     const tipos = await listarTodos("crm.type.list", {}, (d) => d && d.types);
     log("Processos inteligentes existentes no portal: " + tipos.length);
-    const porEntity = {}, porTitulo = {};
-    tipos.forEach((t) => { porEntity[String(t.entityTypeId)] = t; porTitulo[t.title] = t; });
+    const porEntity = {};
+    tipos.forEach((t) => { porEntity[String(t.entityTypeId)] = t; });
+    // título repetido (05/11/2026: duas "Revisões semanais" no mesmo minuto): vale o mais antigo, como no servidor
+    schema.processosRepetidos(tipos).forEach((r) => {
+      log("ATENÇÃO: há mais de um processo \"" + r.titulo + "\" no portal (entityTypeId " + [r.usado].concat(r.outros).join(", ") + "). O app usa o " + r.usado +
+        ", o mesmo das rotinas do servidor. Um administrador apaga o outro, se estiver vazio, na lista de processos inteligentes do CRM.");
+    });
 
     const config = { versao: 1, processos: {}, provisionadoEm: new Date().toISOString() };
     const etiDe = (chave) => config.processos[chave] && config.processos[chave].entityTypeId;
@@ -117,7 +122,15 @@
      try {
       const titulo = schema.tituloProcesso(p);
       const anterior = configAnterior.processos && configAnterior.processos[p.chave];
-      let tipo = (anterior && porEntity[String(anterior.entityTypeId)]) || porTitulo[titulo];
+      // o gravado na configuração só vale se o título dele mudou; com o mesmo título, vale o mais antigo
+      const daConfig = anterior && porEntity[String(anterior.entityTypeId)];
+      const doTitulo = schema.tipoPorTitulo(tipos, titulo);
+      let tipo = daConfig && (!doTitulo || daConfig.title !== titulo) ? daConfig : doTitulo;
+      if (!tipo && !simular) {
+        // outra janela (ou um segundo clique) pode ter criado o processo depois da primeira leitura: confere de novo
+        tipo = schema.tipoPorTitulo(await listarTodos("crm.type.list", {}, (d) => d && d.types), titulo);
+        if (tipo) log("Processo criado há pouco, fora desta execução: " + titulo + " (entityTypeId " + tipo.entityTypeId + ")");
+      }
       let criadoAgora = false;
 
       const paiEti = p.pai === "membros" ? etiDe("membros") : p.pai === "negocio" ? schema.ENTITY_TYPE_NEGOCIO : null;

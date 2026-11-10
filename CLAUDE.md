@@ -18,6 +18,7 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
   - "Padrões" virou **competências comportamentais**, e o sufixo continua `PADROES`.
   - Os alinhamentos do onboarding viraram **avaliações do 1º, 2º e 3º mês**.
   - O título do processo é a chave da descoberta (`descobrirEstrutura`): renomear um processo quebra o app.
+  - **Título repetido no portal** (10/11/2026): em 05/11 nasceram duas "Revisões semanais" no mesmo minuto (1150 e 1154). A configuração gravada apontava a 1154, vazia, e o servidor guardava as respostas na 1150. Por isso o card ficava vazio e o RH via "Revisões semanais: 0 de 25". Agora todos escolhem pelo `schema.tipoPorTitulo`, que fica com o mais antigo (menor entityTypeId): o servidor, o provisionamento e o navegador, que troca a configuração gravada se ela apontar um repetido ou um processo apagado. O RH e o administrador veem o aviso da tabela repetida (`processosRepetidos`), e o "Criar ou completar" roda uma vez por vez e confere o título de novo antes de criar.
 - **Interface:** uma página única (HTML, CSS e JS sem framework), servida por uma função da Vercel. Toda chamada ao Bitrix sai do **navegador** por `BX24.callMethod`, com o login de quem abriu o app. Por isso as funções de acesso do CRM (2.4) valem sozinhas: a liderança só recebe os itens do departamento que chefia. É o mesmo padrão do `widget-rotina-contabil`.
 - **Servidor (só o que o navegador não pode fazer), em `api/` + `lib/`, pelo webhook de entrada:**
   - `api/sincronizar.js` (cron 6h): Membros acompanha a estrutura da empresa.
@@ -84,7 +85,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 144 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 189 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 

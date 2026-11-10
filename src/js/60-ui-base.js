@@ -394,6 +394,19 @@
       login leu com o total do processo no servidor (api/contagem.js) e com os processos negados. */
   function avisoAcesso() {
     if (!podeVerComo() || !estado.repo || estado.repo.modo === "demo" || !estado.ctx) return "";
+    // tabela com o nome repetido no Bitrix (05/11/2026: duas "Revisões semanais"): o app já usa a mesma do servidor
+    const repetidos = ((estado.estrutura || {}).repetidos || []).map(function (r) {
+      const outros = r.outros.map(function (eti, i) {
+        const vazio = (r.vazios || [])[i];
+        return eti + (vazio === true ? " (vazia)" : vazio === false ? " (tem itens: confira antes)" : "");
+      });
+      return "<li><b>" + esc(r.titulo) + "</b>: o app usa a " + esc(r.usado) + ". Repetida: " + esc(outros.join(", ")) + ".</li>";
+    });
+    const avisoRepetidos = repetidos.length ? '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>Há tabela repetida no Bitrix</b>, com o mesmo nome de uma tabela do app:<ul>' + repetidos.join("") + "</ul>" +
+      "O app e as rotinas do servidor usam a mais antiga. Um administrador apaga a repetida na lista de processos inteligentes do CRM (endereço /crm/type/ do portal). Se ela tiver itens, mande ao TI antes.</div></div>" : "";
+    return avisoRepetidos + avisoPermissao();
+  }
+  function avisoPermissao() {
     const negados = estado.acessoNegado || [];
     const total = estado.contagem || {};
     const faltas = [];
@@ -403,6 +416,12 @@
       if (typeof total[p.chave] === "number" && total[p.chave] > vistos) faltas.push(p.nome + ": " + vistos + " de " + total[p.chave]);
     });
     if (!faltas.length) return "";
+    // o administrador do Bitrix lê tudo: para ele, a diferença não é permissão (10/11/2026: era a tabela repetida)
+    const real = estado.euReal || estado.eu || {};
+    if (real.admin) {
+      return '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>O app leu menos registros do que o servidor contou</b> (' + esc(faltas.join(" · ")) + "). " +
+        "Você é administrador do Bitrix e lê tudo, então não é permissão: o app e o servidor estão olhando tabelas diferentes. Mande este aviso ao TI.</div></div>";
+    }
     return '<div class="conteudo" style="padding-bottom:0"><div class="aviso-atencao"><b>O Bitrix não deixa o seu usuário ler todos os registros do app</b> (' + esc(faltas.join(" · ")) + "). " +
       "Por isso equipes, membros e registros podem aparecer vazios, inclusive em \"Ver como\". Um administrador do Bitrix resolve em CRM → Configurações → Permissões de acesso: a função do RH precisa de \"Todos\" em Ler e em Editar nos processos \"Gestão de Pessoas · …\". Depois, recarregue o app.</div></div>";
   }
