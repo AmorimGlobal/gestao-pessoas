@@ -129,7 +129,7 @@ Configure em CRM → Configurações → Permissões. Para cada um dos 11 proces
 | Liderança | Do departamento | Do departamento | Em "Encerramentos de contrato", só leitura a partir de "Enviada ao RH" (permissão por estágio) |
 | Coordenação | Departamento e subdepartamentos | Departamento e subdepartamentos | — |
 | RH | Todos | Todos | Administra estágios |
-| Membros e demais usuários | Nenhum | Nenhum | O membro não vê os próprios registros |
+| Membros e demais usuários | Nenhum | Nenhum | O membro não lê os registros no CRM. Desde 18/11/2026 o Perfil do app mostra a ele os próprios feedbacks SCI e o próprio alinhamento semanal, lidos pelo servidor (`api/membro.js`); a permissão continua "Nenhum" |
 
 **Férias e ausências e Feriados (04/11/2026).** Desde essa data todo funcionário entra no app: quem não lidera ninguém vê só "Férias e ausências" e o Perfil. Só o RH grava nessas duas tabelas do CRM: registra as ausências aprovadas por e-mail e cadastra os feriados (seção 11). Os outros só leem:
 
@@ -373,7 +373,7 @@ Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Aus�
      - A escolha vira um item da tabela, com o campo "Semana de férias coletivas" marcado, e passa pela mesma autorização e validação.
      - Não conta nos 23 dias e é **exceção à regra da equipe**.
    - **Regra da equipe:** duas pessoas com a mesma liderança direta não tiram férias ao mesmo tempo, e a data fica com quem pediu primeiro.
-     - O membro só lê os próprios pedidos no CRM. Por isso o formulário busca as datas da equipe em **`api/ferias-equipe.js`**, que lê pelo webhook e devolve só os períodos e a situação, sem nomes.
+     - O membro só lê os próprios pedidos no CRM. Por isso o formulário busca as datas da equipe em **`api/membro.js`** (era `api/ferias-equipe.js`), que lê pelo webhook e devolve só os períodos e a situação, sem nomes.
      - Antes de gravar, o app lê as datas de novo. Se o servidor não responder, usa o que o login enxerga e avisa que o RH confere.
      - Se dois pedidos cruzarem mesmo assim, a conferência do RH mostra quem pediu antes.
    - **Agenda de férias** (Férias e ausências → "Agenda de férias", para o RH e as lideranças): mostra o ciclo inteiro.
@@ -610,6 +610,18 @@ Quem tem "Departamento e subdepartamentos" ou "Todos" ainda consegue abrir esses
   - Quem tiver acesso aos registros de chamadas da Vercel e do Bitrix poderia, em tese, cruzar horários.
   - Quem apagar as próprias preferências pode responder a mesma pessoa de novo.
   - Em grupos pequenos, o app avisa quem responde e não mostra o grupo sozinho no relatório.
+
+### 5.1 Ciclo de teste (18/11/2026)
+
+Para o RH e a TI testarem o ciclo inteiro antes do de verdade: Revisão de Progresso → Abertura do ciclo → **Abrir um ciclo de teste** (só aparece sem ciclo aberto).
+
+1. Marque as pessoas. Para quem está sem cargo na matriz, escolha um: ele fica gravado no cadastro do membro, como no ciclo de verdade.
+2. Os prazos já vêm curtos (de amanhã a 5 dias) e podem mudar em "Editar prazos e regras".
+3. Só as pessoas marcadas recebem o aviso, veem a autoavaliação e entram na 360°. A liderança de fora do teste (a CEO, por exemplo) não avalia ninguém e não recebe nada; quem está fora vê só "O RH está testando".
+4. No teste, o relatório 360° usa mínimo de 1 resposta, então ele **não é anônimo para o RH**. As conferências da abertura não são pedidas.
+5. No fim, **Encerrar e apagar o teste**: o ciclo e os registros dele vão para a etapa de descartados e somem das telas. O ciclo de verdade só abre depois disso.
+
+Exemplo do primeiro teste: Fernando (membro), Mathias (a liderança dele) e Luciele (RH). Mathias avalia Fernando; Fernando faz a 360° do Mathias; Mathias e Luciele, que têm a mesma liderança, se avaliam como pares; a Luciele calibra e dá os retornos.
 
 ### 6. Pendências do protótipo
 

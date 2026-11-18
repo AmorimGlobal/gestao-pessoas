@@ -183,6 +183,7 @@ a.card { color: inherit; }
 .tag.vermelho { background: var(--vermelho-bg); color: var(--vermelho); }
 .tag.azul { background: var(--azul-bg); color: var(--azul); }
 .tag.cinza { background: var(--cinza-bg); color: var(--muted); }
+.tag.roxo { background: var(--roxo-bg); color: var(--roxo); }
 .ponto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .ponto.verde { background: var(--verde); } .ponto.ambar { background: var(--ambar-forte); } .ponto.vermelho { background: var(--vermelho); } .ponto.azul { background: var(--azul); } .ponto.cinza { background: var(--suave); }
 
@@ -518,6 +519,15 @@ details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy)
 .rv-check { margin-bottom: 8px; align-items: flex-start; }
 .rv-caixa { max-height: 220px; overflow: auto; border: 1px solid var(--borda); border-radius: 10px; padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
 .rv-caixa .escolha { margin: 0; }
+/* ciclo de teste: uma pessoa por linha, com o cargo ao lado */
+.rv-caixa.rv-teste { max-height: 360px; grid-template-columns: 1fr; }
+.rv-teste-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 2px 0; border-bottom: 1px solid var(--borda); }
+.rv-teste-linha:last-child { border-bottom: 0; }
+.rv-teste-cargo { max-width: 260px; font-size: 12px; }
+select.rv-teste-cargo { padding: 4px 8px; }
+/* Perfil: feedbacks e alinhamento semanal do próprio membro */
+.perfil-feedback { padding: 10px 0; border-bottom: 1px solid var(--borda); }
+.perfil-feedback:last-child { border-bottom: 0; padding-bottom: 0; }
 .rv-regras { background: var(--sutil); border-radius: 10px; padding: 10px 14px; font-size: 12.5px; margin-top: 6px; }
 .rv-regras ul { margin: 6px 0 0; padding-left: 18px; }
 .rv-ciencia { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--divisor); }

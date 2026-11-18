@@ -29,7 +29,9 @@ App local do Bitrix24 (`amorimglobal.bitrix24.com.br`) onde cada liderança exec
   - `api/ficha.js`: manda a Ficha do onboarding ao membro por e-mail (SMTP, `lib/email.js`).
   - `api/semanal.js` (e a rotina das 6h): copia as respostas do alinhamento semanal pelo WhatsApp (app-gestao-semanal) para a tabela "Revisões semanais" (`lib/semanal-servidor.js`).
   - `api/revisao360.js`: grava a resposta da avaliação 360° da Revisão de Progresso pelo webhook, sem ligar a quem respondeu (`lib/revisao360.js`). É a única gravação do app que não sai do navegador.
-  - `api/ferias-equipe.js`: as datas de férias já reservadas pela equipe de quem pede, sem nomes (`lib/ferias-equipe.js`). O membro só lê os próprios pedidos no CRM.
+  - `api/membro.js` (era `api/ferias-equipe.js`; juntou em 18/11/2026 para não passar de 12 funções): o que o membro precisa e o login dele não lê no CRM, pelo campo `o` do corpo.
+    - Sem `o` ou `o: "ferias-equipe"`: as datas de férias já reservadas pela equipe de quem pede, sem nomes (`lib/ferias-equipe.js`).
+    - `o: "perfil"`: os feedbacks SCI e o alinhamento semanal da própria pessoa, para o Perfil (`lib/perfil-membro.js`). Só os itens em que a pessoa da sessão é a responsável; sem anulados, sem a evidência anexada e sem o vínculo com plano.
   - São 11 funções em `api/`, e o plano Hobby da Vercel aceita até 12. Antes de criar outra, junte numa que já exista.
   - Os e-mails a quem pede nos funis 77 e 79 saíram do app em 30/10/2026: são regras de automação de cada funil no Bitrix.
   
@@ -69,6 +71,7 @@ src/js/58-revisao.js  Revisão de Progresso: ciclo e regras, quem participa, o q
 src/js/69-ui-revisao.js telas da Revisão de Progresso (#/revisao…): início, abertura do ciclo, revisão de um membro (avaliação, calibração, devolutiva), autoavaliação, 360°, retornos, relatório 360°, matrizes
 lib/revisao360.js     a 360° no servidor: confere ciclo, liberação, relação e escala, e grava pelo webhook sem autor
 lib/ferias-equipe.js  as datas de férias reservadas pela equipe de quem pede, sem nomes (a regra "quem pediu primeiro fica com a data")
+lib/perfil-membro.js  os próprios feedbacks SCI e o próprio alinhamento semanal, para o Perfil (api/membro.js, o: "perfil")
 tools/revisao-matriz.js gera 57-revisao-matriz.js do HTML do protótipo
 src/js/60-ui-base.js  estado, rotas (hash), layout, componentes, painel lateral, eventos
 src/js/60-ui-formulario.js formulário a partir da definição (seções, condicionais, grade de níveis) e enviarCard (cria o card, histórico, passa ao RH)
@@ -85,7 +88,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 189 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 193 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -166,7 +169,7 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
     - a regra da equipe (`reservasDaEquipe`, pelo campo `lideranca` do pedido).
   - Essas regras **travam** o pedido (erros), em vez de virar "ponto fora da política".
   - A semana coletiva é um item com `coletiva = true` (campo novo). `ehColetiva` a tira dos 23 dias e da regra da equipe.
-  - O formulário redesenha o bloco a cada escolha, com o estado em `f._st`. As datas da equipe vêm de `repo.reservasEquipe()` (`api/ferias-equipe.js`, sem nomes).
+  - O formulário redesenha o bloco a cada escolha, com o estado em `f._st`. As datas da equipe vêm de `repo.reservasEquipe()` (`api/membro.js`, sem nomes).
   - Autorizar/Validar/Devolver são só palavras: o valor gravado continua "Aprovada" ou "Recusada".
   - A Agenda de férias é `#/ferias/agenda`.
 - **05/11/2026, Revisão de Progresso (pedido do usuário: "implemente o Revisao_de_Progresso_Prototipo.html", docs seção 14):**
@@ -183,6 +186,9 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
     - a coordenação não vê as perguntas de decisão nem o PDI.
   - A 360° tira a CEO e quem está fora do app (Papéis no navegador; `GP_CEO_IDS` e `GP_EXCECOES_IDS` no servidor), e quem está em encerramento. Superior: a liderança efetiva; se o cargo dela tem "supervis", também quem está acima.
   - A demonstração tem um ciclo aberto, com uma avaliação em cada etapa e 14 respostas 360°.
+- **18/11/2026, Perfil e ciclo de teste (pedidos do usuário):**
+  - **Perfil:** cada pessoa vê os próprios feedbacks SCI (com autor, situação, comportamento, impacto, combinados e adendos) e as próprias respostas ao alinhamento semanal pelo WhatsApp, que antes só a liderança via. A função "Membros" do CRM continua sem leitura nessas tabelas: quem lê é `api/membro.js` (`o: "perfil"`), pelo webhook, só o que é da pessoa da sessão. Em "Ver como", o Perfil usa o que o login do RH ou do administrador já leu. 1:1, O2O, plano de melhoria e onboarding continuam fora do Perfil (o onboarding nunca vai para o membro).
+  - **Ciclo de teste da Revisão de Progresso** (Abertura do ciclo → "Abrir um ciclo de teste"): o RH marca as pessoas e, para quem está sem cargo na matriz, escolhe um (fica no Membros). As regras ganham `publico: "pessoas"`, `pessoas` (IDs do Membros) e `teste: true`. No teste: não pede as conferências; mínimos 1 e 1 (a 360° não é anônima para o RH); `ativos`, `superioresDe`, `paresDe`, `lideradosDe`, `relacaoCom` e o servidor (`lib/revisao360.js`) recebem o ciclo e ficam só entre as pessoas do teste; quem está fora não responde a 360° nem avalia (`equipeNoCiclo` vazio para a liderança de fora, como a CEO); o aviso vai só para os participantes; quem está fora vê "O RH está testando". "Encerrar e apagar o teste" leva o ciclo e os registros dele (avaliações, autoavaliações, retornos e 360°) para FAIL.
 - **05/11/2026, solicitação de promoção (pedido do usuário, docs seção 13):**
   - A liderança direta e a coordenação pedem (Recrutamento → "Solicitar promoção" e aba Carreira do membro). A coordenação e o RH aprovam no app.
   - O card cai no funil 77, o mesmo das vagas, com os campos `UF_CRM_PR_*` (`20-schema.js`, `CAMPOS_PROMOCAO`: texto, data ou pessoa, sem lista).

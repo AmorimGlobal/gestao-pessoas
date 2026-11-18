@@ -337,11 +337,11 @@ test("notificações: o lido é de cada pessoa, e o calendário mudado pelo RH a
   assert.ok(!N.notificacoesDe(ctx, "6").some((n) => /calendário de feriados/.test(n.titulo)), "o próprio RH não precisa do aviso");
 });
 
-test("api/ferias-equipe: as datas da equipe pelo webhook, sem nomes; sem token, 401", async () => {
+test("api/membro (férias da equipe): as datas da equipe pelo webhook, sem nomes; sem token, 401", async () => {
   const { criarBitrixFalso } = require("./fake-bitrix.js");
   const { provisionar } = require("../src/js/30-provision.js");
   const { abrirPortal } = require("../lib/bitrix-servidor.js");
-  const handler = require("../api/ferias-equipe.js");
+  const handler = require("../api/membro.js");
   const bx = criarBitrixFalso({
     usuarios: [{ ID: "3", NAME: "Carla", LAST_NAME: "Mendes", UF_DEPARTMENT: [11] }, { ID: "100", NAME: "Ana", LAST_NAME: "Ribeiro", UF_DEPARTMENT: [11] },
       { ID: "101", NAME: "Bruno", LAST_NAME: "Teixeira", UF_DEPARTMENT: [11] }, { ID: "4", NAME: "Marcos", LAST_NAME: "Lima", UF_DEPARTMENT: [12] }, { ID: "110", NAME: "Igor", LAST_NAME: "Santos", UF_DEPARTMENT: [12] }],

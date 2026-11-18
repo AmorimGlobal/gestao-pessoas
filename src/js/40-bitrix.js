@@ -448,15 +448,25 @@
         if (!j) throw new Error("o servidor respondeu " + r.status);
         return j;
       },
-      /** Férias: as datas que a equipe já reservou, sem nomes (api/ferias-equipe.js). O membro só lê os próprios
+      /** Férias: as datas que a equipe já reservou, sem nomes (api/membro.js). O membro só lê os próprios
           pedidos no CRM, então quem lê a equipe é o servidor. */
       reservasEquipe: async function () {
         const auth = BX24.getAuth ? BX24.getAuth() : null;
         if (!auth || !auth.access_token) throw new Error("o Bitrix não entregou o token de acesso desta sessão");
-        const r = await fetch("/api/ferias-equipe", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auth: auth.access_token }) });
+        const r = await fetch("/api/membro", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auth: auth.access_token, o: "ferias-equipe" }) });
         const j = await r.json().catch(function () { return {}; });
         if (!r.ok || !j.ok) throw new Error(j.erro || "o servidor respondeu " + r.status);
         return j.reservas || [];
+      },
+      /** Perfil (18/11/2026): os feedbacks SCI e o alinhamento semanal da própria pessoa (api/membro.js). A função
+          "Membros" do CRM não lê essas tabelas, então o servidor lê e devolve só o que é da pessoa desta sessão. */
+      meuPerfil: async function () {
+        const auth = BX24.getAuth ? BX24.getAuth() : null;
+        if (!auth || !auth.access_token) throw new Error("o Bitrix não entregou o token de acesso desta sessão");
+        const r = await fetch("/api/membro", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auth: auth.access_token, o: "perfil" }) });
+        const j = await r.json().catch(function () { return {}; });
+        if (!r.ok || !j.ok) throw new Error(j.erro || "o servidor respondeu " + r.status);
+        return { feedbacks: j.feedbacks || [], semanal: j.semanal || [], existe: j.existe || {} };
       },
       /** Revisão de Progresso: a resposta 360° vai para o servidor (api/revisao360.js), que grava pelo webhook, sem
           ligar a quem respondeu. O navegador nunca grava na tabela das respostas. */

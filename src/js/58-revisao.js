@@ -82,6 +82,8 @@
   /* ================================================================ ciclo e regras */
   const REGRAS_PADRAO = {
     publico: "todos", areas: [], excluidos: [], excecoes: "",
+    // ciclo de teste (18/11/2026): só as pessoas escolhidas (IDs do Membros) participam, avisam e entram na 360°
+    pessoas: [], teste: false,
     liberarLideranca: true, liberarPares: true, minimoNotas: 3, minimoComentarios: 5,
     abaixoMinimo: "juntar_area", retornoLidPequeno: "diagnostico_area", retornoTopo: "consultoria",
     conferencias: { lista: false, matriz: false, anonimato: false },
@@ -91,12 +93,27 @@
     r.minimoNotas = Number(r.minimoNotas) || 3;
     r.minimoComentarios = Number(r.minimoComentarios) || 5;
     r.conferencias = Object.assign({}, REGRAS_PADRAO.conferencias, r.conferencias || {});
+    r.pessoas = (r.pessoas || []).map(String);
+    r.teste = !!r.teste || r.publico === "pessoas";
+    if (r.teste) { r.minimoNotas = Number(lerJSON(ciclo && ciclo.regras).minimoNotas) || 1; r.minimoComentarios = Number(lerJSON(ciclo && ciclo.regras).minimoComentarios) || 1; }
     return r;
   }
-  /** O RH só abre com a lista conferida, as matrizes conferidas e, com a 360° liberada, a demonstração do anonimato */
+  /** Ciclo de teste: só as pessoas escolhidas pelo RH, sem as conferências e com mínimo 1 nos relatórios */
+  const ehTeste = (ciclo) => !!(ciclo && regrasDo(ciclo).teste);
+  /** Os usuários do Bitrix que estão no ciclo de teste (null = ciclo normal, sem filtro) */
+  function usuariosDoTeste(ctx, ciclo) {
+    if (!ehTeste(ciclo)) return null;
+    const ids = regrasDo(ciclo).pessoas;
+    const set = {};
+    reg(ctx, "membros").forEach((m) => { if (ids.indexOf(String(m.id)) >= 0 && m.responsavel) set[String(m.responsavel)] = true; });
+    return set;
+  }
+  /** O RH só abre com a lista conferida, as matrizes conferidas e, com a 360° liberada, a demonstração do anonimato.
+      O ciclo de teste não pede as conferências: é ele que serve para conferir. */
   function podeAbrir(regras) {
     const r = regras || REGRAS_PADRAO, cf = r.conferencias || {};
     const faltam = [];
+    if (r.teste || r.publico === "pessoas") return { ok: true, faltam };
     if (!cf.lista) faltam.push("conferir a liderança direta de cada membro");
     if (!cf.matriz) faltam.push("conferir as matrizes dos cargos participantes");
     if ((r.liberarLideranca || r.liberarPares) && !cf.anonimato) faltam.push("a demonstração técnica do anonimato pela TI");
@@ -129,6 +146,7 @@
   function participa(ctx, ciclo, m) {
     if (!m || ["SUCCESS", "FAIL", "EM_ENCERRAMENTO"].indexOf(m.estagio) >= 0) return { ok: false, motivo: "fora do app ou em encerramento" };
     const r = regrasDo(ciclo);
+    if (r.publico === "pessoas" && r.pessoas.indexOf(String(m.id)) < 0) return { ok: false, motivo: "fora do ciclo de teste" };
     if ((r.excluidos || []).map(String).indexOf(String(m.id)) >= 0) return { ok: false, motivo: "exceção definida pelo RH neste ciclo" };
     if (r.publico === "sem_estagio" && ehEstagio(m)) return { ok: false, motivo: "estágios fora deste ciclo" };
     if (r.publico === "selecionar") {
@@ -265,12 +283,14 @@
   /* ================================================================ 360°: quem avalia quem (pela estrutura do Bitrix) */
   /** Quem entra na 360°: pessoas da estrutura, sem a CEO e sem quem está fora do app (Papéis), e sem quem saiu,
       foi arquivado ou está em encerramento no Membros */
-  function ativos(ctx) {
+  function ativos(ctx, ciclo) {
     const pc = (ctx.config && ctx.config.papeis) || {};
+    const doTeste = usuariosDoTeste(ctx, ciclo);
     const fora = {};
     (pc.ceo || []).concat(pc.excecoes || []).forEach((p) => { fora[String(p.id)] = true; });
     return (ctx.usuarios || []).filter((u) => {
       if (fora[String(u.id)] || !(u.departamentos || []).length || (u.tipo && u.tipo !== "employee")) return false;
+      if (doTeste && !doTeste[String(u.id)]) return false;
       const m = ctx.idx.membroPorUsuario[String(u.id)];
       return !m || ["SUCCESS", "FAIL", "EM_ENCERRAMENTO"].indexOf(m.estagio) < 0;
     });
@@ -284,38 +304,42 @@
     return String(dom.liderancaNaEstrutura(ctx.idx.depto, String(uid), u.departamentos).id || "");
   }
   const ehSupervisao = (ctx, uid) => /supervis/i.test(String(dom.pessoa(ctx, uid).cargo || ""));
-  const naEstrutura = (ctx, uid) => ativos(ctx).some((u) => String(u.id) === String(uid));
-  /** Superiores: o imediato e, quando ele é uma supervisão, quem está acima dela */
-  function superioresDe(ctx, uid) {
+  /** No ciclo de teste, quem não está nele não responde a 360° de ninguém */
+  const foraDoTeste = (ctx, ciclo, uid) => { const t = usuariosDoTeste(ctx, ciclo); return !!t && !t[String(uid)]; };
+  const naEstrutura = (ctx, uid, ciclo) => ativos(ctx, ciclo).some((u) => String(u.id) === String(uid));
+  /** Superiores: o imediato e, quando ele é uma supervisão, quem está acima dela (no ciclo de teste, só quem está no teste) */
+  function superioresDe(ctx, uid, ciclo) {
     const lista = [];
+    if (foraDoTeste(ctx, ciclo, uid)) return lista;
     const imediato = liderDe(ctx, uid);
-    if (!imediato || !naEstrutura(ctx, imediato)) return lista;
+    if (!imediato || !naEstrutura(ctx, imediato, ciclo)) return lista;
     lista.push({ uid: imediato, relacao: "Superior", papel: "superior imediato" });
     if (ehSupervisao(ctx, imediato)) {
       const acima = liderDe(ctx, imediato);
-      if (acima && acima !== String(uid) && naEstrutura(ctx, acima)) lista.push({ uid: acima, relacao: "Superior", papel: "superior da sua supervisão" });
+      if (acima && acima !== String(uid) && naEstrutura(ctx, acima, ciclo)) lista.push({ uid: acima, relacao: "Superior", papel: "superior da sua supervisão" });
     }
     return lista;
   }
   /** Pares: quem tem a mesma liderança direta (inclusive lideranças com o mesmo superior) */
-  function paresDe(ctx, uid) {
+  function paresDe(ctx, uid, ciclo) {
+    if (foraDoTeste(ctx, ciclo, uid)) return [];
     const lider = liderDe(ctx, uid);
     if (!lider) return [];
-    return ativos(ctx).filter((u) => String(u.id) !== String(uid) && String(u.id) !== lider && liderDe(ctx, u.id) === lider)
+    return ativos(ctx, ciclo).filter((u) => String(u.id) !== String(uid) && String(u.id) !== lider && liderDe(ctx, u.id) === lider)
       .map((u) => ({ uid: String(u.id), relacao: "Par", papel: "par" }));
   }
   /** Liderados diretos (aparecem com o link para a Revisão formal, sem formulário duplicado) */
-  function lideradosDe(ctx, uid) { return ativos(ctx).filter((u) => String(u.id) !== String(uid) && liderDe(ctx, u.id) === String(uid)).map((u) => String(u.id)); }
+  function lideradosDe(ctx, uid, ciclo) { return ativos(ctx, ciclo).filter((u) => String(u.id) !== String(uid) && liderDe(ctx, u.id) === String(uid)).map((u) => String(u.id)); }
   /** Quantas pessoas podem avaliar alguém nesta relação: abaixo do mínimo, o grupo é pequeno (resposta só usada junto da área) */
-  function avaliadoresPossiveis(ctx, avaliado, relacao) {
-    if (relacao === "Par") return paresDe(ctx, avaliado).length;
-    return ativos(ctx).filter((u) => superioresDe(ctx, u.id).some((s) => s.uid === String(avaliado))).length;
+  function avaliadoresPossiveis(ctx, avaliado, relacao, ciclo) {
+    if (relacao === "Par") return paresDe(ctx, avaliado, ciclo).length;
+    return ativos(ctx, ciclo).filter((u) => superioresDe(ctx, u.id, ciclo).some((s) => s.uid === String(avaliado))).length;
   }
-  function grupoPequeno(ctx, avaliado, relacao, regras) { return avaliadoresPossiveis(ctx, avaliado, relacao) < (Number(regras && regras.minimoNotas) || 3); }
+  function grupoPequeno(ctx, avaliado, relacao, regras, ciclo) { return avaliadoresPossiveis(ctx, avaliado, relacao, ciclo) < (Number(regras && regras.minimoNotas) || 3); }
   /** A relação de quem responde com o avaliado, ou "" se não há (o servidor recusa) */
-  function relacaoCom(ctx, uid, avaliado) {
-    if (superioresDe(ctx, uid).some((s) => s.uid === String(avaliado))) return "Superior";
-    if (paresDe(ctx, uid).some((s) => s.uid === String(avaliado))) return "Par";
+  function relacaoCom(ctx, uid, avaliado, ciclo) {
+    if (superioresDe(ctx, uid, ciclo).some((s) => s.uid === String(avaliado))) return "Superior";
+    if (paresDe(ctx, uid, ciclo).some((s) => s.uid === String(avaliado))) return "Par";
     return "";
   }
   /** Confere uma resposta 360° antes de gravar: as chaves certas, valores da escala e textos de tamanho razoável */
@@ -393,6 +417,9 @@
   /* ================================================================ quem participa e o que cada um enxerga */
   /** Os liderados diretos desta pessoa que participam do ciclo (sem ciclo: os que têm cargo na matriz, para o rascunho) */
   function equipeNoCiclo(ctx, uid, ciclo) {
+    // no ciclo de teste, só avalia quem também está no teste (a CEO, fora dele, não recebe nada)
+    const doTeste = usuariosDoTeste(ctx, ciclo);
+    if (doTeste && !doTeste[String(uid)]) return [];
     return dom.equipeDe(ctx, uid).filter((m) => (ciclo ? participa(ctx, ciclo, m).ok : !!cargoDo(m) && ["SUCCESS", "FAIL", "EM_ENCERRAMENTO"].indexOf(m.estagio) < 0));
   }
   /** Todos os membros do app com a situação no ciclo: {m, ok, motivo}. Para o RH conferir a lista antes de abrir. */
@@ -449,7 +476,7 @@
 
   return {
     NIVEIS_KPI, NIVEIS_COMP, ACORDO, NAO_SEI, AUTO, SOBRE_LIDERANCA, SOBRE_PAR, CICLOS, ETAPAS, MAX_EXTRAS, REGRAS_PADRAO, CODIGOS, PONTOS,
-    rotuloNivel, lerJSON, regrasDo, podeAbrir, cicloAberto, cicloRascunho, ultimoCiclo,
+    rotuloNivel, lerJSON, regrasDo, podeAbrir, cicloAberto, cicloRascunho, ultimoCiclo, ehTeste, usuariosDoTeste,
     nomeCargo, rotuloCargo, cargoDo, matrizDo, participa, areaDe, areas,
     avaliacaoDo, autoavaliacaoDe, retornoDe, faltando, situacaoMinimo, ajustes, situacaoDo,
     equipeNoCiclo, participantes, euParticipo, avaliacaoEnviada,

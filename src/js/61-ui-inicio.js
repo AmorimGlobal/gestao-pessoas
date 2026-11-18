@@ -429,6 +429,58 @@
   };
 
   /* ================================================================ PERFIL */
+  /** Os feedbacks e o alinhamento semanal da própria pessoa (pedido do usuário, 18/11/2026). Vêm do servidor
+      (api/membro.js, o: "perfil"), porque a função "Membros" do CRM não lê essas tabelas; o servidor devolve só os itens
+      em que a pessoa da sessão é a responsável. Em "Ver como", vêm do que o login do RH ou do administrador já leu. */
+  function dadosDoPerfil() {
+    const st = E(), ctx = st.ctx, uid = String(st.eu.id);
+    if (st.verComo) {
+      const meu = (x) => String(x.responsavel) === uid && x.estagio !== "FAIL";
+      const desc = (k) => (a, b) => (String(a[k] || "") < String(b[k] || "") ? 1 : -1);
+      const tem = (chave) => !(ctx.recursos && ctx.recursos[chave] === false);
+      return { uid, carregando: false, erro: "", dados: { existe: { feedbacks: tem("feedbacks"), semanal: tem("semanal") },
+        feedbacks: (ctx.registros.feedbacks || []).filter(meu).sort(desc("data")), semanal: (ctx.registros.semanal || []).filter(meu).sort(desc("semana")) } };
+    }
+    if (!st.meuPerfil || st.meuPerfil.uid !== uid) {
+      const p = st.meuPerfil = { uid, carregando: true, erro: "", dados: null };
+      if (!st.repo || !st.repo.meuPerfil) { p.carregando = false; p.erro = "indisponível nesta versão"; return p; }
+      st.repo.meuPerfil().then((d) => { p.dados = d; p.carregando = false; if (st.meuPerfil === p) ui.render(); },
+        (e) => { p.carregando = false; p.erro = (st.repo.mensagemErro ? st.repo.mensagemErro(e) : "") || (e && (e.message || e.descricao)) || String(e); if (st.meuPerfil === p) ui.render(); });
+    }
+    return st.meuPerfil;
+  }
+  function meusRegistrosHtml(p) {
+    const ctx = E().ctx, S = GP.semanal;
+    if (p.carregando) return '<div class="card"><h3>Meus feedbacks</h3><p class="muted" style="margin:0">Carregando…</p></div>';
+    if (p.erro) return '<div class="card"><h3>Meus feedbacks e alinhamento semanal</h3><div class="aviso-atencao">Não deu para carregar: ' + esc(p.erro) + "</div>" +
+      '<button class="btn sec peq" style="margin-top:10px" data-acao="perfil-recarregar">Tentar de novo</button></div>';
+    const d = p.dados || {}, existe = d.existe || {};
+    let h = "";
+    if (existe.feedbacks !== false) {
+      const lista = d.feedbacks || [];
+      const item = (f) => '<div class="perfil-feedback"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--navy)">Feedback de ' + esc(String(f.tipo || "").toLowerCase()) + "</b>" +
+        '<span class="muted">' + esc(calc.fmtDataAno(f.data)) + (f.autor ? " · por " + esc(dom.pessoa(ctx, f.autor).nome) : "") + "</span>" + (f.retroativo ? c.tag("Registro retroativo", "cinza") : "") + "</div>" +
+        '<div class="sci">' + c.textoRegistro("Situação", f.situacao) + c.textoRegistro("Comportamento", f.comportamento) + c.textoRegistro("Impacto", f.impacto) + c.textoRegistro("Combinados", f.combinados) +
+        (f.adendos ? '<div><div class="k">Adendos</div><div class="adendo">' + esc(f.adendos) + "</div></div>" : "") + "</div></div>";
+      h += '<div class="card"><h3>Meus feedbacks<span class="extra muted">' + esc(lista.length ? plural(lista.length, "registrado", "registrados") + " pela liderança" : "registrados pela liderança") + "</span></h3>" +
+        (lista.length ? lista.map(item).join("") : c.vazio("Nenhum feedback registrado para você ainda.")) + "</div>";
+    }
+    if (existe.semanal !== false && S) {
+      const lista = d.semanal || [];
+      const semana = (s, i) => {
+        const qs = S.lerRespostas(s.respostas);
+        return '<details class="semanal-equipe"' + (i === 0 ? " open" : "") + '><summary><div class="principal-item"><div class="t">Semana de ' + esc(S.rotuloSemana(s.semana)) + '</div><div class="d">' +
+          esc(plural(qs.length, "pergunta respondida", "perguntas respondidas")) + (s.papel === "Liderança" ? " · respondeu como liderança" : "") + "</div></div>" +
+          '<span class="abre"><span class="fechado">Ver respostas</span><span class="aberto">Fechar</span></span></summary><div class="respostas">' +
+          qs.map((q) => '<div class="resposta-semanal"><div class="k">' + esc(q.titulo || q.pergunta) + "</div>" + (q.titulo ? '<div class="muted pergunta">' + esc(q.pergunta) + "</div>" : "") +
+            '<div class="texto-registro">' + esc(q.resposta) + "</div></div>").join("") + "</div></details>";
+      };
+      h += '<div class="card"><h3>Meu alinhamento semanal pelo WhatsApp<span class="extra muted">as suas respostas, semana a semana</span></h3>' +
+        (lista.length ? lista.map(semana).join("") : c.vazio("Nenhuma resposta guardada ainda. As respostas do WhatsApp aparecem aqui no dia seguinte.")) + "</div>";
+    }
+    return h;
+  }
+  ui.acoes["perfil-recarregar"] = function () { E().meuPerfil = null; ui.render(); };
   ui.rotas.perfil = function () {
     const ctx = E().ctx, eu = E().eu;
     const p = dom.papeis(ctx, eu.id);
@@ -442,6 +494,7 @@
       // o aniversário fica no perfil do Bitrix; a agenda e o day off de aniversário usam o dia e o mês
       '<div class="card"><h3>Meu aniversário</h3><div>' + (aniv ? "<b>" + calc.fmtData("2000-" + aniv) + "</b> · aparece só o dia e o mês" : '<span class="muted">Não cadastrado no seu perfil do Bitrix.</span>') + "</div>" +
       (E().verComo ? "" : '<button class="btn sec peq" style="margin-top:10px" data-acao="meu-aniversario">' + (aniv ? "Atualizar" : "Cadastrar") + "</button>") + "</div>" +
+      meusRegistrosHtml(dadosDoPerfil()) +
       (membro ? "" : '<div class="card"><h3>' + icone("amora", 16) + " Perfil da liderança para a Amora</h3>" +
       '<p class="muted">O formulário de cerca de 3 minutos (trajetória, contexto da equipe, desafios e preferências) entra quando o RH liberar o assistente de IA (especificação 4.7). Só você e o RH verão o perfil, e ele nunca serve para avaliar.</p>' +
       "<p class=\"muted\">Hoje, as dicas da semana do Painel são as dicas-modelo da primeira fase: usam só datas, tipos e situações da sua equipe.</p></div>");

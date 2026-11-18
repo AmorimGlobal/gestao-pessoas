@@ -618,7 +618,19 @@
         return D.resumoPainel(D.painelGeral(ctx));
       },
       statusServidor: async () => null, // fora do Bitrix não há servidor para conferir
-      /** Férias: as datas reservadas pela equipe, sem nomes (o mesmo que api/ferias-equipe.js devolve) */
+      /** Perfil: os feedbacks SCI e o alinhamento semanal da própria pessoa (o mesmo que api/membro.js devolve com o: "perfil") */
+      meuPerfil: async function () {
+        await atraso();
+        const meu = (x) => String(x.responsavel) === String(euId) && x.estagio !== "FAIL";
+        const desc = (k) => (a, b) => (String(a[k] || "") < String(b[k] || "") ? 1 : -1);
+        return {
+          existe: { feedbacks: true, semanal: true },
+          feedbacks: (d.registros.feedbacks || []).filter(meu).sort(desc("data")).map((f) => ({ id: f.id, data: f.data, tipo: f.tipo, situacao: f.situacao, comportamento: f.comportamento,
+            impacto: f.impacto, combinados: f.combinados || "", adendos: f.adendos || "", autor: String(f.autor || f.criadoPor || ""), retroativo: !!f.retroativo, estagio: f.estagio })),
+          semanal: (d.registros.semanal || []).filter(meu).sort(desc("semana")).map((s) => ({ id: s.id, semana: s.semana, papel: s.papel || "", respostas: s.respostas || "", respondidas: Number(s.respondidas) || 0 })),
+        };
+      },
+      /** Férias: as datas reservadas pela equipe, sem nomes (o mesmo que api/membro.js devolve) */
       reservasEquipe: async function () {
         await atraso();
         const D = (typeof window !== "undefined" && window.GP && window.GP.dominio) || require("./50-dominio.js");
@@ -634,7 +646,7 @@
         const ctx = D.indexar({ hoje, eu: { id: euId }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros });
         const ciclo = (d.registros.revCiclos || []).find((x) => x.id === String(dados.cicloId));
         if (!ciclo || ciclo.estagio !== "ABERTO") throw { descricao: "este ciclo da Revisão de Progresso não está aberto" };
-        const relacao = RV.relacaoCom(ctx, euId, String(dados.avaliado));
+        const relacao = RV.relacaoCom(ctx, euId, String(dados.avaliado), ciclo);
         if (!relacao) throw { descricao: "pela estrutura, você não avalia esta pessoa na 360°" };
         const regras = RV.regrasDo(ciclo);
         if ((relacao === "Superior" && !regras.liberarLideranca) || (relacao === "Par" && !regras.liberarPares)) throw { descricao: "esta parte da 360° não foi liberada neste ciclo" };

@@ -114,7 +114,7 @@
     const prazos = [ci.prazoAuto, ci.prazoLideranca, ci.prazoCalibracao, ci.prazoDevolutiva, ci.prazoRetornos];
     const feito = (i) => ci.estagio === "SUCCESS" || (prazos[i] && prazos[i] < hoje);
     const atual = ci.estagio === "ABERTO" ? R.ETAPAS.findIndex((_, i) => !feito(i)) : -1;
-    return '<div class="card"><h3>' + esc(ci.ciclo || "Ciclo") + '<span class="extra">' + c.tag(ci.estagioNome || ci.estagio, ci.estagio === "ABERTO" ? "verde" : ci.estagio === "NEW" ? "ambar" : "cinza") + "</span></h3>" +
+    return '<div class="card"><h3>' + esc(ci.ciclo || "Ciclo") + '<span class="extra">' + (R.ehTeste(ci) ? c.tag("Teste", "roxo") + " " : "") + c.tag(ci.estagioNome || ci.estagio, ci.estagio === "ABERTO" ? "verde" : ci.estagio === "NEW" ? "ambar" : "cinza") + "</span></h3>" +
       '<div class="passos">' + R.ETAPAS.map((t, i) => '<span class="p ' + (i === atual ? "atual" : feito(i) ? "feito" : "") + '">' + esc(t) + (prazos[i] ? " · até " + calc.fmtData(prazos[i]) : "") + "</span>").join("") + "</div>" +
       c.dados([["Período avaliado", fmt(ci.periodoInicio) + " a " + fmt(ci.periodoFim)], ["Abertura", fmt(ci.dataAbertura)]]) +
       (ci.mensagem && E().visao !== "membro" ? '<div class="sci" style="margin-top:12px">' + c.textoRegistro("Mensagem do RH para as lideranças", ci.mensagem) + "</div>" : "") + "</div>";
@@ -170,6 +170,9 @@
   function minhaParteHtml(ciclo, ultimo) {
     const ctx = X(), id = String(eu().id);
     const linhas = [];
+    // ciclo de teste do qual a pessoa não faz parte: nada a fazer, só o aviso
+    const doTeste = R.usuariosDoTeste(ctx, ciclo);
+    if (doTeste && !doTeste[id]) return cartao("Ciclo de teste", '<p class="muted" style="margin:0">O RH está testando a Revisão de Progresso com algumas pessoas. Você não participa deste teste; o ciclo de verdade abre depois.</p>');
     if (ciclo) {
       const part = minhaParticipacao(ciclo);
       if (part.ok) {
@@ -179,7 +182,7 @@
       } else linhas.push(["", "Minha autoavaliação", "Você não participa deste ciclo: " + part.motivo + ".", c.tag("Fora do ciclo", "cinza")]);
       const regras = R.regrasDo(ciclo);
       if (regras.liberarLideranca || regras.liberarPares) {
-        const alvo = (regras.liberarLideranca ? R.superioresDe(ctx, id) : []).concat(regras.liberarPares ? R.paresDe(ctx, id) : []);
+        const alvo = (regras.liberarLideranca ? R.superioresDe(ctx, id, ciclo) : []).concat(regras.liberarPares ? R.paresDe(ctx, id, ciclo) : []);
         const ctrl = controle360(ciclo);
         const feitos = alvo.filter((x) => ctrl.e.indexOf(x.uid) >= 0 || ctrl.p.indexOf(x.uid) >= 0).length;
         linhas.push(["#/revisao/360", "Avaliação 360°", alvo.length ? "Seus superiores e pares · " + feitos + " de " + alvo.length + " respondidas ou puladas" : "Ninguém para você avaliar pela estrutura do Bitrix",
@@ -357,7 +360,7 @@
       ret.devolutivaEm ? "conversa em " + fmt(ret.devolutivaEm) + " · " + (ret.cienciaEm ? "ciência em " + fmt(ret.cienciaEm) : "aguardando a ciência") : "");
   }
   function retornoRHHtml(m, ret) {
-    const lidera = R.lideradosDe(X(), m.responsavel).length > 0;
+    const lidera = R.lideradosDe(X(), m.responsavel, R.cicloAberto(X()) || R.ultimoCiclo(X())).length > 0;
     return cartao("Retornos do RH", '<p class="muted" style="margin-top:0">Pares: resumo escrito com 2 ou 3 pontos fortes e 2 ou 3 de desenvolvimento, em temas, sem nomes e sem trechos literais. ' +
       (lidera ? "Liderados: conversa de cerca de 30 minutos, depois que a liderança concluir as devolutivas da equipe." : "") + "</p>" +
       c.dados([["Retorno dos pares", ret && ret.retornoParesEm ? "enviado em " + fmt(ret.retornoParesEm) : "não enviado"]].concat(lidera ? [["Conversa sobre os liderados", ret && ret.retornoLideradosEm ? fmt(ret.retornoLideradosEm) : "não registrada"]] : [])) +
@@ -557,7 +560,7 @@
     const ciclo = R.cicloAberto(ctx);
     if (!m || !ciclo || !ehRH()) return;
     const ret = R.retornoDe(ctx, m.responsavel, ciclo) || {};
-    const lidera = R.lideradosDe(ctx, m.responsavel).length > 0;
+    const lidera = R.lideradosDe(ctx, m.responsavel, ciclo).length > 0;
     ui.abrirPainel({
       titulo: "Retornos do RH · " + nomeDe(m.responsavel), sub: "Em temas, sem nomes e sem trechos literais. Só com respostas suficientes para proteger quem respondeu.",
       corpo: '<div id="form-retorno-rh">' + c.campo({ nome: "retornoPares", rotulo: "Retorno sobre os pares (2 ou 3 pontos fortes e 2 ou 3 de desenvolvimento)", tipo: "textoLongo", linhas: 7, valor: ret.retornoPares, opcional: true,
@@ -721,20 +724,20 @@
     const linha = (x) => {
       const u = dom.pessoa(ctx, x.uid);
       const feito = ctrl.e.indexOf(x.uid) >= 0;
-      const pequeno = R.grupoPequeno(ctx, x.uid, x.relacao, regras);
+      const pequeno = R.grupoPequeno(ctx, x.uid, x.relacao, regras, ciclo);
       return '<div class="item' + (feito ? "" : " clicavel") + '"' + (feito ? "" : ' data-acao="rev-360" data-uid="' + esc(x.uid) + '"') + ">" + c.avatar(u, 30) + '<div class="principal-item"><div class="t">' + esc(u.nome) +
         '</div><div class="d">' + esc([u.cargo, x.papel].filter(Boolean).join(" · ")) + '</div></div><div class="lado">' + (pequeno ? c.tag("grupo pequeno", "cinza") : "") + status(x.uid) + "</div></div>";
     };
     h += '<div class="aviso-info" style="margin-bottom:16px">Você avalia seus superiores, seus pares e, se liderar alguém, seus liderados diretos (pela Revisão formal). Só o RH lê: a pessoa avaliada não recebe o que você escreveu. Depois do ciclo, o RH leva a ela temas resumidos, sem identificar ninguém e sem trechos literais.</div>';
     if (regras.liberarLideranca) {
-      const sup = R.superioresDe(ctx, id);
+      const sup = R.superioresDe(ctx, id, ciclo);
       h += cartao("Seus superiores", sup.length ? '<div class="lista">' + sup.map(linha).join("") + "</div>" : c.vazio("Pela estrutura do Bitrix, você não tem superior para avaliar."), "o imediato e, quando houver supervisão, quem está acima dela");
     }
     if (regras.liberarPares) {
-      const pares = R.paresDe(ctx, id);
+      const pares = R.paresDe(ctx, id, ciclo);
       h += cartao("Seus pares", pares.length ? '<div class="lista">' + pares.map(linha).join("") + "</div>" : c.vazio("Pela estrutura do Bitrix, ninguém tem a mesma liderança direta que você."), "mesma liderança direta · avalie só quem você acompanha de perto");
     }
-    const lid = R.lideradosDe(ctx, id);
+    const lid = R.lideradosDe(ctx, id, ciclo);
     if (lid.length) h += cartao("Seus liderados diretos", '<div class="lista">' + lid.map((uid) => { const m = ctx.idx.membroPorUsuario[uid]; const u = dom.pessoa(ctx, uid);
       return '<div class="item' + (m ? " clicavel" : "") + '"' + (m ? ' data-rota="#/revisao/membro/' + esc(m.id) + '"' : "") + ">" + c.avatar(u, 30) + '<div class="principal-item"><div class="t">' + esc(u.nome) + '</div><div class="d">liderado direto · pela Revisão formal</div></div></div>'; }).join("") + "</div>",
       "a avaliação dos liderados é a Revisão de Progresso formal");
@@ -743,14 +746,14 @@
   ui.acoes["rev-360"] = function (el) {
     const ctx = X(), ciclo = R.cicloAberto(ctx), uid = el.dataset.uid;
     if (!ciclo || E().verComo) return;
-    const relacao = R.relacaoCom(ctx, eu().id, uid);
+    const relacao = R.relacaoCom(ctx, eu().id, uid, ciclo);
     if (!relacao) return;
     const regras = R.regrasDo(ciclo);
-    const pequeno = R.grupoPequeno(ctx, uid, relacao, regras);
+    const pequeno = R.grupoPequeno(ctx, uid, relacao, regras, ciclo);
     const v = lerRasc(ciclo, uid);
     const pre = relacao === "Superior" ? "lid_" : "par_";
     const itens = relacao === "Superior" ? R.SOBRE_LIDERANCA.map((t) => ["", t]) : R.SOBRE_PAR;
-    const papel = (R.superioresDe(ctx, eu().id).concat(R.paresDe(ctx, eu().id)).find((x) => x.uid === uid) || {}).papel || "";
+    const papel = (R.superioresDe(ctx, eu().id, ciclo).concat(R.paresDe(ctx, eu().id, ciclo)).find((x) => x.uid === uid) || {}).papel || "";
     const u = dom.pessoa(ctx, uid);
     const modos = [["Anônima", "Seu nome não fica gravado com as respostas. O RH lê o conteúdo, mas não sabe quem escreveu e não consegue te procurar para entender melhor."],
       ["Identificada", "Seu nome vai junto, visível só para o RH. O RH pode te procurar para entender um ponto. A pessoa avaliada não recebe esta avaliação."]];
@@ -830,7 +833,7 @@
     h += cartao("2 · Do RH, sobre seus pares", ret && ret.retornoPares ? '<div class="texto-registro">' + esc(ret.retornoPares) + '</div><p class="muted" style="font-size:12px;margin-bottom:0">Resumo em temas, sem nomes e sem trechos literais. Se quiser, peça uma conversa com o RH.</p>'
       : '<p class="muted" style="margin:0">Resumo em temas do que seus pares disseram, sem nomes e sem trechos literais. Só existe se houver respostas suficientes para proteger quem respondeu. Se quiser, peça uma conversa com o RH.</p>', ret && ret.retornoParesEm ? fmt(ret.retornoParesEm) : "");
     // 3. do RH sobre os liderados (só quem lidera)
-    if (R.lideradosDe(ctx, id).length) h += cartao("3 · Do RH, sobre seus liderados", ret && ret.retornoLideradosEm ? '<p style="margin:0">Conversa com o RH em <b>' + fmt(ret.retornoLideradosEm) + "</b>. Os temas alimentam o seu PDI.</p>"
+    if (R.lideradosDe(ctx, id, ciclo).length) h += cartao("3 · Do RH, sobre seus liderados", ret && ret.retornoLideradosEm ? '<p style="margin:0">Conversa com o RH em <b>' + fmt(ret.retornoLideradosEm) + "</b>. Os temas alimentam o seu PDI.</p>"
       : '<p class="muted" style="margin:0">Conversa com o RH depois que você concluir as devolutivas da sua equipe. Se você tiver menos liderados que o mínimo, o resultado entra só no diagnóstico da área.</p>');
     return h;
   }
@@ -892,9 +895,11 @@
 
   /* ================================================================ RH: ABERTURA E ENCERRAMENTO DO CICLO */
   function regrasHtml(r) {
-    const op = { todos: "Todos os membros ativos", sem_estagio: "Todos, exceto estágios", selecionar: "Áreas selecionadas" };
+    const op = { todos: "Todos os membros ativos", sem_estagio: "Todos, exceto estágios", selecionar: "Áreas selecionadas", pessoas: "Ciclo de teste" };
     const areas = R.areas(X());
-    return cartao("Regras do ciclo", c.dados([["Público", op[r.publico] + (r.publico === "selecionar" ? ": " + areas.filter((a) => r.areas.indexOf(a.id) >= 0).map((a) => a.nome).join(", ") : "")],
+    const pessoasTeste = r.pessoas.map((id) => X().idx.membro[id]).filter(Boolean).map((m) => nomeDe(m.responsavel));
+    return cartao("Regras do ciclo", c.dados([["Público", op[r.publico] + (r.publico === "selecionar" ? ": " + areas.filter((a) => r.areas.indexOf(a.id) >= 0).map((a) => a.nome).join(", ") : "") +
+        (r.publico === "pessoas" ? ": " + pessoasTeste.join(", ") : "")],
       ["Membros fora deste ciclo", r.excluidos.length ? String(r.excluidos.length) : "nenhum"], ["360° de superiores", r.liberarLideranca ? "liberada" : "fechada"], ["360° de pares", r.liberarPares ? "liberada" : "fechada"],
       ["Mínimo para notas", String(r.minimoNotas)], ["Mínimo para comentários", String(r.minimoComentarios)], ["Abaixo do mínimo", r.abaixoMinimo === "nao_usar" ? "não usar neste ciclo" : "juntar com a área"],
       ["Liderança com poucos liderados", r.retornoLidPequeno === "nao_usar" ? "não usar neste ciclo" : "sem retorno individual · diagnóstico da área"],
@@ -907,11 +912,15 @@
     if (!ehRH()) return h + '<div class="card">' + c.vazio("Só o RH abre e encerra os ciclos.") + "</div>";
     const aberto = R.cicloAberto(ctx), rasc = R.cicloRascunho(ctx);
     const ci = aberto || rasc;
-    const acoes = aberto ? '<button class="btn sec" data-acao="rev-ciclo-form" data-id="' + esc(aberto.id) + '">Editar prazos e regras</button><button class="btn link" data-acao="rev-encerrar" data-id="' + esc(aberto.id) + '">Encerrar o ciclo</button>'
+    const acoes = aberto ? '<button class="btn sec" data-acao="rev-ciclo-form" data-id="' + esc(aberto.id) + '">Editar prazos e regras</button>' +
+        (R.ehTeste(aberto) ? '<button class="btn link" data-acao="rev-teste-descartar" data-id="' + esc(aberto.id) + '">Encerrar e apagar o teste</button>'
+          : '<button class="btn link" data-acao="rev-encerrar" data-id="' + esc(aberto.id) + '">Encerrar o ciclo</button>')
       : '<button class="btn" data-acao="rev-ciclo-form"' + (rasc ? ' data-id="' + esc(rasc.id) + '"' : "") + ">" + (rasc ? "Continuar a abertura" : "Preparar a abertura") + "</button>" +
+        '<button class="btn sec" data-acao="rev-teste-form">Abrir um ciclo de teste</button>' +
         (rasc ? '<button class="btn link" data-acao="rev-descartar-ciclo" data-id="' + esc(rasc.id) + '">Descartar o rascunho</button>' : "");
     h += c.cabecalho("desempenho", "Abertura do ciclo", aberto ? "<span>" + c.tag("Ciclo aberto", "verde") + "</span>" : rasc ? "<span>" + c.tag("Rascunho", "ambar") + "</span>" : "<span>nenhum ciclo aberto · aberturas em junho e novembro</span>", semEstrutura() ? "" : acoes);
     if (semEstrutura()) return h + avisoSemEstrutura();
+    if (aberto && R.ehTeste(aberto)) h += '<div class="aviso-info" style="margin-bottom:16px"><b>Ciclo de teste.</b> Só as pessoas escolhidas participam, recebem avisos e entram na 360°. A liderança de fora do teste não avalia ninguém, e os relatórios usam mínimo de 1 resposta (no teste, a 360° não é anônima para o RH). Ao terminar, use <b>Encerrar e apagar o teste</b>: os registros do teste saem das telas e o ciclo de verdade pode ser aberto.</div>';
     if (ci) h += cicloHtml(ci) + regrasHtml(R.regrasDo(ci));
     else h += '<div class="aviso-info" style="margin-bottom:16px">Defina o ciclo e o período, os prazos de cada etapa, quem participa, as regras da 360° e dos retornos. Salve como rascunho quantas vezes precisar: o ciclo só abre depois das 3 conferências.</div>';
     // a lista para conferir a liderança direta de cada membro antes de abrir
@@ -949,7 +958,8 @@
           '<div class="linha-campos">' + prazo("prazoCalibracao", "Calibração até") + prazo("prazoDevolutiva", "Devolutivas das lideranças até") + "</div>" + prazo("prazoRetornos", "Retornos do RH até") +
           '<p class="muted rv-sub">O retorno dos liderados chega à liderança só depois que ela conclui as devolutivas da equipe, para não influenciar a conversa.</p>') +
         secao("3. Quem participa", "por padrão, todos os membros ativos com cargo na matriz", c.campo({ nome: "publico", rotulo: "Público", tipo: "escolha", valor: r.publico,
-          opcoes: [{ valor: "todos", rotulo: "Todos os membros ativos" }, { valor: "sem_estagio", rotulo: "Todos, exceto estágios" }, { valor: "selecionar", rotulo: "Selecionar áreas" }] }) +
+          opcoes: [{ valor: "todos", rotulo: "Todos os membros ativos" }, { valor: "sem_estagio", rotulo: "Todos, exceto estágios" }, { valor: "selecionar", rotulo: "Selecionar áreas" }]
+            .concat(r.publico === "pessoas" ? [{ valor: "pessoas", rotulo: "Ciclo de teste (as pessoas escolhidas)" }] : []) }) +
           '<div class="campo"><label>Áreas (só com "Selecionar áreas")</label><div class="escolhas">' + R.areas(ctx).map((a) => check("area_" + a.id, a.nome, r.areas.indexOf(a.id) >= 0)).join("") + "</div></div>" +
           '<div class="campo"><label>Membros fora deste ciclo</label><div class="ajuda">Marque quem não participa (licença, desligamento combinado, entrada recente). O motivo vai em Exceções.</div><div class="rv-caixa">' +
             membros.map((m) => check("excl_" + m.id, nomeDe(m.responsavel) + (R.cargoDo(m) ? "" : " (sem cargo na matriz)"), r.excluidos.map(String).indexOf(String(m.id)) >= 0)).join("") + "</div></div>" +
@@ -959,8 +969,8 @@
           check("liberarLideranca", "Liberar para cada membro avaliar os superiores (superior imediato e, quando houver supervisão, quem está acima dela).", r.liberarLideranca) +
           check("liberarPares", "Liberar para cada membro avaliar os pares (mesma liderança direta, inclusive entre lideranças).", r.liberarPares) +
           '<p class="muted rv-sub">Liderados diretos são avaliados pela Revisão formal, no app Gestão de Pessoas.</p>' +
-          '<div class="linha-campos">' + c.campo({ nome: "minimoNotas", rotulo: "Mínimo de respostas para usar notas em relatório", tipo: "lista", opcoes: ["3", "4", "5"], valor: String(r.minimoNotas) }) +
-          c.campo({ nome: "minimoComentarios", rotulo: "Mínimo de respostas para usar comentários", tipo: "lista", opcoes: ["5", "7", "10"], valor: String(r.minimoComentarios) }) + "</div>" +
+          '<div class="linha-campos">' + c.campo({ nome: "minimoNotas", rotulo: "Mínimo de respostas para usar notas em relatório", tipo: "lista", opcoes: (r.teste ? ["1"] : []).concat(["3", "4", "5"]), valor: String(r.minimoNotas) }) +
+          c.campo({ nome: "minimoComentarios", rotulo: "Mínimo de respostas para usar comentários", tipo: "lista", opcoes: (r.teste ? ["1"] : []).concat(["5", "7", "10"]), valor: String(r.minimoComentarios) }) + "</div>" +
           c.campo({ nome: "abaixoMinimo", rotulo: "Quando um grupo não atinge o mínimo", tipo: "escolha", valor: r.abaixoMinimo, opcoes: [{ valor: "juntar_area", rotulo: "Juntar com a área até atingir o mínimo" }, { valor: "nao_usar", rotulo: "Não usar o resultado neste ciclo" }] }) +
           '<div class="rv-regras"><b>Regras fixas de anonimato</b><ul><li>O RH nunca repassa trechos literais de comentários. Nos relatórios entram só temas resumidos.</li><li>Filtros não podem ser combinados se o grupo resultante ficar abaixo do mínimo (área + cidade + tempo de casa, por exemplo).</li>' +
           "<li>Resposta anônima é gravada sem autor. Nem o RH nem a TI conseguem identificar quem escreveu.</li><li>A pessoa avaliada nunca recebe a avaliação, nem individual nem em resumo. Abaixo do mínimo, o grupo segue a regra escolhida acima e nunca aparece sozinho em relatório.</li></ul></div>") +
@@ -976,8 +986,9 @@
         : '<button class="btn sec" data-acao="rev-salvar-ciclo"' + (ci ? ' data-id="' + esc(ci.id) + '"' : "") + '>Salvar rascunho</button><button class="btn" data-acao="rev-salvar-ciclo" data-abrir="1"' + (ci ? ' data-id="' + esc(ci.id) + '"' : "") + ">Abrir ciclo</button>",
     });
   };
-  function lerCiclo() {
+  function lerCiclo(ci) {
     const d = ui.lerForm(document.getElementById("form-ciclo"));
+    const antes = R.regrasDo(ci);
     const marcados = (pre) => Object.keys(d).filter((k) => k.indexOf(pre) === 0 && d[k] === true).map((k) => k.slice(pre.length));
     const regras = {
       publico: d.publico || "todos", areas: marcados("area_"), excluidos: marcados("excl_"), excecoes: String(d.excecoes || "").trim(),
@@ -985,6 +996,8 @@
       abaixoMinimo: d.abaixoMinimo || "juntar_area", retornoLidPequeno: d.retornoLidPequeno || "diagnostico_area", retornoTopo: d.retornoTopo || "consultoria",
       conferencias: { lista: !!d.ok_lista, matriz: !!d.ok_matriz, anonimato: !!d.ok_anonimato },
     };
+    // o ciclo de teste guarda quem participa; a tela de edição não mostra a lista
+    if (regras.publico === "pessoas") Object.assign(regras, { pessoas: antes.pessoas, teste: true });
     const dados = { ciclo: d.ciclo, regras: JSON.stringify(regras), mensagem: String(d.mensagem || "").trim() };
     ["periodoInicio", "periodoFim", "dataAbertura", "prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"].forEach((k) => { dados[k] = d[k] || ""; });
     return { dados, regras };
@@ -996,7 +1009,7 @@
     const ci = el.dataset.id ? ctx.idx.porId.revCiclos[el.dataset.id] : null;
     const abrir = el.dataset.abrir === "1";
     const jaAberto = ci && ci.estagio === "ABERTO";
-    const { dados, regras } = lerCiclo();
+    const { dados, regras } = lerCiclo(ci);
     if (!ui.validar(f, abrir || jaAberto ? ["ciclo", "periodoInicio", "periodoFim", "dataAbertura", "prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"] : ["ciclo"])) return;
     if (dados.periodoFim && dados.periodoInicio && dados.periodoFim < dados.periodoInicio) { erroNoRodape("O fim do período avaliado é antes do início."); return; }
     if (regras.publico === "selecionar" && !regras.areas.length) { erroNoRodape("Com \"Selecionar áreas\", marque pelo menos uma área."); return; }
@@ -1019,6 +1032,77 @@
         GP.app.avisar(Object.keys(ids), "O RH abriu a Revisão de Progresso (" + dados.ciclo + "). Autoavaliação até " + calc.fmtData(dados.prazoAuto) + "; avaliação das lideranças e 360° até " + calc.fmtData(dados.prazoLideranca) + ". Abra o app Gestão de Pessoas → Revisão de Progresso.");
       }
     }, { mensagem: abrir ? "Ciclo aberto. Lideranças e membros foram avisados." : jaAberto ? "Ciclo atualizado." : "Rascunho do ciclo salvo." });
+  };
+  /* ---------------- ciclo de teste (18/11/2026): só as pessoas escolhidas, para o RH e a TI testarem o fluxo inteiro ---------------- */
+  ui.acoes["rev-teste-form"] = function () {
+    if (!ehRH()) return;
+    const ctx = X(), hoje = ctx.hoje;
+    if (R.cicloAberto(ctx)) { window.alert("Já existe um ciclo aberto. Encerre-o antes de abrir um teste."); return; }
+    const membros = dom.membrosAtivos(ctx.registros.membros || []).filter((m) => m.estagio !== "EM_ENCERRAMENTO").sort((a, b) => nomeDe(a.responsavel).localeCompare(nomeDe(b.responsavel), "pt-BR"));
+    const cargos = R.CODIGOS.map((cod) => ({ valor: cod, rotulo: R.rotuloCargo(E().config, cod) }));
+    const linha = (m) => {
+      const cargo = R.cargoDo(m);
+      return '<div class="rv-teste-linha"><label class="escolha rv-check"><input type="checkbox" name="pt_' + esc(m.id) + '"><span>' + esc(nomeDe(m.responsavel)) +
+        ' <span class="muted">· liderança: ' + esc(nomeDe(dom.liderancaEfetiva(ctx, m))) + "</span></span></label>" +
+        (cargo ? '<span class="muted rv-teste-cargo">' + esc(nomeCargo(cargo)) + "</span>"
+          : '<select class="entrada rv-teste-cargo" name="cargo_' + esc(m.id) + '"><option value="">Cargo na matriz…</option>' + cargos.map((o) => '<option value="' + esc(o.valor) + '">' + esc(o.rotulo) + "</option>").join("") + "</select>") + "</div>";
+    };
+    const prazo = (nome, rot, dias) => c.campo({ nome, rotulo: rot, tipo: "data", valor: calc.addDias(hoje, dias) });
+    ui.abrirPainel({
+      titulo: "Abrir um ciclo de teste", largo: true, sub: "Revisão de Progresso · uso exclusivo do RH",
+      corpo: '<div id="form-teste" class="rv-form">' +
+        '<div class="aviso-info" style="margin-bottom:14px">O teste roda o ciclo inteiro (autoavaliação, avaliação da liderança, 360°, calibração, devolutiva e retornos) <b>só com as pessoas marcadas</b>. Só elas recebem aviso e entram na 360°; a liderança de fora do teste não avalia ninguém. Os relatórios usam mínimo de 1 resposta, então no teste a 360° não é anônima para o RH. No fim, "Encerrar e apagar o teste" tira os registros do teste das telas e libera o ciclo de verdade.</div>' +
+        secao("1. Quem participa", "marque as pessoas; quem não tem cargo na matriz precisa de um, que fica gravado no cadastro do membro",
+          '<div class="rv-caixa rv-teste">' + membros.map(linha).join("") + "</div>") +
+        secao("2. Prazos", "curtos, para testar já; dá para mudar depois em Editar prazos e regras",
+          '<div class="linha-campos">' + prazo("prazoAuto", "Autoavaliação até", 1) + prazo("prazoLideranca", "Avaliação da liderança e 360° até", 2) + "</div>" +
+          '<div class="linha-campos">' + prazo("prazoCalibracao", "Calibração até", 3) + prazo("prazoDevolutiva", "Devolutivas até", 4) + "</div>" + prazo("prazoRetornos", "Retornos do RH até", 5)) +
+        secao("3. 360°", "", '<label class="escolha rv-check"><input type="checkbox" name="liberarLideranca" checked><span>Cada pessoa avalia os superiores que estão no teste</span></label>' +
+          '<label class="escolha rv-check"><input type="checkbox" name="liberarPares" checked><span>Cada pessoa avalia os pares que estão no teste</span></label>') + "</div>",
+      rodape: '<button class="btn" data-acao="rev-teste-abrir">Abrir o ciclo de teste</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+    });
+  };
+  ui.acoes["rev-teste-abrir"] = function (el) {
+    if (!ehRH()) return;
+    const ctx = X(), hoje = ctx.hoje;
+    const f = document.getElementById("form-teste");
+    const d = ui.lerForm(f);
+    const ids = Object.keys(d).filter((k) => k.indexOf("pt_") === 0 && d[k] === true).map((k) => k.slice(3));
+    if (!ids.length) { erroNoRodape("Marque pelo menos uma pessoa."); return; }
+    const semCargo = ids.filter((id) => !R.cargoDo(ctx.idx.membro[id]) && !d["cargo_" + id]);
+    if (semCargo.length) { erroNoRodape("Escolha o cargo na matriz de: " + esc(semCargo.map((id) => nomeDe(ctx.idx.membro[id].responsavel)).join(", ")) + "."); return; }
+    if (R.cicloAberto(ctx)) { erroNoRodape("Já existe um ciclo aberto. Encerre-o antes de abrir um teste."); return; }
+    const prazos = ["prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"];
+    if (prazos.some((k) => !d[k])) { erroNoRodape("Preencha os prazos."); return; }
+    const regras = Object.assign({}, R.REGRAS_PADRAO, {
+      publico: "pessoas", pessoas: ids, teste: true, liberarLideranca: !!d.liberarLideranca, liberarPares: !!d.liberarPares,
+      minimoNotas: 1, minimoComentarios: 1, conferencias: { lista: true, matriz: true, anonimato: true },
+    });
+    const nome = "Teste · " + calc.fmtDataAno(hoje);
+    const dados = { ciclo: nome, regras: JSON.stringify(regras), mensagem: "Ciclo de teste do RH e da TI.",
+      periodoInicio: calc.addDias(hoje, -180), periodoFim: hoje, dataAbertura: hoje };
+    prazos.forEach((k) => { dados[k] = d[k]; });
+    const pessoas = ids.map((id) => nomeDe(ctx.idx.membro[id].responsavel));
+    if (!window.confirm("Abrir o ciclo de teste com " + pessoas.join(", ") + "?\n\nSó essas pessoas recebem aviso no Bitrix e veem a Revisão de Progresso aberta.")) return;
+    ui.salvar(el, async () => {
+      for (const id of ids) if (d["cargo_" + id] && !R.cargoDo(X().idx.membro[id])) await ui.atualizar("membros", id, { cargoMatriz: d["cargo_" + id] });
+      await ui.criar("revCiclos", Object.assign({ titulo: "Revisão de Progresso · " + nome, autor: eu().id, responsavel: eu().id, estagio: "ABERTO" }, dados));
+      const avisar = ids.map((id) => X().idx.membro[id].responsavel).filter(Boolean);
+      GP.app.avisar(avisar, "[Teste] O RH abriu um ciclo de teste da Revisão de Progresso. Autoavaliação até " + calc.fmtData(dados.prazoAuto) + "; avaliação da liderança e 360° até " + calc.fmtData(dados.prazoLideranca) + ". Abra o app Gestão de Pessoas → Revisão de Progresso.");
+    }, { mensagem: "Ciclo de teste aberto. Só as pessoas escolhidas foram avisadas." });
+  };
+  ui.acoes["rev-teste-descartar"] = function (el) {
+    const ctx = X(), ci = ctx.idx.porId.revCiclos[el.dataset.id];
+    if (!ci || !ehRH() || !R.ehTeste(ci)) return;
+    const doCiclo = (chave) => (ctx.registros[chave] || []).filter((x) => String(x.cicloId) === String(ci.id) && x.estagio !== "FAIL");
+    const itens = [["revAvaliacoes", doCiclo("revAvaliacoes")], ["revAutoavaliacoes", doCiclo("revAutoavaliacoes")], ["revRetornos", doCiclo("revRetornos")], ["rev360", doCiclo("rev360")]];
+    const total = itens.reduce((s, x) => s + x[1].length, 0);
+    if (!window.confirm("Encerrar e apagar o ciclo de teste?\n\n" + total + " registro(s) do teste (avaliações, autoavaliações, 360° e retornos) vão para a etapa de descartados, e o ciclo some das telas. O cargo na matriz de cada pessoa fica no cadastro.")) return;
+    ui.salvar(el, async () => {
+      for (const [chave, lista] of itens) for (const x of lista) await ui.atualizar(chave, x.id, { estagio: "FAIL" });
+      await ui.atualizar("revCiclos", ci.id, { estagio: "FAIL" });
+      ui.navegar("#/revisao");
+    }, { mensagem: "Teste encerrado e apagado.", rotuloOcupado: "Apagando…" });
   };
   ui.acoes["rev-encerrar"] = function (el) {
     const ci = X().idx.porId.revCiclos[el.dataset.id];
