@@ -186,9 +186,29 @@
     if (!ciclo) return null;
     return reg(ctx, "revAutoavaliacoes").find((a) => String(a.responsavel) === String(uid) && String(a.cicloId) === String(ciclo.id) && a.estagio !== "FAIL") || null;
   }
+  /** Os retornos da pessoa no ciclo. Pelo item do Membros quando ele é lido; senão pelo responsável, desde que o item não seja de outra
+      pessoa (antes da conversa de devolutiva o responsável é a liderança, então o item de um liderado não pode virar o retorno dela). */
   function retornoDe(ctx, uid, ciclo) {
     if (!ciclo) return null;
-    return reg(ctx, "revRetornos").find((a) => String(a.responsavel) === String(uid) && String(a.cicloId) === String(ciclo.id) && a.estagio !== "FAIL") || null;
+    const idx = ctx.idx || {};
+    const lista = reg(ctx, "revRetornos").filter((a) => String(a.cicloId) === String(ciclo.id) && a.estagio !== "FAIL");
+    const meu = idx.membroPorUsuario && idx.membroPorUsuario[String(uid)];
+    if (meu) { const r = lista.find((a) => String(a.membroId) === String(meu.id)); if (r) return r; }
+    return lista.find((a) => {
+      if (String(a.responsavel) !== String(uid)) return false;
+      const dono = idx.membro && idx.membro[a.membroId];
+      return !dono || String(dono.responsavel) === String(uid);
+    }) || null;
+  }
+  /** A devolutiva só chega ao membro depois que a liderança confirma que a conversa aconteceu (pedido de 18/11/2026):
+      a data da conversa (devolutivaEm) é o que libera. Antes disso o registro é só preparação da liderança. */
+  const devolutivaLiberada = (ret) => !!(ret && ret.devolutivaEm);
+  const devolutivaPreparada = (ret) => !!(ret && !ret.devolutivaEm && (ret.fortes || ret.desenvolver || ret.metas));
+  /** Quem fica de responsável pelo item de retornos antes da conversa: a liderança que avalia (o membro, com "Próprios" no CRM,
+      não lê o que ainda não foi conversado). Na liberação, o item passa ao membro. */
+  function donoAntesDaConversa(ctx, m, ciclo, reserva) {
+    const av = avaliacaoDo(ctx, m.id, ciclo);
+    return String((av && (av.avaliador || av.responsavel)) || dom.liderancaEfetiva(ctx, m) || reserva || m.responsavel);
   }
 
   /* ================================================================ o formulário da liderança */
@@ -271,8 +291,9 @@
     const av = avaliacaoDo(ctx, m.id, ciclo);
     const auto = autoavaliacaoDe(ctx, m.responsavel, ciclo);
     const ret = retornoDe(ctx, m.responsavel, ciclo);
+    const preparada = av && av.estagio === "CALIBRADA" && devolutivaPreparada(ret);
     return {
-      avaliacao: av ? (av.cicloId || !ciclo ? SITUACAO_AVALIACAO[av.estagio] || av.estagio : "Rascunho pronto para o ciclo") : "Sem rascunho",
+      avaliacao: av ? (preparada ? "Devolutiva preparada · falta a conversa" : av.cicloId || !ciclo ? SITUACAO_AVALIACAO[av.estagio] || av.estagio : "Rascunho pronto para o ciclo") : "Sem rascunho",
       avaliacaoEstagio: av ? av.estagio : "",
       auto: !ciclo ? "" : auto && auto.estagio === "SUCCESS" ? "Autoavaliação recebida" : auto ? "Autoavaliação em rascunho" : "Aguardando autoavaliação",
       autoEnviada: !!(auto && auto.estagio === "SUCCESS"),
@@ -455,14 +476,15 @@
       equipe.forEach((m) => {
         const a = avaliacaoDo(ctx, m.id, ciclo);
         if (a && a.estagio === "CALIBRADA" && a.calibradaEm) lista.push({ id: "rev-calib-" + a.id, quando: a.calibradaEm, area: "Revisão de Progresso", rota: "#/revisao/membro/" + m.id, acao: true,
-          titulo: "Calibração concluída: faça a devolutiva de " + dom.pessoa(ctx, m.responsavel).nome, texto: ciclo.prazoDevolutiva ? "Até " + calc.fmtData(ciclo.prazoDevolutiva) + "." : "" });
+          titulo: "Calibração concluída: converse com " + dom.pessoa(ctx, m.responsavel).nome + " e libere a devolutiva",
+          texto: "O registro só chega à pessoa depois que você confirmar a conversa." + (ciclo.prazoDevolutiva ? " Até " + calc.fmtData(ciclo.prazoDevolutiva) + "." : "") });
         const ret = retornoDe(ctx, m.responsavel, ciclo);
         if (ret && ret.cienciaEm) lista.push({ id: "rev-ciencia-" + ret.id, quando: ret.cienciaEm, area: "Revisão de Progresso", rota: "#/revisao/membro/" + m.id,
           titulo: dom.pessoa(ctx, m.responsavel).nome + " confirmou a ciência da devolutiva", texto: "" });
       });
     }
     const meu = retornoDe(ctx, id, ciclo);
-    if (meu && meu.estagio === "DEVOLUTIVA" && !meu.cienciaEm) lista.push({ id: "rev-devolutiva-" + meu.id, quando: meu.atualizadoEm || meu.criadoEm, area: "Revisão de Progresso", rota: "#/revisao/retornos", acao: true,
+    if (devolutivaLiberada(meu) && meu.estagio === "DEVOLUTIVA" && !meu.cienciaEm) lista.push({ id: "rev-devolutiva-" + meu.id, quando: meu.atualizadoEm || meu.criadoEm, area: "Revisão de Progresso", rota: "#/revisao/retornos", acao: true,
       titulo: "Sua liderança registrou a devolutiva: confirme a ciência", texto: "Ciência, não concordância." });
     if (p.rh) {
       reg(ctx, "revAvaliacoes").filter((a) => String(a.cicloId) === String(ciclo.id) && a.estagio === "ENVIADA").forEach((a) => {
@@ -478,7 +500,7 @@
     NIVEIS_KPI, NIVEIS_COMP, ACORDO, NAO_SEI, AUTO, SOBRE_LIDERANCA, SOBRE_PAR, CICLOS, ETAPAS, MAX_EXTRAS, REGRAS_PADRAO, CODIGOS, PONTOS,
     rotuloNivel, lerJSON, regrasDo, podeAbrir, cicloAberto, cicloRascunho, ultimoCiclo, ehTeste, usuariosDoTeste,
     nomeCargo, rotuloCargo, cargoDo, matrizDo, participa, areaDe, areas,
-    avaliacaoDo, autoavaliacaoDe, retornoDe, faltando, situacaoMinimo, ajustes, situacaoDo,
+    avaliacaoDo, autoavaliacaoDe, retornoDe, devolutivaLiberada, devolutivaPreparada, donoAntesDaConversa, faltando, situacaoMinimo, ajustes, situacaoDo,
     equipeNoCiclo, participantes, euParticipo, avaliacaoEnviada,
     ativos, liderDe, superioresDe, paresDe, lideradosDe, avaliadoresPossiveis, grupoPequeno, relacaoCom, validarResposta,
     agregar, relatorio360, notificacoes,

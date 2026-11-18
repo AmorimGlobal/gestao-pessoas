@@ -512,7 +512,7 @@ O protótipo traz a matriz inteira de 40 cargos (KPIs e competências). Os nomes
 | Revisão · Avaliações da liderança (filha de Membros) | KPIs e competências do cargo, ajustes, itens novos, conclusão, perguntas de decisão, calibração do RH, PDI e promoção | **a liderança que avalia**: o membro nunca é dono do item |
 | Revisão · Autoavaliações (filha de Membros) | as 5 respostas do membro | o membro |
 | Revisão · Respostas 360° (sem vínculo com ninguém) | as 8 afirmações, os textos, a relação (Superior ou Par), o modo e a área da pessoa avaliada | o RH; gravada pelo webhook |
-| Revisão · Retornos (filha de Membros) | o que chega ao membro: a devolutiva, as metas, a ciência, o retorno do RH sobre os pares e a data da conversa sobre os liderados | o membro |
+| Revisão · Retornos (filha de Membros) | o que chega ao membro: a devolutiva, as metas, a ciência, o retorno do RH sobre os pares e a data da conversa sobre os liderados | **a liderança que avalia, até a conversa de devolutiva; o membro, depois** (desde 18/11/2026: com "Próprios", o membro não lê no CRM o que ainda não foi conversado) |
 
 As respostas longas ficam em JSON num campo de texto. O formulário muda com o cargo e não cabe em campos fixos. As chaves do JSON são os nomes dos campos do protótipo (`kpi_1_nivel`, `comp_2_evidencia`, `pdi_1_acao`…).
 
@@ -547,7 +547,8 @@ Quem tem "Departamento e subdepartamentos" ou "Todos" ainda consegue abrir esses
     - A tela lista cada membro com o cargo e a liderança direta, para a conferência.
     - Ao abrir, quem participa e as lideranças recebem um aviso no Bitrix.
   - **Calibração:** para cada avaliação enviada, o RH registra se houve ajuste de nível, a data, o motivo e a evidência. A liderança recebe o aviso para fazer a devolutiva. O RH também pode **devolver** a avaliação para revisão, com o motivo.
-  - **Retornos:** na tela de cada membro, o RH escreve o retorno sobre os pares, em temas, e registra a data da conversa sobre os liderados. O membro lê em "Seus retornos".
+  - **Retornos:** na tela de cada membro, o RH escreve o retorno sobre os pares, em temas, e registra a data da conversa sobre os liderados. O membro lê em "Seus retornos", só depois da conversa de devolutiva com a liderança.
+  - **Cargo na matriz:** "Trocar cargo" em cada linha da lista do ciclo e no topo da revisão do membro ("Definir cargo" para quem está fora do ciclo por falta de cargo). Grava no cadastro do membro, o mesmo campo de Minha equipe → Editar cadastro. Se a avaliação já foi enviada, ela continua com o cargo antigo; se está em rascunho, o app avisa que os KPIs e as competências mudam.
   - **Relatório 360°:** traz as médias de cada afirmação por pessoa avaliada e relação.
     - Só aparecem grupos com o mínimo de respostas definido na abertura.
     - Abaixo do mínimo, o grupo entra junto na área ou fica de fora, conforme a regra escolhida.
@@ -561,10 +562,10 @@ Quem tem "Departamento e subdepartamentos" ou "Todos" ainda consegue abrir esses
     - O RH recebe o registro do que mudou.
     - A situação frente ao nível mínimo aparece sozinha.
   - **Etapa 2:** a autoavaliação do membro, liberada só depois do envio da etapa 1.
-  - **Etapa 3, devolutiva:** liberada depois da calibração.
-    - A conversa (pontos fortes e de desenvolvimento) e as metas vão para o membro.
+  - **Etapa 3, devolutiva:** liberada depois da calibração, em dois tempos (18/11/2026, pedido do usuário: "esse feedback não pode ser solto imediatamente, e sim após ser dado verbalmente").
+    - **Preparar a devolutiva:** a conversa (pontos fortes e de desenvolvimento), as metas, o PDI e a promoção. Fica salva só com a liderança e o RH; a avaliação continua "Calibrada" e a lista mostra "Devolutiva preparada · falta a conversa".
+    - **Conversa feita: liberar ao membro:** depois da conversa, a liderança confirma e informa a data (não pode ser depois de hoje). Só então a conversa, as metas e o retorno do RH sobre os pares aparecem em "Seus retornos", o item passa ao membro e ele recebe o aviso para confirmar a ciência. Também dá para preparar e liberar de uma vez, marcando "Já conversei" no formulário.
     - O PDI (até 3 ações) e a indicação de promoção ficam só com o RH.
-    - O membro recebe o aviso para confirmar a ciência.
 - **Coordenação:** acompanha as equipes que coordena. Lê as avaliações enviadas, mas não as perguntas de decisão nem o PDI, e não edita.
 - **Todos que participam**, inclusive o membro, que agora vê "Revisão de Progresso" no menu:
   - a **autoavaliação**: 5 perguntas, rascunho e envio. Depois de enviada, não se edita mais.
@@ -573,7 +574,7 @@ Quem tem "Departamento e subdepartamentos" ou "Todos" ainda consegue abrir esses
     - pares: a mesma liderança direta, inclusive entre lideranças;
     - liderados diretos: só o link para a Revisão formal;
     - a resposta é anônima ou identificada. Dá para pular uma pessoa. O app avisa quando o grupo é pequeno.
-  - **"Seus retornos":** a devolutiva com a confirmação de ciência ("ciência, não concordância"), o retorno do RH sobre os pares e, para quem lidera, a conversa sobre os liderados.
+  - **"Seus retornos":** depois da conversa de devolutiva, o que foi combinado, com a confirmação de ciência ("ciência, não concordância"), e o retorno do RH sobre os pares; para quem lidera, a conversa sobre os liderados. Antes da conversa, a linha diz "Depois da conversa" e nada aparece.
 - **Avisos** pelo Bitrix e pelo sino:
   - a abertura do ciclo;
   - as avaliações a enviar;
@@ -615,13 +616,13 @@ Quem tem "Departamento e subdepartamentos" ou "Todos" ainda consegue abrir esses
 
 Para o RH e a TI testarem o ciclo inteiro antes do de verdade: Revisão de Progresso → Abertura do ciclo → **Abrir um ciclo de teste** (só aparece sem ciclo aberto).
 
-1. Marque as pessoas. Para quem está sem cargo na matriz, escolha um: ele fica gravado no cadastro do membro, como no ciclo de verdade.
+1. Marque as pessoas e confira o cargo na matriz de cada uma (vem preenchido; para quem não tem, escolha um). O que mudar fica gravado no cadastro do membro, como no ciclo de verdade. Com o teste aberto, o cargo ainda pode ser trocado em "Trocar cargo", na lista de participantes.
 2. Os prazos já vêm curtos (de amanhã a 5 dias) e podem mudar em "Editar prazos e regras".
 3. Só as pessoas marcadas recebem o aviso, veem a autoavaliação e entram na 360°. A liderança de fora do teste (a CEO, por exemplo) não avalia ninguém e não recebe nada; quem está fora vê só "O RH está testando".
 4. No teste, o relatório 360° usa mínimo de 1 resposta, então ele **não é anônimo para o RH**. As conferências da abertura não são pedidas.
 5. No fim, **Encerrar e apagar o teste**: o ciclo e os registros dele vão para a etapa de descartados e somem das telas. O ciclo de verdade só abre depois disso.
 
-Exemplo do primeiro teste: Fernando (membro), Mathias (a liderança dele) e Luciele (RH). Mathias avalia Fernando; Fernando faz a 360° do Mathias; Mathias e Luciele, que têm a mesma liderança, se avaliam como pares; a Luciele calibra e dá os retornos.
+Exemplo do primeiro teste: Fernando (membro), Mathias (a liderança dele) e Luciele (RH). Mathias avalia Fernando; Fernando faz a 360° do Mathias; Mathias e Luciele, que têm a mesma liderança, se avaliam como pares; a Luciele calibra e dá os retornos. Na devolutiva, o Mathias prepara, conversa com o Fernando e só então clica em "Conversa feita: liberar ao membro": antes disso, Seus retornos do Fernando fica vazio.
 
 ### 6. Pendências do protótipo
 

@@ -97,10 +97,11 @@
       ["Avaliação 360°", "Você avalia seus superiores (o imediato e, quando houver supervisão, quem está acima dela) e seus pares (mesma liderança direta). Avalie só quem você acompanha de perto: se não for o caso, pule. Em cada afirmação existe \"Não sei avaliar\"."],
       ["Anônima ou identificada", "Anônima: seu nome não é gravado e nem o RH sabe quem escreveu; evite detalhes que só você viveu. Identificada: seu nome fica visível só para o RH, que pode te procurar para entender um ponto. Em grupos pequenos, sua resposta só é usada junto com as de outras pessoas da área."],
       ["Para onde vai", "Só para o RH. A pessoa avaliada não recebe o que você escreveu. Depois do ciclo, o RH leva a ela temas resumidos, sem identificar ninguém e sem trechos literais."],
+      ["Seus retornos", "Primeiro a conversa: a sua liderança fala com você sobre a devolutiva. Só depois dessa conversa o que foi combinado (e o retorno do RH sobre os pares) aparece em Seus retornos, e você confirma a ciência. Ciência, não concordância."],
     ] : [
       ["Como funciona o ciclo", "O RH abre os ciclos em junho e novembro. Fora do ciclo, você pode iniciar rascunhos e registrar evidências ao longo do semestre: nada vai ao RH e o membro não vê. Quando o RH abre o ciclo, o rascunho vira a avaliação do ciclo: você revisa e envia."],
-      ["Passo a passo", "Clique no liderado e depois em Iniciar avaliação (ou Iniciar rascunho, fora do ciclo). Avalie cada KPI e cada competência, com evidência, e envie ao RH: o contador no rodapé mostra quantos itens faltam. Leia a autoavaliação do membro, liberada depois do seu envio. Depois da calibração do RH, faça a conversa de devolutiva e registre o que foi combinado."],
-      ["Para onde vai cada coisa", "O formulário fica com você e o RH: o membro não recebe o formulário. Na devolutiva, você leva ao membro os pontos em palavras e as metas do próximo semestre. O PDI e a seção Promoção ficam só com o RH. Depois da conversa, o membro confirma a ciência no app dele."],
+      ["Passo a passo", "Clique no liderado e depois em Iniciar avaliação (ou Iniciar rascunho, fora do ciclo). Avalie cada KPI e cada competência, com evidência, e envie ao RH: o contador no rodapé mostra quantos itens faltam. Leia a autoavaliação do membro, liberada depois do seu envio. Depois da calibração do RH, prepare a devolutiva, converse com o membro e, depois da conversa, clique em \"Conversa feita: liberar ao membro\"."],
+      ["Para onde vai cada coisa", "O formulário fica com você e o RH: o membro não recebe o formulário. Na devolutiva, você leva ao membro os pontos em palavras e as metas do próximo semestre. O PDI e a seção Promoção ficam só com o RH. O membro não vê nada antes da conversa: o registro chega ao membro quando você confirma que a conversa aconteceu, e aí o membro confirma a ciência no app."],
       ["Quando algo não faz sentido para a função", "Você tem autonomia: dentro de cada KPI e competência há a opção Ajustar (texto, meta ou nível mínimo) ou Não se aplica neste ciclo, e no fim de cada seção dá para incluir até 2 itens. O ajuste vale na hora, sem aprovação: o RH só recebe o registro do que mudou."],
       ["Como escrever a evidência", "Modelo SCI: Situação, Comportamento e Impacto. Fatos e dados, não impressões; entregas e resultados, não horas trabalhadas. Ex.: \"Na reunião de 12/09 com o lead [Situação], fez três perguntas antes de qualificar [Comportamento], e a oportunidade avançou sem devolução [Impacto].\""],
     ];
@@ -129,8 +130,10 @@
     const ctx = X(), s = R.situacaoDo(ctx, ciclo, m), u = dom.pessoa(ctx, m.responsavel);
     return '<div class="item clicavel" data-rota="#/revisao/membro/' + esc(m.id) + '">' + c.avatar(u, 30) +
       '<div class="principal-item"><div class="t">' + esc(u.nome) + '</div><div class="d">' + esc(nomeCargo(R.cargoDo(m)) + (comLider ? " · liderança: " + nomeDe(dom.liderancaEfetiva(ctx, m)) : "")) + "</div></div>" +
-      '<div class="lado">' + (ciclo && s.auto ? c.tag(s.auto, s.autoEnviada ? "verde" : "cinza") : "") + tagSituacao(s, ciclo) + "</div></div>";
+      '<div class="lado">' + (ciclo && s.auto ? c.tag(s.auto, s.autoEnviada ? "verde" : "cinza") : "") + tagSituacao(s, ciclo) + botaoCargo(m) + "</div></div>";
   }
+  /** O RH troca o cargo na matriz direto da lista (18/11/2026); fica gravado no cadastro do membro */
+  const botaoCargo = (m) => (ehRH() ? '<button class="btn link rv-cargo-btn" data-acao="rev-cargo" data-id="' + esc(m.id) + '">' + (R.cargoDo(m) ? "Trocar cargo" : "Definir cargo") + "</button>" : "");
 
   /* ================================================================ INÍCIO DA REVISÃO */
   ui.rotas.revisao = function (partes) {
@@ -191,8 +194,9 @@
     }
     const cicloRet = ciclo || ultimo;
     const ret = cicloRet ? R.retornoDe(ctx, id, cicloRet) : null;
-    if (ciclo || ret) linhas.push(["#/revisao/retornos", "Seus retornos", "Da sua liderança (devolutiva) e do RH, depois da calibração",
-      ret && ret.devolutivaEm && !ret.cienciaEm ? c.tag("Confirme a ciência", "ambar") : ret && ret.cienciaEm ? c.tag("Ciência confirmada", "verde") : c.tag("Aguardando", "cinza")]);
+    const liberado = R.devolutivaLiberada(ret);
+    if (ciclo || liberado) linhas.push(["#/revisao/retornos", "Seus retornos", liberado ? "Da sua liderança (devolutiva) e do RH" : "Aparecem aqui depois da conversa de devolutiva com a sua liderança",
+      liberado && !ret.cienciaEm ? c.tag("Confirme a ciência", "ambar") : liberado ? c.tag("Ciência confirmada", "verde") : c.tag("Depois da conversa", "cinza")]);
     if (!linhas.length) return "";
     return cartao(ciclo ? "Sua parte neste ciclo" : "Seus retornos", '<div class="lista">' + linhas.map((l) => '<div class="item' + (l[0] ? " clicavel" : "") + '"' + (l[0] ? ' data-rota="' + l[0] + '"' : "") + '><div class="principal-item"><div class="t">' + esc(l[1]) +
       '</div><div class="d">' + esc(l[2]) + '</div></div><div class="lado">' + l[3] + "</div></div>").join("") + "</div>");
@@ -238,8 +242,9 @@
     if (aguardam.length) h += cartao("Aguardando a calibração do RH", '<div class="lista">' + aguardam.map((s) => linhaMembro(s.m, ciclo, true)).join("") + "</div>", "até " + calc.fmtData(ciclo.prazoCalibracao), "acao");
     h += cartao("Todos os participantes", '<div class="lista">' + dentro.map((x) => linhaMembro(x.m, ciclo, true)).join("") + "</div>", plural(dentro.length, "pessoa", "pessoas"));
     if (fora.length) h += cartao("Fora deste ciclo", '<div class="lista">' + fora.map((x) => '<div class="item clicavel" data-rota="#/membro/' + esc(x.m.id) + '">' + c.avatar(dom.pessoa(ctx, x.m.responsavel), 30) +
-      '<div class="principal-item"><div class="t">' + esc(nomeDe(x.m.responsavel)) + '</div><div class="d">' + esc(x.motivo) + "</div></div></div>").join("") + "</div>" +
-      '<p class="muted" style="font-size:12px;margin:10px 0 0">O cargo na matriz fica no cadastro do membro (Minha equipe → membro → Editar cadastro). As exceções do ciclo ficam na abertura.</p>', plural(fora.length, "pessoa", "pessoas"));
+      '<div class="principal-item"><div class="t">' + esc(nomeDe(x.m.responsavel)) + '</div><div class="d">' + esc(x.motivo) + "</div></div>" +
+      (R.cargoDo(x.m) ? "" : '<div class="lado">' + botaoCargo(x.m) + "</div>") + "</div>").join("") + "</div>" +
+      '<p class="muted" style="font-size:12px;margin:10px 0 0">O cargo na matriz fica no cadastro do membro: troque em "Trocar cargo" (aqui ou na revisão do membro) ou em Minha equipe → membro → Editar cadastro. As exceções do ciclo ficam na abertura.</p>', plural(fora.length, "pessoa", "pessoas"));
     return h;
   }
 
@@ -260,7 +265,8 @@
     const ret = R.retornoDe(ctx, m.responsavel, ciclo);
     const s = R.situacaoDo(ctx, ciclo, m);
     const part = ciclo ? R.participa(ctx, ciclo, m) : { ok: !!codigo, motivo: codigo ? "" : "sem cargo na matriz (o RH define no cadastro do membro)" };
-    let h = voltar() + c.cabecalho("desempenho", u.nome, "<span>" + esc(nomeCargo(codigo)) + "</span><span>" + tagSituacao(s, ciclo) + "</span>");
+    let h = voltar() + c.cabecalho("desempenho", u.nome, "<span>" + esc(nomeCargo(codigo)) + "</span><span>" + tagSituacao(s, ciclo) + "</span>",
+      ehRH() ? '<button class="btn sec" data-acao="rev-cargo" data-id="' + esc(m.id) + '">' + (codigo ? "Trocar o cargo" : "Definir o cargo") + "</button>" : "");
     if (semEstrutura()) return h + avisoSemEstrutura();
     h += '<div class="card">' + c.dados([["Ciclo", ciclo ? ciclo.ciclo : "Fora do ciclo · rascunho"], ["Período avaliado", ciclo ? fmt(ciclo.periodoInicio) + " a " + fmt(ciclo.periodoFim) : "definido pelo RH na abertura"],
       ["Matriz do cargo", cargo ? plural(cargo.kpis.length, "KPI", "KPIs") + " · " + plural(cargo.competencias.length, "competência", "competências") : "—"], ["Liderança direta", nomeDe(dom.liderancaEfetiva(ctx, m))]]) +
@@ -273,10 +279,20 @@
     if (a.avaliar && part.ok && !enviada) b1 = '<button class="btn" data-acao="rev-avaliar" data-id="' + esc(m.id) + '">' + (av ? (ciclo ? "Continuar a avaliação" : "Continuar o rascunho") : (ciclo ? "Iniciar avaliação" : "Iniciar rascunho")) + "</button>";
     const t1 = enviada ? "Enviada ao RH em " + fmt(av.enviadaEm) + "." : av ? (ciclo ? "Rascunho em andamento. " : "Rascunho fora do ciclo: nada vai ao RH agora. ") + "Se houver rascunho, ele já vem preenchido." : ciclo ? "KPIs e competências do cargo, com evidência. Envio ao RH até " + calc.fmtData(ciclo.prazoLideranca) + "." : "Fora do ciclo você só salva o rascunho.";
     const t2 = !ciclo ? "A autoavaliação é liberada ao membro na abertura do ciclo." : !(enviada || a.rh) ? "Liberada depois que você enviar sua avaliação ao RH, para que ela não influencie a sua." : auto && auto.estagio === "SUCCESS" ? "Recebida em " + fmt(auto.enviadaEm) + ". Abaixo, ao lado da sua avaliação." : "O membro ainda não enviou a autoavaliação.";
+    // devolutiva em dois tempos (18/11/2026): a liderança prepara, conversa e só então libera o registro ao membro
+    const liberada = R.devolutivaLiberada(ret), preparada = R.devolutivaPreparada(ret);
+    const ate = ciclo && ciclo.prazoDevolutiva ? " até " + calc.fmtData(ciclo.prazoDevolutiva) : "";
     let b3 = "";
-    if (a.avaliar && av && ["CALIBRADA", "DEVOLUTIVA"].indexOf(av.estagio) >= 0 && !(ret && ret.cienciaEm)) b3 = '<button class="btn' + (av.estagio === "DEVOLUTIVA" ? " sec" : "") + '" data-acao="rev-devolutiva" data-id="' + esc(m.id) + '">' + (av.estagio === "DEVOLUTIVA" ? "Editar a devolutiva" : "Registrar a devolutiva") + "</button>";
-    const t3 = ret && ret.cienciaEm ? "Devolutiva em " + fmt(ret.devolutivaEm) + " · o membro confirmou a ciência em " + fmt(ret.cienciaEm) + "." : av && av.estagio === "DEVOLUTIVA" ? "Devolutiva registrada em " + fmt(av.devolutivaEm) + " · aguardando a ciência do membro." :
-      av && av.estagio === "CALIBRADA" ? "Calibração concluída: converse com o membro e registre o que foi combinado" + (ciclo && ciclo.prazoDevolutiva ? " até " + calc.fmtData(ciclo.prazoDevolutiva) : "") + "." : "Depois da calibração do RH: a conversa com o membro, até 3 ações do PDI e as metas do próximo semestre.";
+    if (a.avaliar && av && ["CALIBRADA", "DEVOLUTIVA"].indexOf(av.estagio) >= 0 && !(ret && ret.cienciaEm)) {
+      if (liberada) b3 = '<button class="btn sec" data-acao="rev-devolutiva" data-id="' + esc(m.id) + '">Editar a devolutiva</button>';
+      else if (preparada) b3 = '<button class="btn" data-acao="rev-liberar-form" data-id="' + esc(m.id) + '">Conversa feita: liberar ao membro</button><button class="btn sec" data-acao="rev-devolutiva" data-id="' + esc(m.id) + '">Editar a devolutiva</button>';
+      else b3 = '<button class="btn" data-acao="rev-devolutiva" data-id="' + esc(m.id) + '">Preparar a devolutiva</button>';
+    }
+    const t3 = ret && ret.cienciaEm ? "Conversa em " + fmt(ret.devolutivaEm) + " · o membro confirmou a ciência em " + fmt(ret.cienciaEm) + "." :
+      liberada ? "Conversa em " + fmt(ret.devolutivaEm) + ", liberada ao membro · aguardando a ciência do membro." :
+      av && av.estagio === "CALIBRADA" && preparada ? "Devolutiva preparada, e o membro ainda não vê. Faça a conversa" + ate + " e depois libere o registro." :
+      av && av.estagio === "CALIBRADA" ? "Calibração concluída: prepare a devolutiva e converse com o membro" + ate + ". O registro só chega ao membro depois que você confirmar a conversa." :
+      "Depois da calibração do RH: a conversa com o membro, até 3 ações do PDI e as metas do próximo semestre. O membro só vê depois da conversa.";
     h += cartao("Etapas", passo(1, "Avaliação da liderança", esc(t1), b1, enviada ? "feito" : "atual") + passo(2, "Autoavaliação do membro", esc(t2), "", auto && auto.estagio === "SUCCESS" && (enviada || a.rh) ? "feito" : "") +
       passo(3, "Devolutiva e PDI", esc(t3), b3, ret && ret.cienciaEm ? "feito" : av && av.estagio === "CALIBRADA" ? "atual" : ""));
 
@@ -291,7 +307,7 @@
     }
     if (av && (enviada || a.avaliar) && (a.avaliar || a.rh || enviada)) h += avaliacaoHtml(m, av, { decisao: a.avaliar || a.rh, calibracao: a.avaliar && !a.rh && av.calibradaEm, pdi: a.avaliar || a.rh });
     if (ciclo && (a.rh || (a.avaliar && enviada)) && auto && auto.estagio === "SUCCESS") h += autoavaliacaoHtml(auto);
-    if (ret && (ret.devolutivaEm || a.rh)) h += devolutivaHtml(ret, a.rh);
+    if (ret && (liberada || preparada || a.rh)) h += devolutivaHtml(ret, a.rh);
     if (a.rh && ciclo) h += retornoRHHtml(m, ret);
     return h;
   }
@@ -354,10 +370,12 @@
       esc([mt[p + "tipo"], mt[p + "prazo"] ? "até " + fmt(mt[p + "prazo"]) : "", mt[p + "indicador"] ? "indicador: " + mt[p + "indicador"] : "", mt[p + "combinada"] === "Sim" ? "combinada entre as partes" : mt[p + "combinada"] === "Não" ? "ainda não combinada" : "", mt[p + "obs"]].filter(Boolean).join(" · ")) + "</div></div></div>"; }).join("") + "</div>";
   }
   function devolutivaHtml(ret, rh) {
-    return cartao("Devolutiva (vai para o membro)", (ret.devolutivaEm ? '<div class="sci">' + c.textoRegistro("Pontos fortes combinados", ret.fortes) + c.textoRegistro("Pontos de desenvolvimento combinados", ret.desenvolver) + "</div>" +
-      (metasHtml(ret) ? '<div class="rv-secao-t" style="margin-top:14px">Metas e entregas do próximo semestre</div>' + metasHtml(ret) : "") : c.vazio("A liderança ainda não registrou a devolutiva.")) +
-      (rh && ret.retornoPares ? '<div class="sci" style="margin-top:12px">' + c.textoRegistro("Retorno do RH sobre os pares (" + fmt(ret.retornoParesEm) + ")", ret.retornoPares) + "</div>" : ""),
-      ret.devolutivaEm ? "conversa em " + fmt(ret.devolutivaEm) + " · " + (ret.cienciaEm ? "ciência em " + fmt(ret.cienciaEm) : "aguardando a ciência") : "");
+    const liberada = R.devolutivaLiberada(ret), preparada = R.devolutivaPreparada(ret);
+    return cartao("Devolutiva (vai para o membro depois da conversa)", (liberada || preparada ? (preparada ? '<div class="aviso-info" style="margin-bottom:12px">Preparada pela liderança. O membro ainda não vê: o registro chega ao membro quando a liderança confirmar que a conversa aconteceu.</div>' : "") +
+      '<div class="sci">' + c.textoRegistro("Pontos fortes combinados", ret.fortes) + c.textoRegistro("Pontos de desenvolvimento combinados", ret.desenvolver) + "</div>" +
+      (metasHtml(ret) ? '<div class="rv-secao-t" style="margin-top:14px">Metas e entregas do próximo semestre</div>' + metasHtml(ret) : "") : c.vazio("A liderança ainda não preparou a devolutiva.")) +
+      (rh && ret.retornoPares ? '<div class="sci" style="margin-top:12px">' + c.textoRegistro("Retorno do RH sobre os pares (" + fmt(ret.retornoParesEm) + ")" + (liberada ? "" : " · chega ao membro depois da conversa"), ret.retornoPares) + "</div>" : ""),
+      liberada ? "conversa em " + fmt(ret.devolutivaEm) + " · " + (ret.cienciaEm ? "ciência em " + fmt(ret.cienciaEm) : "aguardando a ciência") : preparada ? "preparada · o membro ainda não vê" : "");
   }
   function retornoRHHtml(m, ret) {
     const lidera = R.lideradosDe(X(), m.responsavel, R.cicloAberto(X()) || R.ultimoCiclo(X())).length > 0;
@@ -564,7 +582,7 @@
     ui.abrirPainel({
       titulo: "Retornos do RH · " + nomeDe(m.responsavel), sub: "Em temas, sem nomes e sem trechos literais. Só com respostas suficientes para proteger quem respondeu.",
       corpo: '<div id="form-retorno-rh">' + c.campo({ nome: "retornoPares", rotulo: "Retorno sobre os pares (2 ou 3 pontos fortes e 2 ou 3 de desenvolvimento)", tipo: "textoLongo", linhas: 7, valor: ret.retornoPares, opcional: true,
-        ajuda: "O membro lê no app dele, em Seus retornos. Conversa com o RH só se ele pedir." }) +
+        ajuda: "O membro lê no app dele, em Seus retornos, depois da conversa de devolutiva com a liderança. Conversa com o RH só se ele pedir." }) +
         c.campo({ nome: "retornoParesEm", rotulo: "Retorno dos pares enviado em", tipo: "data", valor: ret.retornoParesEm || ctx.hoje, opcional: true }) +
         (lidera ? c.campo({ nome: "retornoLideradosEm", rotulo: "Conversa do RH sobre os liderados em", tipo: "data", valor: ret.retornoLideradosEm, opcional: true, ajuda: "Depois que a liderança concluir as devolutivas da equipe. Os temas alimentam o PDI da própria liderança." }) : "") + "</div>",
       rodape: '<button class="btn" data-acao="rev-salvar-retorno-rh" data-id="' + esc(m.id) + '">Salvar</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
@@ -577,11 +595,13 @@
     const dados = { retornoPares: (d.retornoPares || "").trim(), retornoParesEm: d.retornoPares && d.retornoPares.trim() ? d.retornoParesEm || ctx.hoje : "" };
     if ("retornoLideradosEm" in d) dados.retornoLideradosEm = d.retornoLideradosEm;
     const novoPares = dados.retornoPares && !(ret && ret.retornoPares);
+    const liberado = R.devolutivaLiberada(ret);
     ui.salvar(el, async () => {
       if (ret) await ui.atualizar("revRetornos", ret.id, dados);
-      else await ui.criar("revRetornos", Object.assign(dados, { titulo: "Retornos · " + nomeDe(m.responsavel) + " · " + ciclo.ciclo, membroId: m.id, responsavel: m.responsavel, cicloId: String(ciclo.id), estagio: "NEW" }));
-      if (novoPares) GP.app.avisar([m.responsavel], "Revisão de Progresso: o RH registrou o retorno sobre os seus pares. Veja em Revisão de Progresso → Seus retornos.");
-    }, { mensagem: "Retornos do RH salvos." });
+      // antes da conversa de devolutiva o item fica com a liderança: o membro não lê no CRM o que ainda não foi conversado
+      else await ui.criar("revRetornos", Object.assign(dados, { titulo: "Retornos · " + nomeDe(m.responsavel) + " · " + ciclo.ciclo, membroId: m.id, responsavel: R.donoAntesDaConversa(ctx, m, ciclo, eu().id), cicloId: String(ciclo.id), estagio: "NEW" }));
+      if (novoPares && liberado) GP.app.avisar([m.responsavel], "Revisão de Progresso: o RH registrou o retorno sobre os seus pares. Veja em Revisão de Progresso → Seus retornos.");
+    }, { mensagem: liberado ? "Retornos do RH salvos." : "Retornos do RH salvos. O membro vê depois da conversa de devolutiva com a liderança." });
   };
 
   /* ---------------- liderança: devolutiva, PDI, metas e promoção (Etapa 3) ---------------- */
@@ -603,37 +623,84 @@
       '<div class="linha-campos">' + c.campo({ nome: p + "prazo", rotulo: "Prazo", tipo: "data", valor: mt[p + "prazo"], opcional: true }) + c.campo({ nome: p + "indicador", rotulo: "Indicador", valor: mt[p + "indicador"], opcional: true }) + "</div>" +
       c.campo({ nome: p + "combinada", rotulo: "Combinada entre as partes?", tipo: "escolha", opcoes: ["Sim", "Não"], valor: mt[p + "combinada"], opcional: true }) +
       c.campo({ nome: p + "obs", rotulo: "Observações", valor: mt[p + "obs"], opcional: true }) + "</div>"; };
+    const liberada = R.devolutivaLiberada(ret);
+    const nome = nomeDe(m.responsavel);
     ui.abrirPainel({
-      titulo: "Devolutiva de " + nomeDe(m.responsavel), largo: true, sub: "Depois da calibração do RH. A conversa e as metas vão para o membro; o PDI e a promoção ficam só com o RH.",
+      titulo: "Devolutiva de " + nome, largo: true, sub: "Depois da calibração do RH. Prepare, converse e só então libere: a conversa e as metas chegam ao membro depois da conversa; o PDI e a promoção ficam só com o RH.",
       corpo: '<div id="form-devolutiva" class="rv-form">' +
-        secao("1. A conversa", "exemplos no modelo SCI · vai para o membro", c.campo({ nome: "dev_data", rotulo: "Data da devolutiva", tipo: "data", valor: ret.devolutivaEm || (av && av.devolutivaEm) || ctx.hoje }) +
+        secao("1. A conversa", "exemplos no modelo SCI · vai para o membro depois da conversa",
           c.campo({ nome: "dev_fortes", rotulo: "Pontos fortes combinados", tipo: "textoLongo", linhas: 4, valor: ret.fortes }) +
           c.campo({ nome: "dev_desenv", rotulo: "Pontos de desenvolvimento combinados", tipo: "textoLongo", linhas: 4, valor: ret.desenvolver })) +
         secao("2. Plano de desenvolvimento (PDI)", "no máximo 3 ações · só o RH", [1, 2, 3].map(acao).join("")) +
         secao("3. Metas e entregas do próximo semestre", "resultado ou aprendizado, combinado entre as partes · vai para o membro", [1, 2, 3].map(meta).join("")) +
         secao("4. Promoção", "liga ao pipeline do Plano de Carreira · decisão da CEO · só o RH", c.campo({ nome: "promo_elegivel", rotulo: "A Revisão indica elegibilidade para promoção?", tipo: "escolha", opcoes: ["Sim", "Não"], valor: pdi.promo_elegivel }) +
           c.campo({ nome: "promo_evidencias", rotulo: "Evidências anexadas ao pipeline", tipo: "textoLongo", linhas: 3, valor: pdi.promo_evidencias, opcional: true })) +
-        '<p class="muted" style="font-size:12px">Depois da conversa, o membro confirma no app dele que a devolutiva aconteceu. É ciência, não concordância.</p></div>',
-      rodape: '<button class="btn" data-acao="rev-salvar-devolutiva" data-id="' + esc(m.id) + '">Registrar a devolutiva</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+        (liberada
+          ? secao("5. A conversa com " + nome, "já liberada ao membro: o que você mudar aqui ele vê",
+            c.campo({ nome: "dev_data", rotulo: "Data da conversa", tipo: "data", valor: ret.devolutivaEm }))
+          : secao("5. Liberar ao membro", "só depois da conversa",
+            '<p class="muted rv-sub">Sem marcar, a devolutiva fica salva só com você e o RH. Dá para preparar antes e liberar depois, pelo botão "Conversa feita: liberar ao membro".</p>' +
+            c.campo({ nome: "dev_liberar", rotulo: "A conversa", tipo: "simNao", textoCheck: "Já conversei com " + nome + " sobre a devolutiva: liberar agora" }) +
+            c.campo({ nome: "dev_data", rotulo: "Data da conversa", tipo: "data", valor: ctx.hoje, opcional: true }))) +
+        '<p class="muted" style="font-size:12px">Depois que você libera, o membro lê em Seus retornos e confirma no app dele que a conversa aconteceu. É ciência, não concordância.</p></div>',
+      rodape: '<button class="btn" data-acao="rev-salvar-devolutiva" data-id="' + esc(m.id) + '">' + (liberada ? "Salvar a devolutiva" : "Salvar") + '</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
     });
+  };
+  /** Libera a devolutiva ao membro: data da conversa, o item de retornos passa ao membro e a avaliação vai para "Devolutiva feita" */
+  async function liberarDevolutiva(m, ret, av, data) {
+    const ciclo = R.cicloAberto(X());
+    await ui.atualizar("revRetornos", ret.id, { devolutivaEm: data, estagio: "DEVOLUTIVA", responsavel: m.responsavel });
+    if (av) await ui.atualizar("revAvaliacoes", av.id, { devolutivaEm: data, estagio: "DEVOLUTIVA" });
+    try { await E().repo.comentar("revRetornos", ret.id, "Conversa de devolutiva em " + calc.fmtDataAno(data) + ", confirmada por " + quem() + ". Liberada ao membro."); } catch (e) { /* o comentário não impede */ }
+    GP.app.avisar([m.responsavel], "Revisão de Progresso: depois da conversa de devolutiva, o que foi combinado está em Revisão de Progresso → Seus retornos" +
+      (ret.retornoPares ? ", junto com o retorno do RH sobre os seus pares" : "") + ". Confirme a ciência no app (ciência, não concordância)." + (ciclo && R.ehTeste(ciclo) ? " [Teste]" : ""));
+  }
+  ui.acoes["rev-liberar-form"] = function (el) {
+    const ctx = X(), m = ctx.idx.membro[el.dataset.id];
+    if (!m || !acessoAo(m).avaliar) return;
+    const nome = nomeDe(m.responsavel);
+    ui.abrirPainel({
+      titulo: "Conversa feita: liberar a devolutiva", sub: nome,
+      corpo: '<div id="form-liberar"><p class="muted" style="margin-top:0">Depois de liberar, ' + esc(nome) + " lê em Seus retornos os pontos combinados e as metas (e o retorno do RH sobre os pares, se houver) e confirma a ciência. Antes disso, nada aparece em Seus retornos.</p>" +
+        c.campo({ nome: "conversou", rotulo: "A conversa", tipo: "simNao", textoCheck: "Já conversei com " + nome + " sobre a devolutiva" }) +
+        c.campo({ nome: "data", rotulo: "Data da conversa", tipo: "data", valor: ctx.hoje }) + "</div>",
+      rodape: '<button class="btn" data-acao="rev-liberar" data-id="' + esc(m.id) + '">Liberar ao membro</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+    });
+  };
+  ui.acoes["rev-liberar"] = function (el) {
+    const ctx = X(), m = ctx.idx.membro[el.dataset.id], ciclo = R.cicloAberto(ctx);
+    if (!m || !acessoAo(m).avaliar) return;
+    const f = document.getElementById("form-liberar");
+    if (!ui.validar(f, ["conversou", "data"])) return;
+    const d = ui.lerForm(f);
+    if (d.data > ctx.hoje) { erroNoRodape("A data da conversa não pode ser depois de hoje: libere depois de conversar."); return; }
+    const ret = R.retornoDe(ctx, m.responsavel, ciclo), av = R.avaliacaoDo(ctx, m.id, ciclo);
+    if (!R.devolutivaPreparada(ret)) { erroNoRodape("Prepare a devolutiva antes de liberar."); return; }
+    ui.salvar(el, () => liberarDevolutiva(m, ret, av, d.data), { mensagem: "Devolutiva liberada. " + nomeDe(m.responsavel) + " recebeu o aviso para confirmar a ciência." });
   };
   ui.acoes["rev-salvar-devolutiva"] = function (el) {
     const ctx = X(), m = ctx.idx.membro[el.dataset.id], ciclo = R.cicloAberto(ctx);
     const f = document.getElementById("form-devolutiva");
-    if (!ui.validar(f, ["dev_data", "dev_fortes", "dev_desenv", "promo_elegivel"])) return;
-    const d = soPreenchidos(ui.lerForm(f));
-    const av = R.avaliacaoDo(ctx, m.id, ciclo);
+    const bruto = ui.lerForm(f);
     const ret = R.retornoDe(ctx, m.responsavel, ciclo);
+    const jaLiberada = R.devolutivaLiberada(ret), liberar = !jaLiberada && bruto.dev_liberar === true;
+    if (!ui.validar(f, ["dev_fortes", "dev_desenv", "promo_elegivel"].concat(jaLiberada || liberar ? ["dev_data"] : []))) return;
+    if ((jaLiberada || liberar) && bruto.dev_data > ctx.hoje) { erroNoRodape("A data da conversa não pode ser depois de hoje: libere depois de conversar."); return; }
+    const d = soPreenchidos(bruto);
+    const av = R.avaliacaoDo(ctx, m.id, ciclo);
     const pdi = {}, metas = {};
     Object.keys(d).forEach((k) => { if (/^(pdi_|promo_)/.test(k)) pdi[k] = d[k]; if (/^meta_/.test(k)) metas[k] = d[k]; });
-    const primeira = av.estagio === "CALIBRADA";
     ui.salvar(el, async () => {
-      await ui.atualizar("revAvaliacoes", av.id, { pdi: JSON.stringify(pdi), devolutivaEm: d.dev_data, estagio: "DEVOLUTIVA" });
-      const dados = { devolutivaEm: d.dev_data, fortes: d.dev_fortes, desenvolver: d.dev_desenv, metas: JSON.stringify(metas), estagio: "DEVOLUTIVA" };
+      // a preparação não mexe na etapa: a avaliação continua "Calibrada" e o membro não vê nada até a liberação
+      await ui.atualizar("revAvaliacoes", av.id, Object.assign({ pdi: JSON.stringify(pdi) }, jaLiberada ? { devolutivaEm: d.dev_data } : {}));
+      const dados = { fortes: d.dev_fortes, desenvolver: d.dev_desenv, metas: JSON.stringify(metas) };
+      if (jaLiberada) dados.devolutivaEm = d.dev_data;
+      let item = ret;
       if (ret) await ui.atualizar("revRetornos", ret.id, dados);
-      else await ui.criar("revRetornos", Object.assign(dados, { titulo: "Retornos · " + nomeDe(m.responsavel) + " · " + ciclo.ciclo, membroId: m.id, responsavel: m.responsavel, cicloId: String(ciclo.id) }));
-      if (primeira) GP.app.avisar([m.responsavel], "Revisão de Progresso: sua liderança registrou a devolutiva. Confirme a ciência no app, em Revisão de Progresso → Seus retornos (ciência, não concordância).");
-    }, { mensagem: "Devolutiva registrada. O membro foi avisado para confirmar a ciência." });
+      else item = await ui.criar("revRetornos", Object.assign(dados, { titulo: "Retornos · " + nomeDe(m.responsavel) + " · " + ciclo.ciclo, membroId: m.id,
+        responsavel: R.donoAntesDaConversa(ctx, m, ciclo, eu().id), cicloId: String(ciclo.id), estagio: "NEW" }));
+      if (liberar) await liberarDevolutiva(m, Object.assign({}, item || {}, dados), av, d.dev_data);
+    }, { mensagem: jaLiberada ? "Devolutiva atualizada." : liberar ? "Devolutiva liberada. " + nomeDe(m.responsavel) + " recebeu o aviso para confirmar a ciência." : "Devolutiva preparada. " + nomeDe(m.responsavel) + " só vê depois que você liberar, depois da conversa." });
   };
 
   /* ================================================================ MINHA AUTOAVALIAÇÃO */
@@ -816,10 +883,11 @@
     if (semEstrutura()) return h + avisoSemEstrutura();
     if (!ciclo) return h + '<div class="card">' + c.vazio("Os retornos chegam depois da calibração de cada ciclo.") + "</div>";
     const ret = R.retornoDe(ctx, id, ciclo);
-    h += '<p class="muted" style="margin:0 0 14px">O que chega para você, de quem e quando. Nada chega antes da calibração.</p>';
-    // 1. da liderança
+    const liberado = R.devolutivaLiberada(ret);
+    h += '<p class="muted" style="margin:0 0 14px">O que chega para você, de quem e quando. Primeiro a sua liderança conversa com você; o registro aparece aqui só depois dessa conversa.</p>';
+    // 1. da liderança (só depois que a liderança confirma a conversa)
     let c1;
-    if (ret && ret.devolutivaEm) {
+    if (liberado) {
       c1 = c.dados([["Conversa de devolutiva", fmt(ret.devolutivaEm)], ["Com", nomeDe(R.liderDe(ctx, id))]]) +
         '<div class="sci" style="margin-top:12px">' + c.textoRegistro("Pontos fortes combinados", ret.fortes) + c.textoRegistro("Pontos de desenvolvimento combinados", ret.desenvolver) + "</div>" +
         (metasHtml(ret) ? '<div class="rv-secao-t" style="margin-top:14px">Metas e entregas do próximo semestre</div>' + metasHtml(ret) : "") +
@@ -827,11 +895,11 @@
           : E().verComo ? '<p class="muted" style="margin-top:14px">A ciência é confirmada pela própria pessoa.</p>'
           : '<div class="rv-ciencia" id="form-ciencia">' + c.campo({ nome: "ciencia", rotulo: "Ciência", tipo: "simNao", textoCheck: "Participei da conversa de devolutiva. (ciência, não concordância)" }) +
             '<button class="btn" data-acao="rev-ciencia" data-id="' + esc(ret.id) + '">Confirmar ciência</button></div>');
-    } else c1 = '<p class="muted" style="margin:0">Conversa de devolutiva com pontos fortes e de desenvolvimento em palavras, e as metas do próximo semestre. Depois da conversa, elas aparecem aqui para você acompanhar.</p>';
-    h += cartao("1 · Da sua liderança", c1, ret && ret.devolutivaEm && !ret.cienciaEm ? c.tag("Confirme a ciência", "ambar") : "", ret && ret.devolutivaEm && !ret.cienciaEm ? "acao" : "");
-    // 2. do RH sobre os pares
-    h += cartao("2 · Do RH, sobre seus pares", ret && ret.retornoPares ? '<div class="texto-registro">' + esc(ret.retornoPares) + '</div><p class="muted" style="font-size:12px;margin-bottom:0">Resumo em temas, sem nomes e sem trechos literais. Se quiser, peça uma conversa com o RH.</p>'
-      : '<p class="muted" style="margin:0">Resumo em temas do que seus pares disseram, sem nomes e sem trechos literais. Só existe se houver respostas suficientes para proteger quem respondeu. Se quiser, peça uma conversa com o RH.</p>', ret && ret.retornoParesEm ? fmt(ret.retornoParesEm) : "");
+    } else c1 = '<p class="muted" style="margin:0">A sua liderança conversa com você sobre os pontos fortes e de desenvolvimento, em palavras, e sobre as metas do próximo semestre. Depois da conversa, o que foi combinado aparece aqui para você acompanhar.</p>';
+    h += cartao("1 · Da sua liderança", c1, liberado && !ret.cienciaEm ? c.tag("Confirme a ciência", "ambar") : "", liberado && !ret.cienciaEm ? "acao" : "");
+    // 2. do RH sobre os pares (também só depois da conversa com a liderança)
+    h += cartao("2 · Do RH, sobre seus pares", liberado && ret.retornoPares ? '<div class="texto-registro">' + esc(ret.retornoPares) + '</div><p class="muted" style="font-size:12px;margin-bottom:0">Resumo em temas, sem nomes e sem trechos literais. Se quiser, peça uma conversa com o RH.</p>'
+      : '<p class="muted" style="margin:0">Resumo em temas do que seus pares disseram, sem nomes e sem trechos literais. Só existe se houver respostas suficientes para proteger quem respondeu, e chega depois da conversa de devolutiva com a sua liderança. Se quiser, peça uma conversa com o RH.</p>', liberado && ret.retornoParesEm ? fmt(ret.retornoParesEm) : "");
     // 3. do RH sobre os liderados (só quem lidera)
     if (R.lideradosDe(ctx, id, ciclo).length) h += cartao("3 · Do RH, sobre seus liderados", ret && ret.retornoLideradosEm ? '<p style="margin:0">Conversa com o RH em <b>' + fmt(ret.retornoLideradosEm) + "</b>. Os temas alimentam o seu PDI.</p>"
       : '<p class="muted" style="margin:0">Conversa com o RH depois que você concluir as devolutivas da sua equipe. Se você tiver menos liderados que o mínimo, o resultado entra só no diagnóstico da área.</p>');
@@ -1033,26 +1101,56 @@
       }
     }, { mensagem: abrir ? "Ciclo aberto. Lideranças e membros foram avisados." : jaAberto ? "Ciclo atualizado." : "Rascunho do ciclo salvo." });
   };
+  /* ---------------- cargo na matriz (18/11/2026): o RH troca da lista ou da revisão do membro; grava no cadastro (Membros) ---------------- */
+  const opcoesCargo = () => R.CODIGOS.map((cod) => ({ valor: cod, rotulo: R.rotuloCargo(E().config, cod) }));
+  ui.acoes["rev-cargo"] = function (el) {
+    const ctx = X(), m = ctx.idx.membro[el.dataset.id];
+    if (!m || !ehRH()) return;
+    const atual = R.cargoDo(m);
+    const av = R.avaliacaoDo(ctx, m.id, R.cicloAberto(ctx));
+    const doAv = av && (av.cargo || atual);
+    let aviso = "";
+    if (av && R.avaliacaoEnviada(av)) aviso = "A avaliação deste ciclo já foi enviada ao RH com o cargo " + nomeCargo(doAv) + " e continua com ele. O novo cargo vale para as próximas avaliações.";
+    else if (av) aviso = "A liderança já começou a avaliação com o cargo " + nomeCargo(doAv) + ". Com outro cargo, os KPIs e as competências do formulário mudam e o que já foi preenchido pode não corresponder: avise a liderança para revisar o rascunho.";
+    ui.abrirPainel({
+      titulo: (atual ? "Trocar o cargo de " : "Definir o cargo de ") + nomeDe(m.responsavel), sub: "Cargo na matriz da Revisão de Progresso",
+      corpo: '<div id="form-cargo">' + c.campo({ nome: "cargoMatriz", rotulo: "Cargo na matriz", tipo: "lista", valor: atual, opcoes: opcoesCargo(),
+        ajuda: "Define os KPIs e as competências que a liderança avalia. Fica gravado no cadastro do membro. Os nomes dos cargos ficam em Configuração; os KPIs de cada um, em Matrizes dos cargos." }) +
+        (aviso ? '<div class="aviso-atencao" style="margin-top:12px">' + esc(aviso) + "</div>" : "") + "</div>",
+      rodape: '<button class="btn" data-acao="rev-salvar-cargo" data-id="' + esc(m.id) + '">Salvar</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+    });
+  };
+  ui.acoes["rev-salvar-cargo"] = function (el) {
+    const ctx = X(), m = ctx.idx.membro[el.dataset.id];
+    if (!m || !ehRH()) return;
+    const f = document.getElementById("form-cargo");
+    if (!ui.validar(f, ["cargoMatriz"])) return;
+    const novo = ui.lerForm(f).cargoMatriz;
+    if (novo === R.cargoDo(m)) { ui.fecharPainel(true); return; }
+    ui.salvar(el, () => ui.atualizar("membros", m.id, { cargoMatriz: novo }), { mensagem: "Cargo de " + nomeDe(m.responsavel) + ": " + nomeCargo(novo) + "." });
+  };
+
   /* ---------------- ciclo de teste (18/11/2026): só as pessoas escolhidas, para o RH e a TI testarem o fluxo inteiro ---------------- */
   ui.acoes["rev-teste-form"] = function () {
     if (!ehRH()) return;
     const ctx = X(), hoje = ctx.hoje;
     if (R.cicloAberto(ctx)) { window.alert("Já existe um ciclo aberto. Encerre-o antes de abrir um teste."); return; }
     const membros = dom.membrosAtivos(ctx.registros.membros || []).filter((m) => m.estagio !== "EM_ENCERRAMENTO").sort((a, b) => nomeDe(a.responsavel).localeCompare(nomeDe(b.responsavel), "pt-BR"));
-    const cargos = R.CODIGOS.map((cod) => ({ valor: cod, rotulo: R.rotuloCargo(E().config, cod) }));
+    const cargos = opcoesCargo();
+    // o cargo de cada um vem preenchido e pode ser trocado aqui; o que mudar fica no cadastro do membro
     const linha = (m) => {
       const cargo = R.cargoDo(m);
       return '<div class="rv-teste-linha"><label class="escolha rv-check"><input type="checkbox" name="pt_' + esc(m.id) + '"><span>' + esc(nomeDe(m.responsavel)) +
         ' <span class="muted">· liderança: ' + esc(nomeDe(dom.liderancaEfetiva(ctx, m))) + "</span></span></label>" +
-        (cargo ? '<span class="muted rv-teste-cargo">' + esc(nomeCargo(cargo)) + "</span>"
-          : '<select class="entrada rv-teste-cargo" name="cargo_' + esc(m.id) + '"><option value="">Cargo na matriz…</option>' + cargos.map((o) => '<option value="' + esc(o.valor) + '">' + esc(o.rotulo) + "</option>").join("") + "</select>") + "</div>";
+        '<select class="entrada rv-teste-cargo" name="cargo_' + esc(m.id) + '"><option value="">Cargo na matriz…</option>' +
+        cargos.map((o) => '<option value="' + esc(o.valor) + '"' + (o.valor === cargo ? " selected" : "") + ">" + esc(o.rotulo) + "</option>").join("") + "</select></div>";
     };
     const prazo = (nome, rot, dias) => c.campo({ nome, rotulo: rot, tipo: "data", valor: calc.addDias(hoje, dias) });
     ui.abrirPainel({
       titulo: "Abrir um ciclo de teste", largo: true, sub: "Revisão de Progresso · uso exclusivo do RH",
       corpo: '<div id="form-teste" class="rv-form">' +
         '<div class="aviso-info" style="margin-bottom:14px">O teste roda o ciclo inteiro (autoavaliação, avaliação da liderança, 360°, calibração, devolutiva e retornos) <b>só com as pessoas marcadas</b>. Só elas recebem aviso e entram na 360°; a liderança de fora do teste não avalia ninguém. Os relatórios usam mínimo de 1 resposta, então no teste a 360° não é anônima para o RH. No fim, "Encerrar e apagar o teste" tira os registros do teste das telas e libera o ciclo de verdade.</div>' +
-        secao("1. Quem participa", "marque as pessoas; quem não tem cargo na matriz precisa de um, que fica gravado no cadastro do membro",
+        secao("1. Quem participa", "marque as pessoas e confira o cargo na matriz de cada uma; o que mudar fica gravado no cadastro do membro",
           '<div class="rv-caixa rv-teste">' + membros.map(linha).join("") + "</div>") +
         secao("2. Prazos", "curtos, para testar já; dá para mudar depois em Editar prazos e regras",
           '<div class="linha-campos">' + prazo("prazoAuto", "Autoavaliação até", 1) + prazo("prazoLideranca", "Avaliação da liderança e 360° até", 2) + "</div>" +
@@ -1069,7 +1167,7 @@
     const d = ui.lerForm(f);
     const ids = Object.keys(d).filter((k) => k.indexOf("pt_") === 0 && d[k] === true).map((k) => k.slice(3));
     if (!ids.length) { erroNoRodape("Marque pelo menos uma pessoa."); return; }
-    const semCargo = ids.filter((id) => !R.cargoDo(ctx.idx.membro[id]) && !d["cargo_" + id]);
+    const semCargo = ids.filter((id) => !d["cargo_" + id]);
     if (semCargo.length) { erroNoRodape("Escolha o cargo na matriz de: " + esc(semCargo.map((id) => nomeDe(ctx.idx.membro[id].responsavel)).join(", ")) + "."); return; }
     if (R.cicloAberto(ctx)) { erroNoRodape("Já existe um ciclo aberto. Encerre-o antes de abrir um teste."); return; }
     const prazos = ["prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"];
@@ -1085,7 +1183,7 @@
     const pessoas = ids.map((id) => nomeDe(ctx.idx.membro[id].responsavel));
     if (!window.confirm("Abrir o ciclo de teste com " + pessoas.join(", ") + "?\n\nSó essas pessoas recebem aviso no Bitrix e veem a Revisão de Progresso aberta.")) return;
     ui.salvar(el, async () => {
-      for (const id of ids) if (d["cargo_" + id] && !R.cargoDo(X().idx.membro[id])) await ui.atualizar("membros", id, { cargoMatriz: d["cargo_" + id] });
+      for (const id of ids) if (d["cargo_" + id] && d["cargo_" + id] !== R.cargoDo(X().idx.membro[id])) await ui.atualizar("membros", id, { cargoMatriz: d["cargo_" + id] });
       await ui.criar("revCiclos", Object.assign({ titulo: "Revisão de Progresso · " + nome, autor: eu().id, responsavel: eu().id, estagio: "ABERTO" }, dados));
       const avisar = ids.map((id) => X().idx.membro[id].responsavel).filter(Boolean);
       GP.app.avisar(avisar, "[Teste] O RH abriu um ciclo de teste da Revisão de Progresso. Autoavaliação até " + calc.fmtData(dados.prazoAuto) + "; avaliação da liderança e 360° até " + calc.fmtData(dados.prazoLideranca) + ". Abra o app Gestão de Pessoas → Revisão de Progresso.");

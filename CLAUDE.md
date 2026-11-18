@@ -88,7 +88,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 193 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 197 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -175,7 +175,7 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
 - **05/11/2026, Revisão de Progresso (pedido do usuário: "implemente o Revisao_de_Progresso_Prototipo.html", docs seção 14):**
   - O usuário escolheu seguir sem a planilha dos nomes dos cargos e fazer as 3 visões de uma vez. O RH dá nome aos cargos em Configuração (`config.revisao.cargos`; `NOMES_DO_PROTOTIPO` cobre C04, C05 e C06). O cargo de cada membro é `cargoMatriz` no Membros.
   - São 5 tabelas (`revCiclos`, `revAvaliacoes`, `revAutoavaliacoes`, `rev360`, `revRetornos`). As respostas longas ficam em JSON, com as chaves dos `name` do protótipo.
-  - Na avaliação, o responsável é **a liderança** (o membro nunca é dono). Na autoavaliação e nos retornos, o responsável é o membro. `autoavaliacaoDe` e `retornoDe` acham o item pelo responsável, porque o membro pode não ler o próprio item do Membros.
+  - Na avaliação, o responsável é **a liderança** (o membro nunca é dono). Na autoavaliação, o responsável é o membro. Nos retornos, é a liderança até a conversa de devolutiva e o membro depois (`R.donoAntesDaConversa`, 18/11/2026). `autoavaliacaoDe` acha pelo responsável, porque o membro pode não ler o próprio item do Membros; `retornoDe` acha pelo `membroId` e, sem o item do Membros, pelo responsável, desde que o item não seja de outra pessoa (o de um liderado fica com a liderança antes da conversa).
   - Anonimato: `rev360` só é gravada por `api/revisao360.js`, sem autor, e o RH é o responsável. O "já respondi" fica em `userOption gp_360_<ciclo>` e o rascunho, no localStorage.
     - `lib/contexto-servidor.js` não lê `rev360`.
     - O relatório só traz textos de grupos com o mínimo (`relatorio360` devolve `textos: null` abaixo dele).
@@ -188,6 +188,9 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - A demonstração tem um ciclo aberto, com uma avaliação em cada etapa e 14 respostas 360°.
 - **18/11/2026, Perfil e ciclo de teste (pedidos do usuário):**
   - **Perfil:** cada pessoa vê os próprios feedbacks SCI (com autor, situação, comportamento, impacto, combinados e adendos) e as próprias respostas ao alinhamento semanal pelo WhatsApp, que antes só a liderança via. A função "Membros" do CRM continua sem leitura nessas tabelas: quem lê é `api/membro.js` (`o: "perfil"`), pelo webhook, só o que é da pessoa da sessão. Em "Ver como", o Perfil usa o que o login do RH ou do administrador já leu. 1:1, O2O, plano de melhoria e onboarding continuam fora do Perfil (o onboarding nunca vai para o membro).
+  - **Cargo editável e devolutiva depois da conversa** (pedidos do usuário no primeiro teste, mesmo dia):
+    - O RH troca o cargo na matriz em "Trocar cargo" (cada linha da lista do ciclo, topo da revisão do membro, e o formulário do teste, que agora traz o cargo de todos já preenchido). Grava `cargoMatriz` no Membros. A avaliação guarda o próprio `cargo`, então a enviada continua lida com o cargo antigo; em rascunho, o app avisa.
+    - A devolutiva tem dois tempos: "Preparar a devolutiva" grava o item de retornos sem `devolutivaEm`, em NEW, com a liderança como responsável; a avaliação fica em CALIBRADA. "Conversa feita: liberar ao membro" (`liberarDevolutiva`) grava a data da conversa (`devolutivaEm`, que é o que libera: `R.devolutivaLiberada`), DEVOLUTIVA nas duas tabelas, passa o item ao membro, comenta e avisa. Antes disso o membro não vê nada em Seus retornos (nem o retorno do RH sobre os pares) e não recebe aviso; o RH salvando os pares antes da conversa cria o item com a liderança como responsável.
   - **Ciclo de teste da Revisão de Progresso** (Abertura do ciclo → "Abrir um ciclo de teste"): o RH marca as pessoas e, para quem está sem cargo na matriz, escolhe um (fica no Membros). As regras ganham `publico: "pessoas"`, `pessoas` (IDs do Membros) e `teste: true`. No teste: não pede as conferências; mínimos 1 e 1 (a 360° não é anônima para o RH); `ativos`, `superioresDe`, `paresDe`, `lideradosDe`, `relacaoCom` e o servidor (`lib/revisao360.js`) recebem o ciclo e ficam só entre as pessoas do teste; quem está fora não responde a 360° nem avalia (`equipeNoCiclo` vazio para a liderança de fora, como a CEO); o aviso vai só para os participantes; quem está fora vê "O RH está testando". "Encerrar e apagar o teste" leva o ciclo e os registros dele (avaliações, autoavaliações, retornos e 360°) para FAIL.
 - **05/11/2026, solicitação de promoção (pedido do usuário, docs seção 13):**
   - A liderança direta e a coordenação pedem (Recrutamento → "Solicitar promoção" e aba Carreira do membro). A coordenação e o RH aprovam no app.

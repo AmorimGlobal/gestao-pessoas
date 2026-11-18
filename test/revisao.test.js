@@ -184,7 +184,7 @@ test("relatório 360°: só grupos com o mínimo; abaixo dele, junta na área ou
 test("sino: abertura para quem participa, equipe a avaliar, devolutiva a fazer, ciência a confirmar e envio ao RH", () => {
   const ctx = contextoDemo("3");
   const t = (uid) => R.notificacoes(ctx, uid).map((n) => n.titulo);
-  assert.deepEqual(t("3"), ["Avalie sua equipe na Revisão de Progresso", "Calibração concluída: faça a devolutiva de Bruno Teixeira"]);
+  assert.deepEqual(t("3"), ["Avalie sua equipe na Revisão de Progresso", "Calibração concluída: converse com Bruno Teixeira e libere a devolutiva"]);
   assert.deepEqual(t("100"), ["O RH abriu a Revisão de Progresso (Novembro 2026 · inaugural (anual))", "Sua liderança registrou a devolutiva: confirme a ciência"]);
   assert.deepEqual(t("6"), ["Avaliação enviada ao RH: Daniela Rocha"]);
   assert.deepEqual(t("110"), [], "sem cargo na matriz: fora do ciclo");

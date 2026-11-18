@@ -525,6 +525,7 @@ details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy)
 .rv-teste-linha:last-child { border-bottom: 0; }
 .rv-teste-cargo { max-width: 260px; font-size: 12px; }
 select.rv-teste-cargo { padding: 4px 8px; }
+.btn.link.rv-cargo-btn { font-size: 12px; }
 /* Perfil: feedbacks e alinhamento semanal do próprio membro */
 .perfil-feedback { padding: 10px 0; border-bottom: 1px solid var(--borda); }
 .perfil-feedback:last-child { border-bottom: 0; padding-bottom: 0; }
