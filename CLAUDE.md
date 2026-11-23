@@ -88,7 +88,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 204 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 205 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -199,6 +199,7 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
     - **Para onde vão os arquivos:** a 360° vai pelo servidor, sem autor na anônima. A autoavaliação e a avaliação da liderança vão pelo navegador. O campo `anexos` existe nas três tabelas.
     - **Ciclo:** sem cargo na matriz, todo mundo participa. Abertura e encerramento (`encerramento`, `R.encerramentoDo`) são as únicas datas na tela. A abertura guarda os links dos modelos (`regras.modelos`).
     - **RH:** "Ver os formulários" (`#/revisao/formularios`) mostra os formulários do app só para leitura.
+  - **Abrir sem avisar** (`regras.silencioso`, `R.silencioso`): por padrão o ciclo abre sem notificação do Bitrix nem do sino, inclusive pelos envios, até o RH clicar em "Avisar as pessoas" (grava `regras.avisadoEm`). Os avisos da Revisão passam por `avisarRev`/`avisarRHRev` em 69-ui-revisao.js.
   - **Retornos ao membro desligados** (`R.RETORNOS_AO_MEMBRO = false`): sem "Seus retornos", sem avisos ao membro, e o item de retornos fica com a liderança.
   - **O2O:** abre sozinho na janela do trimestre (`dom.janelaO2O`: primeiro dia útil + 14 dias). "Registrar O2O" cria o item quando o RH não criou.
   - **Outros:** "desligamento" virou "encerramento" no Offboarding. A pausa contratual saiu de Férias e ausências. No guia da Revisão, "Comportamento" virou "Competência" nos níveis, e saiu a frase do PDI e da ciência.

@@ -79,6 +79,19 @@
     if (el) el.innerHTML = '<div class="aviso-erro">' + texto + "</div>";
   }
   const quem = () => eu().nome + (E().verComo && E().euReal ? " (registrado por " + E().euReal.nome + ")" : "");
+  /** Avisos do Bitrix da Revisão. Com o ciclo aberto em silêncio (23/11/2026, pedido do usuário), nada sai até o RH clicar em "Avisar as pessoas" */
+  const mudo = () => R.silencioso(R.cicloAberto(X()));
+  function avisarRev(ids, texto) { if (!mudo()) GP.app.avisar(ids, texto); }
+  function avisarRHRev(texto) { if (!mudo()) GP.app.avisarRH(texto); }
+  const textoAbertura = (ci, regras) => "O RH abriu a Revisão de Progresso (" + ci.ciclo + "). " + (regras.entrega === "anexos"
+    ? "Envie as suas avaliações em arquivo (autoavaliação, lideranças, pares e, para quem lidera, liderados) até " + calc.fmtData(ci.encerramento || ci.prazoLideranca) + "."
+    : "Autoavaliação até " + calc.fmtData(ci.prazoAuto) + "; avaliação das lideranças e 360° até " + calc.fmtData(ci.prazoLideranca) + ".") + " Abra o app Gestão de Pessoas → Revisão de Progresso.";
+  /** Quem recebe o aviso de abertura: quem participa e as lideranças dessas pessoas */
+  function idsDaAbertura(ci) {
+    const ids = {};
+    R.participantes(X(), ci).filter((x) => x.ok).forEach((x) => { ids[x.m.responsavel] = true; const l = dom.liderancaEfetiva(X(), x.m); if (l) ids[l] = true; });
+    return Object.keys(ids);
+  }
 
   /** O que esta pessoa pode fazer com a revisão de um membro */
   function acessoAo(m) {
@@ -575,7 +588,7 @@
     if (!window.confirm("Enviar a avaliação de " + nome + " ao RH?\n\nDepois do envio, ajustes passam pela calibração do RH. A autoavaliação do membro fica liberada para você ler.")) return;
     ui.salvar(el, async () => {
       await gravarAvaliacao(m, d, true);
-      GP.app.avisarRH("Revisão de Progresso: " + quem() + " enviou ao RH a avaliação de " + nome + ".");
+      avisarRHRev("Revisão de Progresso: " + quem() + " enviou ao RH a avaliação de " + nome + ".");
     }, { mensagem: "Avaliação enviada ao RH." });
   };
   /** Abre os itens que faltam preencher, para a liderança achar */
@@ -606,7 +619,7 @@
     const primeira = av.estagio === "ENVIADA";
     ui.salvar(el, async () => {
       await ui.atualizar("revAvaliacoes", av.id, Object.assign({ calibracao: JSON.stringify(soPreenchidos(d)), calibradaEm: ui.agoraISO() }, primeira ? { estagio: "CALIBRADA" } : {}));
-      if (primeira) GP.app.avisar([av.avaliador || av.responsavel], "Revisão de Progresso: o RH concluiu a calibração de " + nomeDe(m && m.responsavel) + ". Faça a devolutiva" + (ciclo && ciclo.prazoDevolutiva ? " até " + calc.fmtData(ciclo.prazoDevolutiva) : "") + " e registre no app.");
+      if (primeira) avisarRev([av.avaliador || av.responsavel], "Revisão de Progresso: o RH concluiu a calibração de " + nomeDe(m && m.responsavel) + ". Faça a devolutiva" + (ciclo && ciclo.prazoDevolutiva ? " até " + calc.fmtData(ciclo.prazoDevolutiva) : "") + " e registre no app.");
     }, { mensagem: "Calibração registrada." });
   };
   ui.acoes["rev-devolver"] = function (el) {
@@ -618,7 +631,7 @@
     ui.salvar(el, async () => {
       await ui.atualizar("revAvaliacoes", av.id, { estagio: "NEW", enviadaEm: "" });
       try { await E().repo.comentar("revAvaliacoes", av.id, "Devolvida à liderança pelo RH (" + quem() + ")" + (motivo.trim() ? ": " + motivo.trim() : ".")); } catch (e) { /* o comentário não impede */ }
-      GP.app.avisar([av.avaliador || av.responsavel], "Revisão de Progresso: o RH devolveu a avaliação de " + nomeDe(m && m.responsavel) + " para você revisar" + (motivo.trim() ? ": " + motivo.trim() : ".") );
+      avisarRev([av.avaliador || av.responsavel], "Revisão de Progresso: o RH devolveu a avaliação de " + nomeDe(m && m.responsavel) + " para você revisar" + (motivo.trim() ? ": " + motivo.trim() : ".") );
     }, { mensagem: "Avaliação devolvida à liderança." });
   };
   ui.acoes["rev-retorno-rh"] = function (el) {
@@ -648,7 +661,7 @@
       if (ret) await ui.atualizar("revRetornos", ret.id, dados);
       // antes da conversa de devolutiva o item fica com a liderança: o membro não lê no CRM o que ainda não foi conversado
       else await ui.criar("revRetornos", Object.assign(dados, { titulo: "Retornos · " + nomeDe(m.responsavel) + " · " + ciclo.ciclo, membroId: m.id, responsavel: R.donoAntesDaConversa(ctx, m, ciclo, eu().id), cicloId: String(ciclo.id), estagio: "NEW" }));
-      if (LIB && novoPares && liberado) GP.app.avisar([m.responsavel], "Revisão de Progresso: o RH registrou o retorno sobre os seus pares. Veja em Revisão de Progresso → Seus retornos.");
+      if (LIB && novoPares && liberado) avisarRev([m.responsavel], "Revisão de Progresso: o RH registrou o retorno sobre os seus pares. Veja em Revisão de Progresso → Seus retornos.");
     }, { mensagem: liberado || !LIB ? "Retornos do RH salvos." : "Retornos do RH salvos. O membro vê depois da conversa de devolutiva com a liderança." });
   };
 
@@ -701,7 +714,7 @@
     await ui.atualizar("revRetornos", ret.id, Object.assign({ devolutivaEm: data, estagio: "DEVOLUTIVA" }, LIB ? { responsavel: m.responsavel } : {}));
     if (av) await ui.atualizar("revAvaliacoes", av.id, { devolutivaEm: data, estagio: "DEVOLUTIVA" });
     try { await E().repo.comentar("revRetornos", ret.id, "Conversa de devolutiva em " + calc.fmtDataAno(data) + ", confirmada por " + quem() + "." + (LIB ? " Liberada ao membro." : "")); } catch (e) { /* o comentário não impede */ }
-    if (LIB) GP.app.avisar([m.responsavel], "Revisão de Progresso: depois da conversa de devolutiva, o que foi combinado está em Revisão de Progresso → Seus retornos" +
+    if (LIB) avisarRev([m.responsavel], "Revisão de Progresso: depois da conversa de devolutiva, o que foi combinado está em Revisão de Progresso → Seus retornos" +
       (ret.retornoPares ? ", junto com o retorno do RH sobre os seus pares" : "") + ". Confirme a ciência no app (ciência, não concordância)." + (ciclo && R.ehTeste(ciclo) ? " [Teste]" : ""));
   }
   ui.acoes["rev-liberar-form"] = function (el) {
@@ -804,7 +817,7 @@
     ui.salvar(el, async () => {
       await gravarAuto(d, true);
       const lider = R.liderDe(X(), eu().id);
-      if (lider) GP.app.avisar([lider], "Revisão de Progresso: " + eu().nome + " enviou a autoavaliação. Você lê depois de enviar a sua avaliação ao RH.");
+      if (lider) avisarRev([lider], "Revisão de Progresso: " + eu().nome + " enviou a autoavaliação. Você lê depois de enviar a sua avaliação ao RH.");
     }, { mensagem: "Autoavaliação enviada." });
   };
 
@@ -1033,7 +1046,7 @@
         await ui.criar("revAutoavaliacoes", Object.assign(dados, { titulo: "Autoavaliação · " + eu().nome + " · " + ciclo.ciclo, responsavel: id, membroId: m ? m.id : "", cicloId: String(ciclo.id) }));
       }
       const lider = R.liderDe(X(), id);
-      if (lider) GP.app.avisar([lider], "Revisão de Progresso: " + eu().nome + " enviou a autoavaliação. Você lê depois de enviar a sua avaliação ao RH.");
+      if (lider) avisarRev([lider], "Revisão de Progresso: " + eu().nome + " enviou a autoavaliação. Você lê depois de enviar a sua avaliação ao RH.");
     }, { mensagem: "Autoavaliação enviada." });
   };
 
@@ -1110,7 +1123,7 @@
       // responsável = quem avalia: o membro nunca é dono do item (não lê a avaliação, mesmo com "Próprios" no CRM)
       if (av) await ui.atualizar("revAvaliacoes", av.id, dados);
       else await ui.criar("revAvaliacoes", Object.assign(dados, { titulo: "Revisão · " + nome + " · " + ciclo.ciclo, membroId: m.id, responsavel: eu().id, avaliador: eu().id, autor: eu().id }));
-      GP.app.avisarRH("Revisão de Progresso: " + quem() + " enviou ao RH a avaliação de " + nome + " (em arquivo).");
+      avisarRHRev("Revisão de Progresso: " + quem() + " enviou ao RH a avaliação de " + nome + " (em arquivo).");
     }, { mensagem: "Avaliação de " + nome + " enviada ao RH." });
   };
 
@@ -1167,7 +1180,7 @@
     ui.salvar(el, async () => {
       await ui.atualizar("revRetornos", ret.id, { cienciaEm: ui.agoraISO(), estagio: "SUCCESS" });
       const lider = R.liderDe(X(), eu().id);
-      if (lider) GP.app.avisar([lider], "Revisão de Progresso: " + eu().nome + " confirmou a ciência da devolutiva.");
+      if (lider) avisarRev([lider], "Revisão de Progresso: " + eu().nome + " confirmou a ciência da devolutiva.");
     }, { mensagem: "Ciência confirmada." });
   };
 
@@ -1289,6 +1302,7 @@
         (rasc ? '<button class="btn link" data-acao="rev-descartar-ciclo" data-id="' + esc(rasc.id) + '">Descartar o rascunho</button>' : "");
     h += c.cabecalho("desempenho", "Abertura do ciclo", aberto ? "<span>" + c.tag("Ciclo aberto", "verde") + "</span>" : rasc ? "<span>" + c.tag("Rascunho", "ambar") + "</span>" : "<span>nenhum ciclo aberto · aberturas em junho e novembro</span>", semEstrutura() ? "" : acoes);
     if (semEstrutura()) return h + avisoSemEstrutura();
+    if (aberto && R.silencioso(aberto)) h += '<div class="aviso-atencao" style="margin-bottom:16px"><b>Ciclo aberto sem aviso.</b> Ninguém recebeu notificação no Bitrix nem no sino do app, e os envios também não avisam ninguém. Quem abrir o app já vê a Revisão de Progresso. Quando quiserem anunciar, clique em <b>Avisar as pessoas</b>: vai uma notificação do Bitrix para ' + plural(idsDaAbertura(aberto).length, "pessoa", "pessoas") + ' (quem participa e as lideranças).<div style="margin-top:10px"><button class="btn" data-acao="rev-avisar-ciclo" data-id="' + esc(aberto.id) + '">Avisar as pessoas</button></div></div>';
     if (aberto && R.ehTeste(aberto)) h += '<div class="aviso-info" style="margin-bottom:16px"><b>Ciclo de teste.</b> Só as pessoas escolhidas participam, recebem avisos e entram na 360°. A liderança de fora do teste não avalia ninguém, e os relatórios usam mínimo de 1 resposta (no teste, a 360° não é anônima para o RH). Ao terminar, use <b>Encerrar e apagar o teste</b>: os registros do teste saem das telas e o ciclo de verdade pode ser aberto.</div>';
     if (ci) h += cicloHtml(ci) + regrasHtml(R.regrasDo(ci));
     else h += '<div class="aviso-info" style="margin-bottom:16px">Defina o ciclo e o período, os prazos de cada etapa, quem participa, as regras da 360° e dos retornos. Salve como rascunho quantas vezes precisar: o ciclo só abre depois das 3 conferências.</div>';
@@ -1353,6 +1367,9 @@
           c.campo({ nome: "retornoLidPequeno", rotulo: "Liderança com menos liderados do que o mínimo", tipo: "escolha", valor: r.retornoLidPequeno, opcoes: [{ valor: "diagnostico_area", rotulo: "Sem retorno individual · entra no diagnóstico da área" }, { valor: "nao_usar", rotulo: "Não usar neste ciclo" }] }) +
           c.campo({ nome: "retornoTopo", rotulo: "Quem dá o retorno à CEO e ao próprio RH", tipo: "escolha", valor: r.retornoTopo, opcoes: [{ valor: "consultoria", rotulo: "Consultoria externa para os dois" }, { valor: "ceo_rh_consultoria_ceo", rotulo: "CEO dá ao RH · consultoria dá à CEO" }] }) +
           '<p class="muted rv-sub">O RH não dá retorno sobre si mesmo. As regras de anonimato da seção 4 valem para todos os retornos.</p>') +
+        (aberto ? "" : secao("Aviso às pessoas", "pode ficar para depois",
+          check("avisar_agora", "Ao abrir, avisar agora quem participa e as lideranças (notificação do Bitrix e sino do app).", false) +
+          '<p class="muted rv-sub">Sem marcar, o ciclo abre em silêncio: ninguém é notificado, nem pelos envios, até o RH clicar em "Avisar as pessoas" na tela do ciclo.</p>')) +
         secao("6. Conferência antes de abrir", "os itens marcados liberam o botão Abrir ciclo", check("ok_lista", "Conferi no Bitrix a liderança direta de cada membro.", r.conferencias.lista) +
           check("ok_matriz", "Conferi que todos os cargos participantes têm matriz validada.", r.conferencias.matriz) +
           check("ok_anonimato", "A TI demonstrou com uma resposta de teste que a avaliação anônima é gravada sem autor, que os acessos ficam registrados e que a exportação bruta está bloqueada.", r.conferencias.anonimato)) +
@@ -1375,6 +1392,9 @@
     };
     // o ciclo de teste guarda quem participa; a tela de edição não mostra a lista
     if (regras.publico === "pessoas") Object.assign(regras, { pessoas: antes.pessoas, teste: true });
+    // o silêncio é decidido na abertura; editar o ciclo depois não muda
+    Object.assign(regras, { silencioso: !!antes.silencioso, avisadoEm: antes.avisadoEm || "" });
+    regras.avisarAgora = d.avisar_agora === true;
     const dados = { ciclo: d.ciclo, regras: JSON.stringify(regras), mensagem: String(d.mensagem || "").trim() };
     ["periodoInicio", "periodoFim", "dataAbertura", "encerramento", "prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"].forEach((k) => { dados[k] = d[k] || ""; });
     // com entrega por arquivo, a autoavaliação e a avaliação da liderança vão até o encerramento
@@ -1404,21 +1424,36 @@
       if (outro && (!ci || outro.id !== ci.id)) { erroNoRodape("Já existe um ciclo aberto (" + esc(outro.ciclo) + "). Encerre-o antes de abrir outro."); return; }
     }
     const titulo = "Revisão de Progresso · " + dados.ciclo;
+    const avisarAgora = regras.avisarAgora;
+    delete regras.avisarAgora;
+    if (abrir && !jaAberto) Object.assign(regras, avisarAgora ? { silencioso: false, avisadoEm: ui.agoraISO() } : { silencioso: true, avisadoEm: "" });
+    dados.regras = JSON.stringify(regras);
     const participantes = abrir ? R.participantes(Object.assign({}, ctx), { regras: dados.regras }).filter((x) => x.ok).map((x) => x.m) : [];
     if (abrir && !window.confirm("Abrir o ciclo " + dados.ciclo + "?\n\n" + participantes.length + " pessoas participam. Lideranças passam a enviar as avaliações ao RH; membros recebem a autoavaliação" + (regras.liberarLideranca || regras.liberarPares ? " e a 360°" : "") +
-      (regras.entrega === "anexos" ? ", tudo em arquivo, até " + calc.fmtData(dados.encerramento) : "") + ". Todos recebem um aviso no Bitrix.")) return;
+      (regras.entrega === "anexos" ? ", tudo em arquivo, até " + calc.fmtData(dados.encerramento) : "") + "." +
+      (avisarAgora ? " Todos recebem um aviso no Bitrix agora." : " Ninguém é avisado agora: o aviso fica para o botão \"Avisar as pessoas\"."))) return;
     ui.salvar(el, async () => {
       const base = Object.assign({ titulo }, dados, abrir ? { estagio: "ABERTO" } : {});
       if (ci) await ui.atualizar("revCiclos", ci.id, base);
       else await ui.criar("revCiclos", Object.assign(base, { autor: eu().id, responsavel: eu().id, estagio: abrir ? "ABERTO" : "NEW" }));
-      if (abrir) {
+      if (abrir && avisarAgora) {
         const ids = {};
         participantes.forEach((m) => { ids[m.responsavel] = true; const l = dom.liderancaEfetiva(X(), m); if (l) ids[l] = true; });
-        GP.app.avisar(Object.keys(ids), "O RH abriu a Revisão de Progresso (" + dados.ciclo + "). " + (regras.entrega === "anexos"
-          ? "Envie as suas avaliações em arquivo (autoavaliação, lideranças, pares e, para quem lidera, liderados) até " + calc.fmtData(dados.encerramento) + "."
-          : "Autoavaliação até " + calc.fmtData(dados.prazoAuto) + "; avaliação das lideranças e 360° até " + calc.fmtData(dados.prazoLideranca) + ".") + " Abra o app Gestão de Pessoas → Revisão de Progresso.");
+        GP.app.avisar(Object.keys(ids), textoAbertura(dados, regras));
       }
-    }, { mensagem: abrir ? "Ciclo aberto. Lideranças e membros foram avisados." : jaAberto ? "Ciclo atualizado." : "Rascunho do ciclo salvo." });
+    }, { mensagem: abrir ? (avisarAgora ? "Ciclo aberto. Lideranças e membros foram avisados." : "Ciclo aberto sem aviso. Ninguém foi notificado.") : jaAberto ? "Ciclo atualizado." : "Rascunho do ciclo salvo." });
+  };
+  /** O RH anuncia o ciclo que abriu em silêncio: a notificação de abertura sai agora, e os avisos da Revisão passam a sair */
+  ui.acoes["rev-avisar-ciclo"] = function (el) {
+    const ci = X().idx.porId.revCiclos[el.dataset.id];
+    if (!ci || !ehRH() || !R.silencioso(ci)) return;
+    const ids = idsDaAbertura(ci);
+    if (!window.confirm("Avisar agora " + plural(ids.length, "pessoa", "pessoas") + " no Bitrix (quem participa e as lideranças)?\n\nDepois disso, os envios também passam a avisar (a liderança, quando o membro envia a autoavaliação; o RH, quando a liderança envia).")) return;
+    const regras = R.regrasDo(ci);
+    ui.salvar(el, async () => {
+      await ui.atualizar("revCiclos", ci.id, { regras: JSON.stringify(Object.assign({}, R.lerJSON(ci.regras), { silencioso: false, avisadoEm: ui.agoraISO() })) });
+      GP.app.avisar(ids, textoAbertura(ci, regras));
+    }, { mensagem: "Aviso enviado a " + plural(ids.length, "pessoa", "pessoas") + "." });
   };
   /* ---------------- cargo na matriz (18/11/2026): o RH troca da lista ou da revisão do membro; grava no cadastro (Membros) ---------------- */
   const opcoesCargo = () => R.CODIGOS.map((cod) => ({ valor: cod, rotulo: R.rotuloCargo(E().config, cod) }));

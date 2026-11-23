@@ -125,3 +125,21 @@ test("férias e ausências: a pausa contratual saiu das opções; os pedidos ant
   assert.deepEqual(F.TIPOS, ["Férias", "Day off"]);
   assert.ok(F.PRAZOS["Pausa contratual"], "o prazo de resposta dos pedidos antigos continua");
 });
+
+test("ciclo aberto em silêncio: nenhum aviso da Revisão até o RH avisar; o RH continua vendo o que chegou", () => {
+  const demo = require("../src/js/45-demo.js");
+  const d = demo.dadosDemo();
+  const ctx = dom.indexar({ hoje: "2026-10-08", eu: { id: "3" }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros });
+  const c = R.cicloAberto(ctx);
+  const comRegras = (o) => { ctx.registros.revCiclos = ctx.registros.revCiclos.map((x) => (x.id === c.id ? Object.assign({}, c, { regras: JSON.stringify(Object.assign(JSON.parse(c.regras), o)) }) : x)); };
+  const t = (uid) => R.notificacoes(ctx, uid).map((n) => n.titulo);
+  assert.equal(R.silencioso(c), false, "ciclo antigo, sem a regra: avisa como antes");
+  comRegras({ silencioso: true, avisadoEm: "" });
+  assert.equal(R.silencioso(R.cicloAberto(ctx)), true);
+  assert.deepEqual(t("100"), [], "o membro não recebe nada");
+  assert.deepEqual(t("3"), [], "a liderança não recebe nada");
+  assert.deepEqual(t("6"), ["Avaliação enviada ao RH: Daniela Rocha"], "o RH vê o que chegou");
+  comRegras({ silencioso: true, avisadoEm: "2026-10-08T10:00:00-03:00" });
+  assert.equal(R.silencioso(R.cicloAberto(ctx)), false, "depois do aviso, volta ao normal");
+  assert.ok(t("100").length >= 1);
+});

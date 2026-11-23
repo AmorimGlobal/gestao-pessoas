@@ -349,7 +349,8 @@
     const RV = GP.revisao, cicloRev = RV ? RV.cicloAberto(estado.ctx) : null;
     let naRevisao = 0;
     if (cicloRev) {
-      naRevisao = RV.equipeNoCiclo(estado.ctx, estado.eu.id, cicloRev).filter((m) => { const a = RV.avaliacaoDo(estado.ctx, m.id, cicloRev); return !a || a.estagio === "NEW" || a.estagio === "CALIBRADA"; }).length;
+      // ciclo aberto em silêncio (23/11/2026): a liderança não recebe o número até o RH avisar
+      if (!(RV.silencioso && RV.silencioso(cicloRev))) naRevisao = RV.equipeNoCiclo(estado.ctx, estado.eu.id, cicloRev).filter((m) => { const a = RV.avaliacaoDo(estado.ctx, m.id, cicloRev); return !a || a.estagio === "NEW" || a.estagio === "CALIBRADA"; }).length;
       if (estado.visao === "rh") naRevisao += (estado.ctx.registros.revAvaliacoes || []).filter((a) => String(a.cicloId) === String(cicloRev.id) && a.estagio === "ENVIADA").length;
     }
     const itemRevisao = item("revisao", "desempenho", "Revisão de Progresso", naRevisao, "Avaliações aguardando você");

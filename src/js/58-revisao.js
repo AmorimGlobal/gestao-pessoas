@@ -90,6 +90,8 @@
     // 23/11/2026, pedido do RH: neste primeiro ciclo as avaliações chegam em arquivo, por categoria (autoavaliação,
     // lideranças, pares e, para quem lidera, liderados). Os formulários do app voltam quando o RH revisar (2027): "formularios".
     entrega: "anexos",
+    // 23/11/2026, pedido do usuário: o ciclo abre em silêncio (sem aviso no Bitrix nem no sino) até o RH clicar em "Avisar as pessoas"
+    silencioso: false, avisadoEm: "",
   };
   /** Os retornos ao membro (devolutiva, retorno do RH, ciência) ficam fora até o RH liberar (pedido de 23/11/2026):
       o membro não vê "Seus retornos", não recebe aviso e o item de retornos nunca passa para ele. */
@@ -105,6 +107,8 @@
     if (r.teste) { r.minimoNotas = Number(lerJSON(ciclo && ciclo.regras).minimoNotas) || 1; r.minimoComentarios = Number(lerJSON(ciclo && ciclo.regras).minimoComentarios) || 1; }
     return r;
   }
+  /** Ciclo aberto sem aviso: nenhuma notificação da Revisão (Bitrix ou sino) até o RH avisar as pessoas */
+  const silencioso = (ciclo) => { const r = regrasDo(ciclo); return !!(ciclo && r.silencioso && !r.avisadoEm); };
   /** As avaliações deste ciclo chegam em arquivo (anexo), e não pelos formulários do app */
   const porAnexo = (ciclo) => regrasDo(ciclo).entrega === "anexos";
   /** A data em que as entregas fecham: o encerramento do ciclo ou, em ciclo antigo, o prazo da liderança */
@@ -537,6 +541,8 @@
     const quando = ciclo.dataAbertura ? ciclo.dataAbertura + "T08:00:00-03:00" : ciclo.criadoEm;
     const auto = autoavaliacaoDe(ctx, id, ciclo);
     const anexo = porAnexo(ciclo), fim = encerramentoDo(ciclo);
+    // em silêncio, só o RH vê o que chegou para calibrar
+    if (silencioso(ciclo)) return p.rh ? enviadasAoRH(ctx, ciclo) : [];
     if (euParticipo(ctx, id, ciclo)) lista.push({ id: "rev-ciclo-" + ciclo.id, quando, area: "Revisão de Progresso", rota: anexo ? "#/revisao" : "#/revisao/auto",
       titulo: "O RH abriu a Revisão de Progresso (" + nomeCiclo + ")",
       texto: anexo ? (fim ? "Envie as suas avaliações (autoavaliação, lideranças e pares) até " + calc.fmtData(fim) + "." : "") : ciclo.prazoAuto ? "Sua autoavaliação vai até " + calc.fmtData(ciclo.prazoAuto) + "." : "",
@@ -559,19 +565,20 @@
     const meu = retornoDe(ctx, id, ciclo);
     if (RETORNOS_AO_MEMBRO && devolutivaLiberada(meu) && meu.estagio === "DEVOLUTIVA" && !meu.cienciaEm) lista.push({ id: "rev-devolutiva-" + meu.id, quando: meu.atualizadoEm || meu.criadoEm, area: "Revisão de Progresso", rota: "#/revisao/retornos", acao: true,
       titulo: "Sua liderança registrou a devolutiva: confirme a ciência", texto: "Ciência, não concordância." });
-    if (p.rh) {
-      reg(ctx, "revAvaliacoes").filter((a) => String(a.cicloId) === String(ciclo.id) && a.estagio === "ENVIADA").forEach((a) => {
-        const m = ctx.idx.membro[a.membroId];
-        lista.push({ id: "rev-enviada-" + a.id, quando: a.enviadaEm || a.atualizadoEm, area: "Revisão de Progresso", rota: "#/revisao/membro/" + a.membroId, acao: true,
-          titulo: "Avaliação enviada ao RH: " + (m ? dom.pessoa(ctx, m.responsavel).nome : a.titulo), texto: "Por " + dom.pessoa(ctx, a.avaliador || a.responsavel).nome + ". Aguarda a calibração." });
-      });
-    }
+    if (p.rh) lista.push(...enviadasAoRH(ctx, ciclo));
     return lista;
+  }
+  function enviadasAoRH(ctx, ciclo) {
+    return reg(ctx, "revAvaliacoes").filter((a) => String(a.cicloId) === String(ciclo.id) && a.estagio === "ENVIADA").map((a) => {
+      const m = ctx.idx.membro[a.membroId];
+      return { id: "rev-enviada-" + a.id, quando: a.enviadaEm || a.atualizadoEm, area: "Revisão de Progresso", rota: "#/revisao/membro/" + a.membroId, acao: true,
+        titulo: "Avaliação enviada ao RH: " + (m ? dom.pessoa(ctx, m.responsavel).nome : a.titulo), texto: "Por " + dom.pessoa(ctx, a.avaliador || a.responsavel).nome + ". Aguarda a calibração." };
+    });
   }
 
   return {
     NIVEIS_KPI, NIVEIS_COMP, ACORDO, NAO_SEI, AUTO, SOBRE_LIDERANCA, SOBRE_PAR, CICLOS, ETAPAS, MAX_EXTRAS, REGRAS_PADRAO, CODIGOS, PONTOS,
-    RETORNOS_AO_MEMBRO, LIMITE_ANEXO, EXTENSOES_ANEXO, porAnexo, encerramentoDo, conferirAnexos, temAnexo, so360Anexo, anexos360, colegasDaArea,
+    RETORNOS_AO_MEMBRO, LIMITE_ANEXO, EXTENSOES_ANEXO, porAnexo, silencioso, encerramentoDo, conferirAnexos, temAnexo, so360Anexo, anexos360, colegasDaArea,
     rotuloNivel, lerJSON, regrasDo, podeAbrir, cicloAberto, cicloRascunho, ultimoCiclo, ehTeste, usuariosDoTeste,
     nomeCargo, rotuloCargo, cargoDo, matrizDo, participa, areaDe, areas,
     avaliacaoDo, autoavaliacaoDe, retornoDe, devolutivaLiberada, devolutivaPreparada, donoAntesDaConversa, faltando, situacaoMinimo, ajustes, situacaoDo,

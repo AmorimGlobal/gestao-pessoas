@@ -648,6 +648,12 @@ O RH adaptou o primeiro ciclo para receber as avaliações **em arquivo**. Os fo
    - O botão da liderança vira "Registrar a conversa".
    - Para religar, troque a constante e publique.
 8. **Guia de preenchimento:** saiu "O PDI e a seção Promoção ficam só com o RH. Depois da conversa, o membro confirma a ciência no app dele". Em "Como ler os níveis", "Comportamento" virou "Competência".
+9. **Abrir sem avisar** (pedido do usuário, mesmo dia): na abertura, "Ao abrir, avisar agora quem participa e as lideranças" vem desmarcado. Sem marcar, o ciclo abre em silêncio (`regras.silencioso`):
+   - nenhuma notificação do Bitrix e nada no sino nem no número do menu, inclusive pelos envios (autoavaliação, avaliação da liderança, calibração);
+   - o RH continua vendo no sino as avaliações que chegam;
+   - quem abrir o app já vê a Revisão de Progresso: o silêncio é só dos avisos.
+
+   Na tela do ciclo, "Avisar as pessoas" manda o aviso de abertura e grava `regras.avisadoEm`. Daí em diante, tudo avisa normalmente. Ciclos abertos antes (o de teste) não têm a regra e avisam como antes.
 
 Fora da Revisão, no mesmo pedido:
 
