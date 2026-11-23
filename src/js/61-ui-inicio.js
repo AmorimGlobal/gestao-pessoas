@@ -58,7 +58,7 @@
       destino("onboarding", "onboarding", "Onboarding", "Ficha e avaliações dos 3 primeiros meses") +
       destino("rotinas", "rotinas", "Feedbacks", "Feedbacks SCI, 1:1 do mês, O2O e plano de melhoria") +
       (dom.DESEMPENHO_ATIVO ? destino("desempenho", "desempenho", "Desempenho", "Entregas, evidências e o ano") : "") +
-      destino("offboarding", "offboarding", "Offboarding", "Solicitações e histórico de desligamentos") +
+      destino("offboarding", "offboarding", "Offboarding", "Solicitações e histórico de encerramentos") +
       '<div class="sep">Para consultar</div>' +
       destino("agenda", "agenda", "Agenda", "Ausências, aniversários e feriados") +
       (links.manual ? '<a href="' + esc(links.manual) + '" target="_blank" rel="noopener"><span class="ic">' + icone("manual", 18) + '</span><span><span class="t">Manual</span><br><span class="d">Manual da liderança</span></span></a>'

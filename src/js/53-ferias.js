@@ -24,7 +24,8 @@
   "use strict";
 
   const EMAIL_RH = "hr@amorimlawfirm.com";
-  const TIPOS = ["Férias", "Day off", "Pausa contratual"];
+  // A pausa contratual saiu das opções em 23/11/2026 (pedido do RH). As regras e os prazos dela ficam para os pedidos antigos.
+  const TIPOS = ["Férias", "Day off"];
   // antecedência mínima (dias corridos) e prazos de resposta (dias úteis): o RH, depois a liderança
   const PRAZOS = {
     "Férias": { antecedencia: 60, rh: 3, lideranca: 2 },

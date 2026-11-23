@@ -54,7 +54,7 @@
     const sec = (t, itens) => "<h4>" + esc(t) + "</h4><ul>" + itens.map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul>";
     return '<details class="card politica"' + (aberta ? " open" : "") + '><summary>' + icone("manual", 15) + " Políticas de Férias e Ausências</summary>" +
       '<div class="corpo-politica"><h4>Fluxo de solicitação</h4><ol>' + P.fluxo.map((x) => "<li><b>" + esc(x[0]) + ".</b> " + esc(x[1]) + "</li>").join("") + "</ol>" +
-      sec("Férias", P["Férias"]) + sec("Day off", P["Day off"]) + sec("Pausa contratual", P["Pausa contratual"]) + sec("Feriados", P.feriados) +
+      sec("Férias", P["Férias"]) + sec("Day off", P["Day off"]) + sec("Feriados", P.feriados) +
       '<p class="muted" style="font-size:12px">Dúvidas: ' + esc(F.EMAIL_RH) + ".</p></div></details>";
   }
 
@@ -87,8 +87,8 @@
     }
     h += '<div class="aviso-info" style="margin-bottom:16px">Você pede aqui, depois de ler as regras: o RH autoriza, a sua liderança valida, e o período entra na Agenda da equipe. Cada passo chega como aviso no Bitrix. ' +
       "O e-mail para " + esc(F.EMAIL_RH) + " com cópia para a liderança, que a política pede, sai pronto para enviar pela sua caixa do Bitrix." + (ehRH() ? " O RH também registra direto uma ausência combinada fora do app." : "") + "</div>";
-    if (paraRH.length) h += '<div class="card acao"><h3>Aguardando a autorização do RH<span class="extra muted">por ordem de chegada · em até 3 dias úteis (5 na pausa contratual)</span></h3>' + lista(paraRH, true, "") + "</div>";
-    if (paraMim.length) h += '<div class="card acao"><h3>Aguardando a sua validação<span class="extra muted">já autorizados pelo RH · em até 2 dias úteis (5 na pausa)</span></h3>' + lista(paraMim, true, "") + "</div>";
+    if (paraRH.length) h += '<div class="card acao"><h3>Aguardando a autorização do RH<span class="extra muted">por ordem de chegada · em até 3 dias úteis</span></h3>' + lista(paraRH, true, "") + "</div>";
+    if (paraMim.length) h += '<div class="card acao"><h3>Aguardando a sua validação<span class="extra muted">já autorizados pelo RH · em até 2 dias úteis</span></h3>' + lista(paraMim, true, "") + "</div>";
     // o aniversário fica no topo dos seus pedidos: o day off de aniversário usa o mês dele
     const aniv = (u.aniversario ? "Seu aniversário: <b>" + calc.fmtData("2000-" + u.aniversario) + "</b> · day off no mês de " + calc.MESES_LONGOS[Number(u.aniversario.slice(0, 2)) - 1] + "."
       : "Seu aniversário não está cadastrado: o day off de aniversário usa o mês dele.") +
@@ -221,7 +221,7 @@
       .slice().sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).map((u) => ({ valor: u.id, rotulo: u.nome }));
     return '<div id="form-ausencia">' +
       (p ? '<input type="hidden" name="pessoa" value="' + esc(p.responsavel) + '">' : c.campo({ nome: "pessoa", rotulo: "Quem fica ausente", tipo: "lista", opcoes: pessoas })) +
-      c.campo({ nome: "tipo", rotulo: "Tipo", tipo: "escolha", opcoes: F.TIPOS, valor: v.tipo || "Férias" }) +
+      c.campo({ nome: "tipo", rotulo: "Tipo", tipo: "escolha", opcoes: F.TIPOS.concat(v.tipo && F.TIPOS.indexOf(v.tipo) < 0 ? [v.tipo] : []), valor: v.tipo || "Férias" }) +
       '<div data-so="Day off">' + c.campo({ nome: "motivoDayOff", rotulo: "Motivo do day off", tipo: "escolha", opcoes: GP.schema.OPCOES.motivoDayOff, valor: v.motivoDayOff, opcional: true }) + "</div>" +
       '<div class="linha-campos">' + c.campo({ nome: "inicio", rotulo: "Primeiro dia", tipo: "data", valor: v.inicio }) +
       '<div data-nao="Day off">' + c.campo({ nome: "fim", rotulo: "Último dia", tipo: "data", valor: v.fim }) + "</div></div>" +
@@ -320,7 +320,7 @@
         '<div' + so("Pausa contratual,Férias-lei") + ">" + c.campo({ nome: "fim", rotulo: "Último dia", tipo: "data", min: ctx.hoje }) + "</div></div>" +
         '<div id="periodo-ferias" class="muted" style="font-size:12.5px;margin:-6px 0 14px"></div></div>' +
       '<div' + so("Férias-lei,Pausa contratual") + ">" + c.campo({ nome: "cobertura", rotulo: "Como as suas atividades ficam cobertas no período?", tipo: "textoLongo", ajuda: "A política pede cobertura do time no período: quem assume o quê." }) + "</div>" +
-      '<div' + so(comDatas) + ">" + c.campo({ nome: "justificativa", rotulo: "Justificativa", tipo: "textoLongo", opcional: true, ajuda: "Obrigatória na pausa contratual e quando o pedido tem pontos fora da política." }) +
+      '<div' + so(comDatas) + ">" + c.campo({ nome: "justificativa", rotulo: "Justificativa", tipo: "textoLongo", opcional: true, ajuda: "Obrigatória quando o pedido tem pontos fora da política." }) +
         '<div class="grupo-form"><div class="rotulo-grupo">Conferência com a política</div><div id="conferencia-ferias" class="muted">Preencha o período.</div></div></div></div>';
   }
   /** O pedido como está no formulário (day off, pausa e férias pela lei) */

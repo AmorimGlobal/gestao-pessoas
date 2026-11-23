@@ -54,7 +54,9 @@ test("ciclo: regras padrão, conferências para abrir e quem participa", () => {
   assert.equal(r.minimoNotas, 3);
   assert.equal(r.minimoComentarios, 5);
   assert.equal(r.abaixoMinimo, "juntar_area");
-  assert.deepEqual(R.podeAbrir(r).faltam.length, 3);
+  assert.equal(r.entrega, "anexos", "23/11/2026: o primeiro ciclo recebe as avaliações em arquivo");
+  assert.deepEqual(R.podeAbrir(r).faltam.length, 2, "com entrega por arquivo, a conferência das matrizes não é exigida");
+  assert.deepEqual(R.podeAbrir(Object.assign({}, r, { entrega: "formularios" })).faltam.length, 3);
   assert.equal(R.podeAbrir(Object.assign({}, r, { liberarLideranca: false, liberarPares: false, conferencias: { lista: true, matriz: true } })).ok, true, "sem 360°, a demonstração do anonimato não é exigida");
 
   const ctx = contextoDemo("6");
@@ -63,8 +65,9 @@ test("ciclo: regras padrão, conferências para abrir e quem participa", () => {
   const part = (id, c) => R.participa(ctx, c || ciclo, ctx.idx.membro[id]);
   assert.equal(part("1").ok, true);
   assert.match(part("5").motivo, /encerramento/, "Fernanda está em encerramento");
-  assert.match(part("7").motivo, /sem cargo/);
   const regras = (o) => ({ id: "x", regras: JSON.stringify(Object.assign({}, JSON.parse(ciclo.regras), o)) });
+  assert.equal(part("7").ok, true, "com entrega por arquivo, quem está sem cargo na matriz também participa");
+  assert.match(part("7", regras({ entrega: "formularios" })).motivo, /sem cargo/);
   assert.match(part("1", regras({ excluidos: ["1"] })).motivo, /exceção/);
   ctx.idx.membro["2"].contrato = "Estágio";
   assert.match(part("2", regras({ publico: "sem_estagio" })).motivo, /estágio/);
@@ -148,7 +151,10 @@ test("360°: superiores (com a supervisão, quem está acima dela), pares e lide
   assert.deepEqual(R.lideradosDe(ctx, "3"), ["4", "5"]);
   assert.equal(R.relacaoCom(ctx, "4", "2"), "Superior");
   assert.equal(R.relacaoCom(ctx, "4", "5"), "Par");
-  assert.equal(R.relacaoCom(ctx, "4", "7"), "", "Marketing não é par de quem está em SDR");
+  const pelosFormularios = { regras: JSON.stringify({ entrega: "formularios" }) };
+  assert.equal(R.relacaoCom(ctx, "4", "7", pelosFormularios), "", "pelos formulários, Marketing não é par de quem está em SDR");
+  assert.equal(R.relacaoCom(ctx, "4", "7"), "Par", "na entrega por arquivo, o colega da mesma área conta como par (23/11/2026)");
+  assert.deepEqual(R.colegasDaArea(ctx, "4", pelosFormularios), []);
   assert.equal(R.relacaoCom(ctx, "3", "4"), "", "liderado direto é a Revisão formal, não a 360°");
   assert.equal(R.avaliadoresPossiveis(ctx, "3", "Superior"), 2);
   assert.equal(R.grupoPequeno(ctx, "3", "Superior", { minimoNotas: 3 }), true);
@@ -184,10 +190,14 @@ test("relatório 360°: só grupos com o mínimo; abaixo dele, junta na área ou
 test("sino: abertura para quem participa, equipe a avaliar, devolutiva a fazer, ciência a confirmar e envio ao RH", () => {
   const ctx = contextoDemo("3");
   const t = (uid) => R.notificacoes(ctx, uid).map((n) => n.titulo);
-  assert.deepEqual(t("3"), ["Avalie sua equipe na Revisão de Progresso", "Calibração concluída: converse com Bruno Teixeira e libere a devolutiva"]);
-  assert.deepEqual(t("100"), ["O RH abriu a Revisão de Progresso (Novembro 2026 · inaugural (anual))", "Sua liderança registrou a devolutiva: confirme a ciência"]);
+  assert.deepEqual(t("3"), ["Avalie sua equipe na Revisão de Progresso", "Calibração concluída: converse com Bruno Teixeira e registre a devolutiva"]);
+  assert.deepEqual(t("100"), ["O RH abriu a Revisão de Progresso (Novembro 2026 · inaugural (anual))"], "os retornos ao membro estão desligados (23/11/2026): sem o aviso da ciência");
+  assert.match(R.notificacoes(ctx, "100")[0].texto, /Envie as suas avaliações .* até 16\/10/);
   assert.deepEqual(t("6"), ["Avaliação enviada ao RH: Daniela Rocha"]);
-  assert.deepEqual(t("110"), [], "sem cargo na matriz: fora do ciclo");
+  assert.deepEqual(t("110"), ["O RH abriu a Revisão de Progresso (Novembro 2026 · inaugural (anual))"], "com entrega por arquivo, quem está sem cargo na matriz também participa");
+  const c = R.cicloAberto(ctx);
+  ctx.registros.revCiclos = ctx.registros.revCiclos.map((x) => (x.id === c.id ? Object.assign({}, c, { regras: JSON.stringify(Object.assign(JSON.parse(c.regras), { entrega: "formularios" })) }) : x));
+  assert.deepEqual(t("110"), [], "pelos formulários, sem cargo na matriz: fora do ciclo");
   // no sino do app, junto com os outros avisos
   const N = require("../src/js/54-notificacoes.js");
   assert.ok(N.notificacoesDe(ctx, "100").some((n) => n.area === "Revisão de Progresso"));

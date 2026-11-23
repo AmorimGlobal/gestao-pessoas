@@ -256,6 +256,23 @@
     const ant = calc.trimestreAnterior(t);
     return cicloDo(ctx, c.membroId, ant.chave);
   }
+  /** Janela do O2O (pedido do RH, 23/11/2026): o registro abre sozinho, sem esperar o RH criar o item do ciclo,
+      no primeiro dia útil do trimestre, e fica aberto por duas semanas (14 dias corridos). Quem já tem o item
+      criado pelo RH segue o fluxo dele (agendar e registrar) a qualquer momento. */
+  const DIAS_JANELA_O2O = 14;
+  function janelaO2O(ctx, tri) {
+    const t = tri || ctx.tri;
+    const inicio = calc.ajustarPrazo(t.inicio, feriadosDe(ctx, "SP"));
+    const fim = calc.addDias(inicio, DIAS_JANELA_O2O - 1);
+    return { trimestre: t, inicio, fim, aberta: ctx.hoje >= inicio && ctx.hoje <= fim, passou: ctx.hoje > fim };
+  }
+  /** A próxima janela do O2O que ainda não terminou (a deste trimestre ou a do seguinte) */
+  function proximaJanelaO2O(ctx) {
+    const j = janelaO2O(ctx);
+    if (!j.passou) return j;
+    const t = ctx.tri.tri === 4 ? calc.trimestre(ctx.tri.ano + 1, 1) : calc.trimestre(ctx.tri.ano, ctx.tri.tri + 1);
+    return janelaO2O(ctx, t);
+  }
   /** Situação do item do ciclo, na régua de cor da 4.6 */
   function statusCiclo(ctx, c) {
     const m = ctx.idx.membro[c.membroId];
@@ -1150,7 +1167,7 @@
     indexar, pessoa, infoMembro, membrosAtivos, deptosChefiados, descendentes, papeis, equipeDe, deptoPrincipal, liderancaPelaEstrutura, coordenacaoPelaEstrutura, liderancaNaEstrutura, coordenacaoNaEstrutura, liderancaEfetiva, coordenacaoEfetiva, liderancasDoSetor, membrosVisiveis,
     feriadosDe, feriadosDoMembro, feriadosOficiais, feriadosCadastrados, feriadosDoAno, calendarioFeriados, ausenciasAprovadas, SIGLA_ABRANGENCIA,
     feedbackValido, feedbacksDo, editavel, ultimoFeedback,
-    cicloDo, cicloAnterior, combinados, statusCiclo, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
+    cicloDo, cicloAnterior, combinados, statusCiclo, janelaO2O, proximaJanelaO2O, DIAS_JANELA_O2O, statusOnboarding, onboardingDo, statusPlano, planoAtivoDo,
     temMensal, mensaisDo, mensalNoMes, situacaoMensal, ultimoDiaUtil,
     verificarRegistros, destinoEncerramento, aprovadorDe,
     pendenciasDe, ordenarPendencias, aprovacoesPendentes, filaRH,

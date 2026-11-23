@@ -68,7 +68,7 @@ src/js/54-notificacoes.js o sino: notificações calculadas dos registros (pedid
 src/js/56-semanal.js  revisões semanais do WhatsApp: quem é quem (telefone, nome), a semana pelo calendário do app semanal, o texto guardado e o plano (criar/atualizar sem duplicar)  [Node + navegador]
 src/js/57-revisao-matriz.js  GERADO por tools/revisao-matriz.js a partir do protótipo do RH: 40 cargos (KPIs e competências) e o glossário. Não edite à mão; não leia inteiro (179 KB)  [Node + navegador]
 src/js/58-revisao.js  Revisão de Progresso: ciclo e regras, quem participa, o que falta no formulário, mínimo das competências, ajustes, quem avalia quem na 360°, relatório com os mínimos, avisos do sino  [Node + navegador]
-src/js/69-ui-revisao.js telas da Revisão de Progresso (#/revisao…): início, abertura do ciclo, revisão de um membro (avaliação, calibração, devolutiva), autoavaliação, 360°, retornos, relatório 360°, matrizes
+src/js/69-ui-revisao.js telas da Revisão de Progresso (#/revisao…): início (com a entrega por anexo, 23/11/2026), abertura do ciclo, revisão de um membro (avaliação, calibração, devolutiva), autoavaliação, 360°, retornos, relatório 360°, matrizes, formulários (só leitura)
 lib/revisao360.js     a 360° no servidor: confere ciclo, liberação, relação e escala, e grava pelo webhook sem autor
 lib/ferias-equipe.js  as datas de férias reservadas pela equipe de quem pede, sem nomes (a regra "quem pediu primeiro fica com a data")
 lib/perfil-membro.js  os próprios feedbacks SCI e o próprio alinhamento semanal, para o Perfil (api/membro.js, o: "perfil")
@@ -88,7 +88,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 197 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 204 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -192,6 +192,17 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
     - O RH troca o cargo na matriz em "Trocar cargo" (cada linha da lista do ciclo, topo da revisão do membro, e o formulário do teste, que agora traz o cargo de todos já preenchido). Grava `cargoMatriz` no Membros. A avaliação guarda o próprio `cargo`, então a enviada continua lida com o cargo antigo; em rascunho, o app avisa.
     - A devolutiva tem dois tempos: "Preparar a devolutiva" grava o item de retornos sem `devolutivaEm`, em NEW, com a liderança como responsável; a avaliação fica em CALIBRADA. "Conversa feita: liberar ao membro" (`liberarDevolutiva`) grava a data da conversa (`devolutivaEm`, que é o que libera: `R.devolutivaLiberada`), DEVOLUTIVA nas duas tabelas, passa o item ao membro, comenta e avisa. Antes disso o membro não vê nada em Seus retornos (nem o retorno do RH sobre os pares) e não recebe aviso; o RH salvando os pares antes da conversa cria o item com a liderança como responsável.
   - **Ciclo de teste da Revisão de Progresso** (Abertura do ciclo → "Abrir um ciclo de teste"): o RH marca as pessoas e, para quem está sem cargo na matriz, escolhe um (fica no Membros). As regras ganham `publico: "pessoas"`, `pessoas` (IDs do Membros) e `teste: true`. No teste: não pede as conferências; mínimos 1 e 1 (a 360° não é anônima para o RH); `ativos`, `superioresDe`, `paresDe`, `lideradosDe`, `relacaoCom` e o servidor (`lib/revisao360.js`) recebem o ciclo e ficam só entre as pessoas do teste; quem está fora não responde a 360° nem avalia (`equipeNoCiclo` vazio para a liderança de fora, como a CEO); o aviso vai só para os participantes; quem está fora vê "O RH está testando". "Encerrar e apagar o teste" leva o ciclo e os registros dele (avaliações, autoavaliações, retornos e 360°) para FAIL.
+- **23/11/2026, notas de melhoria do RH (docs seção 14, item 5.2):**
+  - **Entrega por anexo:** o primeiro ciclo recebe as avaliações em arquivo (`regras.entrega = "anexos"`, o padrão).
+    - **Membro:** no início da Revisão, o cartão "Avaliação 360º" com autoavaliação, lideranças e pares. Em Pares entram também os colegas da área (`R.colegasDaArea`, fora da cadeia de liderança).
+    - **Liderança:** anexa a avaliação de cada liderado em "Sua equipe direta".
+    - **Para onde vão os arquivos:** a 360° vai pelo servidor, sem autor na anônima. A autoavaliação e a avaliação da liderança vão pelo navegador. O campo `anexos` existe nas três tabelas.
+    - **Ciclo:** sem cargo na matriz, todo mundo participa. Abertura e encerramento (`encerramento`, `R.encerramentoDo`) são as únicas datas na tela. A abertura guarda os links dos modelos (`regras.modelos`).
+    - **RH:** "Ver os formulários" (`#/revisao/formularios`) mostra os formulários do app só para leitura.
+  - **Retornos ao membro desligados** (`R.RETORNOS_AO_MEMBRO = false`): sem "Seus retornos", sem avisos ao membro, e o item de retornos fica com a liderança.
+  - **O2O:** abre sozinho na janela do trimestre (`dom.janelaO2O`: primeiro dia útil + 14 dias). "Registrar O2O" cria o item quando o RH não criou.
+  - **Outros:** "desligamento" virou "encerramento" no Offboarding. A pausa contratual saiu de Férias e ausências. No guia da Revisão, "Comportamento" virou "Competência" nos níveis, e saiu a frase do PDI e da ciência.
+  - **Falta no portal:** um administrador roda "Criar ou completar a estrutura", que cria os 4 campos novos.
 - **05/11/2026, solicitação de promoção (pedido do usuário, docs seção 13):**
   - A liderança direta e a coordenação pedem (Recrutamento → "Solicitar promoção" e aba Carreira do membro). A coordenação e o RH aprovam no app.
   - O card cai no funil 77, o mesmo das vagas, com os campos `UF_CRM_PR_*` (`20-schema.js`, `CAMPOS_PROMOCAO`: texto, data ou pessoa, sem lista).

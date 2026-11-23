@@ -31,8 +31,8 @@
     { valor: "Supera", desc: "Entregou claramente além do combinado, com evidência." },
   ];
   const NIVEIS_COMP = [
-    { n: 1, rotulo: "Básico", desc: "Comportamento ainda pontual ou com apoio constante." },
-    { n: 2, rotulo: "Em desenvolvimento", desc: "Comportamento presente, mas ainda sem consistência." },
+    { n: 1, rotulo: "Básico", desc: "Competência ainda pontual ou com apoio constante." },
+    { n: 2, rotulo: "Em desenvolvimento", desc: "Competência presente, mas ainda sem consistência." },
     { n: 3, rotulo: "Consistente", desc: "Nível mínimo esperado dos cargos já formalizados." },
     { n: 4, rotulo: "Referência", desc: "Sinal de prontidão para o próximo nível." },
   ];
@@ -87,7 +87,13 @@
     liberarLideranca: true, liberarPares: true, minimoNotas: 3, minimoComentarios: 5,
     abaixoMinimo: "juntar_area", retornoLidPequeno: "diagnostico_area", retornoTopo: "consultoria",
     conferencias: { lista: false, matriz: false, anonimato: false },
+    // 23/11/2026, pedido do RH: neste primeiro ciclo as avaliações chegam em arquivo, por categoria (autoavaliação,
+    // lideranças, pares e, para quem lidera, liderados). Os formulários do app voltam quando o RH revisar (2027): "formularios".
+    entrega: "anexos",
   };
+  /** Os retornos ao membro (devolutiva, retorno do RH, ciência) ficam fora até o RH liberar (pedido de 23/11/2026):
+      o membro não vê "Seus retornos", não recebe aviso e o item de retornos nunca passa para ele. */
+  const RETORNOS_AO_MEMBRO = false;
   function regrasDo(ciclo) {
     const r = Object.assign({}, REGRAS_PADRAO, lerJSON(ciclo && ciclo.regras));
     r.minimoNotas = Number(r.minimoNotas) || 3;
@@ -95,9 +101,14 @@
     r.conferencias = Object.assign({}, REGRAS_PADRAO.conferencias, r.conferencias || {});
     r.pessoas = (r.pessoas || []).map(String);
     r.teste = !!r.teste || r.publico === "pessoas";
+    r.entrega = r.entrega === "formularios" ? "formularios" : "anexos";
     if (r.teste) { r.minimoNotas = Number(lerJSON(ciclo && ciclo.regras).minimoNotas) || 1; r.minimoComentarios = Number(lerJSON(ciclo && ciclo.regras).minimoComentarios) || 1; }
     return r;
   }
+  /** As avaliações deste ciclo chegam em arquivo (anexo), e não pelos formulários do app */
+  const porAnexo = (ciclo) => regrasDo(ciclo).entrega === "anexos";
+  /** A data em que as entregas fecham: o encerramento do ciclo ou, em ciclo antigo, o prazo da liderança */
+  const encerramentoDo = (ciclo) => (ciclo && (ciclo.encerramento || ciclo.prazoLideranca || ciclo.prazoAuto)) || "";
   /** Ciclo de teste: só as pessoas escolhidas pelo RH, sem as conferências e com mínimo 1 nos relatórios */
   const ehTeste = (ciclo) => !!(ciclo && regrasDo(ciclo).teste);
   /** Os usuários do Bitrix que estão no ciclo de teste (null = ciclo normal, sem filtro) */
@@ -115,7 +126,7 @@
     const faltam = [];
     if (r.teste || r.publico === "pessoas") return { ok: true, faltam };
     if (!cf.lista) faltam.push("conferir a liderança direta de cada membro");
-    if (!cf.matriz) faltam.push("conferir as matrizes dos cargos participantes");
+    if (!cf.matriz && r.entrega === "formularios") faltam.push("conferir as matrizes dos cargos participantes");
     if ((r.liberarLideranca || r.liberarPares) && !cf.anonimato) faltam.push("a demonstração técnica do anonimato pela TI");
     return { ok: !faltam.length, faltam };
   }
@@ -153,7 +164,8 @@
       const area = areaDe(ctx, m.responsavel).id;
       if ((r.areas || []).map(String).indexOf(String(area)) < 0) return { ok: false, motivo: "área fora deste ciclo" };
     }
-    if (!cargoDo(m)) return { ok: false, motivo: "sem cargo na matriz (o RH define no cadastro do membro)" };
+    // com entrega por anexo, a matriz do cargo não entra (o arquivo do RH já traz o que avaliar)
+    if (!cargoDo(m) && r.entrega !== "anexos") return { ok: false, motivo: "sem cargo na matriz (o RH define no cadastro do membro)" };
     return { ok: true, motivo: "" };
   }
   /** A área de uma pessoa: o primeiro nível abaixo da empresa no caminho do departamento principal */
@@ -349,6 +361,29 @@
     return ativos(ctx, ciclo).filter((u) => String(u.id) !== String(uid) && String(u.id) !== lider && liderDe(ctx, u.id) === lider)
       .map((u) => ({ uid: String(u.id), relacao: "Par", papel: "par" }));
   }
+  /** As lideranças acima de alguém, da direta até o topo */
+  function cadeiaAcima(ctx, uid) {
+    const lista = [], vistos = {};
+    vistos[String(uid)] = true;
+    let l = liderDe(ctx, uid);
+    while (l && !vistos[l]) { vistos[l] = true; lista.push(l); l = liderDe(ctx, l); }
+    return lista;
+  }
+  /** Colegas da mesma área (23/11/2026: "avalie seus colegas de equipe ou da mesma área"), só na entrega por anexo:
+      quem está na área de quem avalia, fora os pares de mesma liderança e quem está acima ou abaixo na cadeia de
+      liderança (a coordenação da área não é colega; quem a pessoa lidera, mesmo indiretamente, também não) */
+  function colegasDaArea(ctx, uid, ciclo) {
+    if (!porAnexo(ciclo) || foraDoTeste(ctx, ciclo, uid)) return [];
+    const area = areaDe(ctx, uid).id;
+    if (!area) return [];
+    const id = String(uid);
+    const ja = {};
+    ja[id] = true;
+    superioresDe(ctx, uid, ciclo).concat(paresDe(ctx, uid, ciclo)).forEach((x) => { ja[x.uid] = true; });
+    cadeiaAcima(ctx, uid).forEach((x) => { ja[x] = true; });
+    return ativos(ctx, ciclo).filter((u) => !ja[String(u.id)] && areaDe(ctx, u.id).id === area && cadeiaAcima(ctx, u.id).indexOf(id) < 0)
+      .map((u) => ({ uid: String(u.id), relacao: "Par", papel: "colega da área" }));
+  }
   /** Liderados diretos (aparecem com o link para a Revisão formal, sem formulário duplicado) */
   function lideradosDe(ctx, uid, ciclo) { return ativos(ctx, ciclo).filter((u) => String(u.id) !== String(uid) && liderDe(ctx, u.id) === String(uid)).map((u) => String(u.id)); }
   /** Quantas pessoas podem avaliar alguém nesta relação: abaixo do mínimo, o grupo é pequeno (resposta só usada junto da área) */
@@ -361,10 +396,13 @@
   function relacaoCom(ctx, uid, avaliado, ciclo) {
     if (superioresDe(ctx, uid, ciclo).some((s) => s.uid === String(avaliado))) return "Superior";
     if (paresDe(ctx, uid, ciclo).some((s) => s.uid === String(avaliado))) return "Par";
+    if (colegasDaArea(ctx, uid, ciclo).some((s) => s.uid === String(avaliado))) return "Par";
     return "";
   }
-  /** Confere uma resposta 360° antes de gravar: as chaves certas, valores da escala e textos de tamanho razoável */
-  function validarResposta(relacao, r) {
+  /** Confere uma resposta 360° antes de gravar: as chaves certas, valores da escala e textos de tamanho razoável.
+      Com o arquivo (entrega por anexo, 23/11/2026), a resposta pode vir só com ele: grava {anexo: true}. */
+  function validarResposta(relacao, r, comArquivo) {
+    if (comArquivo) return { ok: true, erros: [], respostas: { anexo: true } };
     const pre = relacao === "Superior" ? "lid_" : "par_";
     const erros = [], limpo = {};
     for (let i = 1; i <= 8; i++) {
@@ -380,6 +418,38 @@
     });
     if (!Object.keys(limpo).some((k) => k.indexOf(pre) === 0)) erros.push("responda pelo menos uma afirmação");
     return { ok: !erros.length, erros, respostas: limpo };
+  }
+
+  /* ================================================================ entrega por anexo */
+  const LIMITE_ANEXO = 3 * 1024 * 1024; // bytes somados por envio (a 360° passa pelo servidor da Vercel, que aceita até 4,5 MB)
+  const EXTENSOES_ANEXO = ["pdf", "doc", "docx", "xls", "xlsx", "odt", "ods", "ppt", "pptx", "png", "jpg", "jpeg", "txt"];
+  /** Confere os arquivos de uma entrega: arquivos = [[nome, base64], ...] (servidor) ou [{name, size}] (navegador) */
+  function conferirAnexos(arquivos) {
+    const lista = Array.isArray(arquivos) ? arquivos : [];
+    const erros = [];
+    if (!lista.length) erros.push("escolha o arquivo da avaliação");
+    if (lista.length > 5) erros.push("até 5 arquivos por envio");
+    let total = 0;
+    lista.forEach((a) => {
+      const nome = String(Array.isArray(a) ? a[0] : (a && a.name) || "");
+      const ext = (nome.split(".").pop() || "").toLowerCase();
+      if (!nome || nome.length > 200) erros.push("nome de arquivo inválido");
+      else if (EXTENSOES_ANEXO.indexOf(ext) < 0) erros.push(nome + ": envie PDF, Word, Excel, PowerPoint ou imagem");
+      total += Array.isArray(a) ? Math.floor(String(a[1] || "").length * 3 / 4) : Number(a && a.size) || 0;
+    });
+    if (total > LIMITE_ANEXO) erros.push("os arquivos passam de 3 MB juntos: salve em PDF ou reduza as imagens");
+    return { ok: !erros.length, erros };
+  }
+  const temAnexo = (x) => !!(x && Array.isArray(x.anexos) && x.anexos.length);
+  /** Resposta 360° que só traz o arquivo (sem as afirmações): fica fora das médias e aparece na lista de arquivos */
+  const so360Anexo = (x) => { const r = lerJSON(x && x.respostas); return !!r.anexo || (temAnexo(x) && !Object.keys(r).some((k) => /^(lid|par)_/.test(k))); };
+  /** As avaliações 360° em arquivo do ciclo, por pessoa avaliada e relação (para o RH abrir no Bitrix) */
+  function anexos360(ctx, ciclo) {
+    const resp = reg(ctx, "rev360").filter((x) => String(x.cicloId) === String(ciclo && ciclo.id) && x.estagio !== "FAIL" && so360Anexo(x));
+    const grupos = {};
+    resp.forEach((x) => { const k = String(x.avaliado) + "|" + (x.relacao || ""); (grupos[k] = grupos[k] || { avaliado: String(x.avaliado), relacao: x.relacao || "", itens: [] }).itens.push(x); });
+    return Object.keys(grupos).map((k) => Object.assign(grupos[k], { nome: dom.pessoa(ctx, grupos[k].avaliado).nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") || a.relacao.localeCompare(b.relacao));
   }
 
   /* ================================================================ relatório do RH (só agregados, com o mínimo) */
@@ -406,7 +476,7 @@
       vai para o grupo da área (juntar_area) ou fica de fora (nao_usar). Os comentários só entram com o mínimo próprio. */
   function relatorio360(ctx, ciclo) {
     const r = regrasDo(ciclo);
-    const resp = reg(ctx, "rev360").filter((x) => String(x.cicloId) === String(ciclo && ciclo.id) && x.estagio !== "FAIL");
+    const resp = reg(ctx, "rev360").filter((x) => String(x.cicloId) === String(ciclo && ciclo.id) && x.estagio !== "FAIL" && !so360Anexo(x));
     const grupos = {};
     resp.forEach((x) => { const k = String(x.avaliado) + "|" + (x.relacao || ""); (grupos[k] = grupos[k] || []).push(x); });
     const pessoas = [], porArea = {};
@@ -466,25 +536,28 @@
     const nomeCiclo = ciclo.ciclo || "Revisão de Progresso";
     const quando = ciclo.dataAbertura ? ciclo.dataAbertura + "T08:00:00-03:00" : ciclo.criadoEm;
     const auto = autoavaliacaoDe(ctx, id, ciclo);
-    if (euParticipo(ctx, id, ciclo)) lista.push({ id: "rev-ciclo-" + ciclo.id, quando, area: "Revisão de Progresso", rota: "#/revisao/auto",
-      titulo: "O RH abriu a Revisão de Progresso (" + nomeCiclo + ")", texto: ciclo.prazoAuto ? "Sua autoavaliação vai até " + calc.fmtData(ciclo.prazoAuto) + "." : "", acao: !(auto && auto.estagio === "SUCCESS") });
+    const anexo = porAnexo(ciclo), fim = encerramentoDo(ciclo);
+    if (euParticipo(ctx, id, ciclo)) lista.push({ id: "rev-ciclo-" + ciclo.id, quando, area: "Revisão de Progresso", rota: anexo ? "#/revisao" : "#/revisao/auto",
+      titulo: "O RH abriu a Revisão de Progresso (" + nomeCiclo + ")",
+      texto: anexo ? (fim ? "Envie as suas avaliações (autoavaliação, lideranças e pares) até " + calc.fmtData(fim) + "." : "") : ciclo.prazoAuto ? "Sua autoavaliação vai até " + calc.fmtData(ciclo.prazoAuto) + "." : "",
+      acao: !(auto && auto.estagio === "SUCCESS") });
     const equipe = equipeNoCiclo(ctx, id, ciclo);
     if (equipe.length) {
       const faltam = equipe.filter((m) => { const a = avaliacaoDo(ctx, m.id, ciclo); return !a || a.estagio === "NEW"; }).length;
       if (faltam) lista.push({ id: "rev-equipe-" + ciclo.id, quando, area: "Revisão de Progresso", rota: "#/revisao", acao: true,
-        titulo: "Avalie sua equipe na Revisão de Progresso", texto: faltam + " de " + equipe.length + " avaliações a enviar" + (ciclo.prazoLideranca ? " até " + calc.fmtData(ciclo.prazoLideranca) : "") + "." });
+        titulo: "Avalie sua equipe na Revisão de Progresso", texto: faltam + " de " + equipe.length + " avaliações a enviar" + ((anexo ? fim : ciclo.prazoLideranca) ? " até " + calc.fmtData(anexo ? fim : ciclo.prazoLideranca) : "") + "." });
       equipe.forEach((m) => {
         const a = avaliacaoDo(ctx, m.id, ciclo);
         if (a && a.estagio === "CALIBRADA" && a.calibradaEm) lista.push({ id: "rev-calib-" + a.id, quando: a.calibradaEm, area: "Revisão de Progresso", rota: "#/revisao/membro/" + m.id, acao: true,
-          titulo: "Calibração concluída: converse com " + dom.pessoa(ctx, m.responsavel).nome + " e libere a devolutiva",
-          texto: "O registro só chega à pessoa depois que você confirmar a conversa." + (ciclo.prazoDevolutiva ? " Até " + calc.fmtData(ciclo.prazoDevolutiva) + "." : "") });
+          titulo: "Calibração concluída: converse com " + dom.pessoa(ctx, m.responsavel).nome + (RETORNOS_AO_MEMBRO ? " e libere a devolutiva" : " e registre a devolutiva"),
+          texto: (RETORNOS_AO_MEMBRO ? "O registro só chega à pessoa depois que você confirmar a conversa." : "O registro fica com você e o RH.") + (ciclo.prazoDevolutiva ? " Até " + calc.fmtData(ciclo.prazoDevolutiva) + "." : "") });
         const ret = retornoDe(ctx, m.responsavel, ciclo);
         if (ret && ret.cienciaEm) lista.push({ id: "rev-ciencia-" + ret.id, quando: ret.cienciaEm, area: "Revisão de Progresso", rota: "#/revisao/membro/" + m.id,
           titulo: dom.pessoa(ctx, m.responsavel).nome + " confirmou a ciência da devolutiva", texto: "" });
       });
     }
     const meu = retornoDe(ctx, id, ciclo);
-    if (devolutivaLiberada(meu) && meu.estagio === "DEVOLUTIVA" && !meu.cienciaEm) lista.push({ id: "rev-devolutiva-" + meu.id, quando: meu.atualizadoEm || meu.criadoEm, area: "Revisão de Progresso", rota: "#/revisao/retornos", acao: true,
+    if (RETORNOS_AO_MEMBRO && devolutivaLiberada(meu) && meu.estagio === "DEVOLUTIVA" && !meu.cienciaEm) lista.push({ id: "rev-devolutiva-" + meu.id, quando: meu.atualizadoEm || meu.criadoEm, area: "Revisão de Progresso", rota: "#/revisao/retornos", acao: true,
       titulo: "Sua liderança registrou a devolutiva: confirme a ciência", texto: "Ciência, não concordância." });
     if (p.rh) {
       reg(ctx, "revAvaliacoes").filter((a) => String(a.cicloId) === String(ciclo.id) && a.estagio === "ENVIADA").forEach((a) => {
@@ -498,6 +571,7 @@
 
   return {
     NIVEIS_KPI, NIVEIS_COMP, ACORDO, NAO_SEI, AUTO, SOBRE_LIDERANCA, SOBRE_PAR, CICLOS, ETAPAS, MAX_EXTRAS, REGRAS_PADRAO, CODIGOS, PONTOS,
+    RETORNOS_AO_MEMBRO, LIMITE_ANEXO, EXTENSOES_ANEXO, porAnexo, encerramentoDo, conferirAnexos, temAnexo, so360Anexo, anexos360, colegasDaArea,
     rotuloNivel, lerJSON, regrasDo, podeAbrir, cicloAberto, cicloRascunho, ultimoCiclo, ehTeste, usuariosDoTeste,
     nomeCargo, rotuloCargo, cargoDo, matrizDo, participa, areaDe, areas,
     avaliacaoDo, autoavaliacaoDe, retornoDe, devolutivaLiberada, devolutivaPreparada, donoAntesDaConversa, faltando, situacaoMinimo, ajustes, situacaoDo,

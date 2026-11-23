@@ -650,11 +650,14 @@
         if (!relacao) throw { descricao: "pela estrutura, você não avalia esta pessoa na 360°" };
         const regras = RV.regrasDo(ciclo);
         if ((relacao === "Superior" && !regras.liberarLideranca) || (relacao === "Par" && !regras.liberarPares)) throw { descricao: "esta parte da 360° não foi liberada neste ciclo" };
-        const v = RV.validarResposta(relacao, dados.respostas);
+        const anexos = Array.isArray(dados.anexos) && dados.anexos.length ? dados.anexos : null;
+        if (anexos) { const ca = RV.conferirAnexos(anexos); if (!ca.ok) throw { descricao: ca.erros.join("; ") }; }
+        const v = RV.validarResposta(relacao, dados.respostas, !!anexos);
         if (!v.ok) throw { descricao: v.erros.join("; ") };
         d.registros.rev360.push({ id: String(++seq), titulo: "360° · " + relacao + " · " + D.pessoa(ctx, dados.avaliado).nome, estagio: "NEW", estagioNome: "Recebida",
           cicloId: String(ciclo.id), avaliado: String(dados.avaliado), relacao, modo: dados.modo === "Identificada" ? "Identificada" : "Anônima",
           identificadoPor: dados.modo === "Identificada" ? euId : "", area: RV.areaDe(ctx, dados.avaliado).nome, respostas: JSON.stringify(v.respostas),
+          anexos: anexos ? anexos.map((a, i) => ({ id: String(900 + i), nome: a[0] })) : [],
           criadoEm: agora(), atualizadoEm: agora(), criadoPor: "", responsavel: "6", membroId: "" });
         return true;
       },

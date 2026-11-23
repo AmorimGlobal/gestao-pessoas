@@ -101,9 +101,9 @@
   const ENCERRAMENTO = {
     chave: "encerramento",
     nome: "Solicitação de Encerramento de Contrato",
-    descricao: "Este formulário tem como objetivo formalizar as solicitações de desligamento, garantindo o registro das justificativas, o alinhamento entre a liderança e o RH e a adequada documentação do processo. " +
+    descricao: "Este formulário tem como objetivo formalizar as solicitações de encerramento de contrato, garantindo o registro das justificativas, o alinhamento entre a liderança e o RH e a adequada documentação do processo. " +
       "As informações preenchidas devem ser claras, objetivas e fundamentadas em fatos e evidências que justifiquem a decisão. " +
-      "Atenção: nos casos de desligamento motivados por baixo desempenho ou incompatibilidade com a função, é obrigatória a inclusão de, no mínimo, 2 (dois) registros de feedback estruturado, devidamente documentados e anexados ao formulário. " +
+      "Atenção: nos casos de encerramento motivados por baixo desempenho ou incompatibilidade com a função, é obrigatória a inclusão de, no mínimo, 2 (dois) registros de feedback estruturado, devidamente documentados e anexados ao formulário. " +
       "Esses registros devem evidenciar os pontos abordados, as orientações fornecidas e as oportunidades de melhoria comunicadas ao membro.",
     secoes: [
       { titulo: "1. Dados da Solicitação", campos: [
@@ -112,7 +112,7 @@
         { codigo: "UF_CRM_OFF_SETOR", rotulo: "Departamento/Área", tipo: "texto", obrigatorio: true },
         { codigo: "UF_CRM_OFF_SOLICIT", rotulo: "Coordenação e Liderança", tipo: "texto", obrigatorio: true },
         { codigo: "UF_CRM_OFF_CARGO", rotulo: "Cargo e responsabilidades do profissional", tipo: "textoLongo", obrigatorio: true },
-        { codigo: "UF_CRM_OFF_DATA_DES", rotulo: "Data limite para o desligamento", tipo: "data", obrigatorio: true, ajuda: "Pelo menos 7 dias a partir de hoje. Evite sextas-feiras." },
+        { codigo: "UF_CRM_OFF_DATA_DES", rotulo: "Data limite para o encerramento", tipo: "data", obrigatorio: true, ajuda: "Pelo menos 7 dias a partir de hoje. Evite sextas-feiras." },
       ] },
       { titulo: "2. Justificativa", campos: [
         { codigo: "UF_CRM_OFF_MOTIVO", rotulo: "Marque a justificativa correta", tipo: "escolha", obrigatorio: true, empilhado: true,

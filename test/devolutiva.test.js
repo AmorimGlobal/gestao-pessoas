@@ -54,14 +54,15 @@ test("antes da conversa o item fica com a liderança, e o retorno da liderança 
   assert.equal(R.retornoDe(dela, "4", R.cicloAberto(dela)).id, "r4");
 });
 
-test("sino: o membro só é chamado a confirmar a ciência depois da conversa; a liderança vê o lembrete até liberar", () => {
+test("sino: com os retornos desligados (23/11/2026), o membro nunca é chamado à ciência; a liderança vê o lembrete até registrar a conversa", () => {
   const t = (ctx, uid) => R.notificacoes(ctx, uid).map((n) => n.titulo);
+  assert.equal(R.RETORNOS_AO_MEMBRO, false);
   const antes = contexto([preparada]);
   assert.ok(!t(antes, "4").some((x) => /confirme a ciência/.test(x)), "preparada: nada para a Beatriz");
-  assert.ok(t(antes, "3").includes("Calibração concluída: converse com Beatriz Nogueira e libere a devolutiva"));
+  assert.ok(t(antes, "3").includes("Calibração concluída: converse com Beatriz Nogueira e registre a devolutiva"));
   const depois = contexto([liberada], { estagioAv: "DEVOLUTIVA" });
-  assert.ok(t(depois, "4").includes("Sua liderança registrou a devolutiva: confirme a ciência"));
-  assert.ok(!t(depois, "3").some((x) => /Calibração concluída/.test(x)), "liberada: o lembrete da liderança sai");
+  assert.ok(!t(depois, "4").some((x) => /confirme a ciência/.test(x)), "retornos desligados: nada para a Beatriz nem depois da conversa");
+  assert.ok(!t(depois, "3").some((x) => /Calibração concluída/.test(x)), "conversa registrada: o lembrete da liderança sai");
 });
 
 test("lista da liderança e do RH: a devolutiva preparada aparece como falta a conversa", () => {

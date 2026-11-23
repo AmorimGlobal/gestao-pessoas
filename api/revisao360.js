@@ -1,7 +1,8 @@
 // Avaliação 360° da Revisão de Progresso: grava a resposta pelo webhook, sem ligar a quem respondeu
 // (lib/revisao360.js). Escrito à mão (não é gerado pelo build.js).
 //
-// O app chama com POST { auth: <token da sessão do Bitrix (BX24.getAuth)>, cicloId, avaliado, modo, respostas }.
+// O app chama com POST { auth: <token da sessão do Bitrix (BX24.getAuth)>, cicloId, avaliado, modo, respostas, anexos }.
+// anexos = [[nome, base64], ...] (entrega por anexo, 23/11/2026): até 3 MB somados, porque a Vercel aceita corpo de até 4,5 MB.
 // O token só serve para saber quem responde e conferir a relação com a pessoa avaliada; ele não é gravado.
 // De propósito, nada aqui escreve nos logs quem respondeu, nem quando dá erro.
 //
@@ -36,7 +37,7 @@ module.exports = async function handler(req, res, injetado) {
   }
   try {
     const r = await gravar360({ chamar: inj.chamar || criarChamadaWebhook(env.BITRIX_WEBHOOK_URL), env, uid, agora: inj.agora,
-      pedido: { cicloId: corpo.cicloId, avaliado: corpo.avaliado, modo: corpo.modo, respostas: corpo.respostas } });
+      pedido: { cicloId: corpo.cicloId, avaliado: corpo.avaliado, modo: corpo.modo, respostas: corpo.respostas, anexos: corpo.anexos } });
     return responder(res, r.status, r.ok ? { ok: true } : { ok: false, erro: r.erro });
   } catch (e) {
     // só a mensagem do Bitrix, sem quem respondeu nem o conteúdo

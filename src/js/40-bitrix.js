@@ -474,8 +474,9 @@
         const auth = BX24.getAuth ? BX24.getAuth() : null;
         if (!auth || !auth.access_token) throw new Error("o Bitrix não entregou o token de acesso desta sessão");
         const r = await fetch("/api/revisao360", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ auth: auth.access_token, cicloId: String(dados.cicloId), avaliado: String(dados.avaliado), modo: dados.modo, respostas: dados.respostas }) });
+          body: JSON.stringify({ auth: auth.access_token, cicloId: String(dados.cicloId), avaliado: String(dados.avaliado), modo: dados.modo, respostas: dados.respostas, anexos: dados.anexos || undefined }) });
         const j = await r.json().catch(function () { return {}; });
+        if (r.status === 413) throw new Error("o arquivo é grande demais para o envio: salve em PDF ou reduza as imagens (até 3 MB)");
         if (!r.ok || !j.ok) throw new Error(j.erro || "o servidor respondeu " + r.status);
         return true;
       },

@@ -9,6 +9,11 @@
      devolutiva (vai para o membro) com o PDI e a promoção (só o RH).
    - Quem participa: a autoavaliação (#/revisao/auto), a 360° dos superiores e pares (#/revisao/360)
      e os retornos do ciclo, com a ciência da devolutiva (#/revisao/retornos).
+   - Entrega por anexo (23/11/2026, pedido do RH para o primeiro ciclo): no início da Revisão, o cartão
+     "Avaliação 360º" recebe o arquivo de cada categoria (autoavaliação, lideranças e pares), e a liderança
+     anexa a avaliação de cada liderado em "Sua equipe direta". Os formulários do app ficam para 2027
+     (regras.entrega = "formularios"); o RH os vê em #/revisao/formularios.
+   - Os retornos ao membro ("Seus retornos", ciência, avisos) estão desligados (R.RETORNOS_AO_MEMBRO).
    Os formulários abrem no painel lateral, como no resto do app: o render() não apaga o que foi digitado.
    A 360° nunca é gravada pelo navegador: vai para o servidor (api/revisao360.js), que grava sem autor.
    ===================================================================================== */
@@ -33,6 +38,26 @@
   const NIVEIS_KPI = R.NIVEIS_KPI.map((x) => x.valor);
   const NIVEIS_COMP = R.NIVEIS_COMP.map((y) => ({ valor: String(y.n), rotulo: y.n + " · " + y.rotulo }));
   const DIMENSOES = ["Colaboração", "Valor para o cliente", "Autonomia e organização", "Pensamento e aprendizado", "Liderança"];
+  // 23/11/2026: os retornos ao membro ficam desligados até o RH liberar; com eles desligados, nada da devolutiva chega ao membro
+  const LIB = R.RETORNOS_AO_MEMBRO;
+  const anexoNoCiclo = (ciclo) => !!ciclo && R.porAnexo(ciclo);
+  /** O campo do arquivo ainda não existe no Bitrix (falta o "Criar ou completar a estrutura") */
+  const semCampoAnexo = (chave) => ((E().estrutura && E().estrutura.ausentes) || []).indexOf(chave + ".anexos") >= 0;
+  /** Os nomes dos arquivos, quando o Bitrix ou a demonstração os trazem */
+  function nomesAnexos(x) {
+    return (Array.isArray(x && x.anexos) ? x.anexos : []).map((a, i) => (Array.isArray(a) ? a[0] : (a && (a.nome || a.name)) || "")).filter(Boolean);
+  }
+  const qtdAnexos = (x) => (Array.isArray(x && x.anexos) ? x.anexos.length : 0);
+  /** Abre o card nativo do item no Bitrix, onde ficam os arquivos */
+  const linkBitrix = (chave, id, rotulo) => (id ? '<button class="btn link peq" data-acao="rev-abrir-card" data-chave="' + esc(chave) + '" data-id="' + esc(id) + '">' + esc(rotulo || "Abrir no Bitrix") + "</button>" : "");
+  ui.acoes["rev-abrir-card"] = function (el) { if (E().repo && E().repo.abrirCard) E().repo.abrirCard(el.dataset.chave, el.dataset.id); };
+  /** O link do modelo de cada categoria, que o RH cola na abertura do ciclo */
+  const MODELOS = [["auto", "Autoavaliação"], ["lideranca", "Avaliação das lideranças"], ["pares", "Avaliação dos pares"], ["liderados", "Avaliação dos liderados (liderança)"]];
+  function linkModelo(ciclo, tipo) {
+    const url = String(((R.regrasDo(ciclo).modelos || {})[tipo]) || "").trim();
+    return /^https?:\/\//i.test(url) ? '<a class="btn sec peq" href="' + esc(url) + '" target="_blank" rel="noopener">' + icone("baixar", 13) + " Baixar o modelo</a>" : "";
+  }
+  const icone = (n, t) => (GP.util.icone ? GP.util.icone(n, t) : "");
 
   /** Só o que foi preenchido vai para o JSON do Bitrix */
   function soPreenchidos(d) {
@@ -92,16 +117,28 @@
   }
   function guiaHtml() {
     const membro = E().visao === "membro";
-    const t = membro ? [
+    const ciclo = R.cicloAberto(X());
+    const anexo = !ciclo || anexoNoCiclo(ciclo);
+    const t = membro && anexo ? [
+      ["Como entregar", "Em cada categoria da Avaliação 360º (autoavaliação, lideranças e pares), preencha o modelo do RH e anexe o arquivo até o encerramento. Vale PDF, Word, Excel ou imagem, até 3 MB por envio. Confira o arquivo antes de enviar: depois do envio, não dá para trocar. Se precisar corrigir, fale com o RH."],
+      ["Quem lê", "Autoavaliação: sua liderança direta e o RH. Mais ninguém. Sua liderança lê só depois de enviar a avaliação dela ao RH, para não ser influenciada. Lideranças e pares: só o RH. A pessoa avaliada não recebe o seu arquivo."],
+      ["Lideranças e pares", "Lideranças: o superior imediato e, quando houver supervisão, quem está acima dela. Pares: quem tem a mesma liderança direta, e você pode incluir outro colega da sua área. Avalie só quem você acompanha de perto: se não for o caso, pule."],
+      ["Anônima ou identificada", "Anônima: seu nome não é gravado e nem o RH sabe quem enviou. Para isso, não escreva o seu nome no arquivo e confira as propriedades do documento (o Word e o Excel gravam o autor): o app não tira essa informação. Identificada: seu nome fica visível só para o RH, que pode te procurar para entender um ponto."],
+    ] : membro ? [
       ["Minha autoavaliação", "Quem lê: sua liderança direta e o RH. Mais ninguém. Sua liderança lê só depois de enviar a avaliação dela ao RH, para não ser influenciada. Responda com fatos, números e exemplos; depois de enviar, você não edita mais."],
       ["Avaliação 360°", "Você avalia seus superiores (o imediato e, quando houver supervisão, quem está acima dela) e seus pares (mesma liderança direta). Avalie só quem você acompanha de perto: se não for o caso, pule. Em cada afirmação existe \"Não sei avaliar\"."],
       ["Anônima ou identificada", "Anônima: seu nome não é gravado e nem o RH sabe quem escreveu; evite detalhes que só você viveu. Identificada: seu nome fica visível só para o RH, que pode te procurar para entender um ponto. Em grupos pequenos, sua resposta só é usada junto com as de outras pessoas da área."],
       ["Para onde vai", "Só para o RH. A pessoa avaliada não recebe o que você escreveu. Depois do ciclo, o RH leva a ela temas resumidos, sem identificar ninguém e sem trechos literais."],
-      ["Seus retornos", "Primeiro a conversa: a sua liderança fala com você sobre a devolutiva. Só depois dessa conversa o que foi combinado (e o retorno do RH sobre os pares) aparece em Seus retornos, e você confirma a ciência. Ciência, não concordância."],
+    ].concat(LIB ? [["Seus retornos", "Primeiro a conversa: a sua liderança fala com você sobre a devolutiva. Só depois dessa conversa o que foi combinado (e o retorno do RH sobre os pares) aparece em Seus retornos, e você confirma a ciência. Ciência, não concordância."]] : [])
+    : anexo ? [
+      ["Como funciona o ciclo", "Neste ciclo as avaliações chegam em arquivo. Você preenche o modelo do RH para cada liderado e anexa o arquivo em Sua equipe direta (Anexar avaliação) até o encerramento. Você também faz a sua parte na Avaliação 360º: autoavaliação, lideranças e pares."],
+      ["Passo a passo", "Em Sua equipe direta, clique em Anexar avaliação em cada liderado e envie o arquivo. A autoavaliação do membro fica liberada para você depois do seu envio. Depois da calibração do RH, faça a conversa de devolutiva com o membro e registre-a no app."],
+      ["Para onde vai cada coisa", "O arquivo fica com você e o RH: o membro não recebe a avaliação. Na devolutiva, você leva ao membro os pontos em palavras e as metas do próximo semestre."],
+      ["Como escrever a evidência", "Modelo SCI: Situação, Comportamento e Impacto. Fatos e dados, não impressões; entregas e resultados, não horas trabalhadas. Ex.: \"Na reunião de 12/09 com o lead [Situação], fez três perguntas antes de qualificar [Comportamento], e a oportunidade avançou sem devolução [Impacto].\""],
     ] : [
       ["Como funciona o ciclo", "O RH abre os ciclos em junho e novembro. Fora do ciclo, você pode iniciar rascunhos e registrar evidências ao longo do semestre: nada vai ao RH e o membro não vê. Quando o RH abre o ciclo, o rascunho vira a avaliação do ciclo: você revisa e envia."],
-      ["Passo a passo", "Clique no liderado e depois em Iniciar avaliação (ou Iniciar rascunho, fora do ciclo). Avalie cada KPI e cada competência, com evidência, e envie ao RH: o contador no rodapé mostra quantos itens faltam. Leia a autoavaliação do membro, liberada depois do seu envio. Depois da calibração do RH, prepare a devolutiva, converse com o membro e, depois da conversa, clique em \"Conversa feita: liberar ao membro\"."],
-      ["Para onde vai cada coisa", "O formulário fica com você e o RH: o membro não recebe o formulário. Na devolutiva, você leva ao membro os pontos em palavras e as metas do próximo semestre. O PDI e a seção Promoção ficam só com o RH. O membro não vê nada antes da conversa: o registro chega ao membro quando você confirma que a conversa aconteceu, e aí o membro confirma a ciência no app."],
+      ["Passo a passo", "Clique no liderado e depois em Iniciar avaliação (ou Iniciar rascunho, fora do ciclo). Avalie cada KPI e cada competência, com evidência, e envie ao RH: o contador no rodapé mostra quantos itens faltam. Leia a autoavaliação do membro, liberada depois do seu envio. Depois da calibração do RH, prepare a devolutiva, converse com o membro e registre a conversa no app."],
+      ["Para onde vai cada coisa", "O formulário fica com você e o RH: o membro não recebe o formulário. Na devolutiva, você leva ao membro os pontos em palavras e as metas do próximo semestre."],
       ["Quando algo não faz sentido para a função", "Você tem autonomia: dentro de cada KPI e competência há a opção Ajustar (texto, meta ou nível mínimo) ou Não se aplica neste ciclo, e no fim de cada seção dá para incluir até 2 itens. O ajuste vale na hora, sem aprovação: o RH só recebe o registro do que mudou."],
       ["Como escrever a evidência", "Modelo SCI: Situação, Comportamento e Impacto. Fatos e dados, não impressões; entregas e resultados, não horas trabalhadas. Ex.: \"Na reunião de 12/09 com o lead [Situação], fez três perguntas antes de qualificar [Comportamento], e a oportunidade avançou sem devolução [Impacto].\""],
     ];
@@ -110,14 +147,11 @@
   }
 
   /* ================================================================ o ciclo (cabeçalho das telas) */
+  /** O ciclo no topo: só a abertura e o encerramento (pedido do RH, 23/11/2026, no lugar dos prazos de cada etapa) */
   function cicloHtml(ci) {
-    const hoje = X().hoje;
-    const prazos = [ci.prazoAuto, ci.prazoLideranca, ci.prazoCalibracao, ci.prazoDevolutiva, ci.prazoRetornos];
-    const feito = (i) => ci.estagio === "SUCCESS" || (prazos[i] && prazos[i] < hoje);
-    const atual = ci.estagio === "ABERTO" ? R.ETAPAS.findIndex((_, i) => !feito(i)) : -1;
+    const fim = R.encerramentoDo(ci);
     return '<div class="card"><h3>' + esc(ci.ciclo || "Ciclo") + '<span class="extra">' + (R.ehTeste(ci) ? c.tag("Teste", "roxo") + " " : "") + c.tag(ci.estagioNome || ci.estagio, ci.estagio === "ABERTO" ? "verde" : ci.estagio === "NEW" ? "ambar" : "cinza") + "</span></h3>" +
-      '<div class="passos">' + R.ETAPAS.map((t, i) => '<span class="p ' + (i === atual ? "atual" : feito(i) ? "feito" : "") + '">' + esc(t) + (prazos[i] ? " · até " + calc.fmtData(prazos[i]) : "") + "</span>").join("") + "</div>" +
-      c.dados([["Período avaliado", fmt(ci.periodoInicio) + " a " + fmt(ci.periodoFim)], ["Abertura", fmt(ci.dataAbertura)]]) +
+      c.dados([["Abertura", ci.dataAbertura ? calc.fmtData(ci.dataAbertura) : "—"], ["Encerramento", fim ? calc.fmtData(fim) : "—"]]) +
       (ci.mensagem && E().visao !== "membro" ? '<div class="sci" style="margin-top:12px">' + c.textoRegistro("Mensagem do RH para as lideranças", ci.mensagem) + "</div>" : "") + "</div>";
   }
   /** Cor da situação da avaliação na lista */
@@ -130,7 +164,13 @@
     const ctx = X(), s = R.situacaoDo(ctx, ciclo, m), u = dom.pessoa(ctx, m.responsavel);
     return '<div class="item clicavel" data-rota="#/revisao/membro/' + esc(m.id) + '">' + c.avatar(u, 30) +
       '<div class="principal-item"><div class="t">' + esc(u.nome) + '</div><div class="d">' + esc(nomeCargo(R.cargoDo(m)) + (comLider ? " · liderança: " + nomeDe(dom.liderancaEfetiva(ctx, m)) : "")) + "</div></div>" +
-      '<div class="lado">' + (ciclo && s.auto ? c.tag(s.auto, s.autoEnviada ? "verde" : "cinza") : "") + tagSituacao(s, ciclo) + botaoCargo(m) + "</div></div>";
+      '<div class="lado">' + (ciclo && s.auto ? c.tag(s.auto, s.autoEnviada ? "verde" : "cinza") : "") + tagSituacao(s, ciclo) + botaoAnexarAvaliacao(m, ciclo) + botaoCargo(m) + "</div></div>";
+  }
+  /** Entrega por anexo: a liderança anexa a avaliação do liderado direto da lista */
+  function botaoAnexarAvaliacao(m, ciclo) {
+    if (!anexoNoCiclo(ciclo) || ciclo.estagio !== "ABERTO" || !acessoAo(m).avaliar || !R.participa(X(), ciclo, m).ok) return "";
+    if (R.avaliacaoEnviada(R.avaliacaoDo(X(), m.id, ciclo))) return "";
+    return '<button class="btn peq" data-acao="rev-anexo-lider" data-id="' + esc(m.id) + '">Anexar avaliação</button>';
   }
   /** O RH troca o cargo na matriz direto da lista (18/11/2026); fica gravado no cadastro do membro */
   const botaoCargo = (m) => (ehRH() ? '<button class="btn link rv-cargo-btn" data-acao="rev-cargo" data-id="' + esc(m.id) + '">' + (R.cargoDo(m) ? "Trocar cargo" : "Definir cargo") + "</button>" : "");
@@ -145,6 +185,7 @@
     if (p === "retornos") return telaRetornos();
     if (p === "relatorio") return telaRelatorio();
     if (p === "matriz") return telaMatriz(partes[1]);
+    if (p === "formularios") return telaFormularios(partes[1]);
     return telaInicio();
   };
 
@@ -156,12 +197,13 @@
     if (ehRH() && !semEstrutura()) acoes += '<a class="btn" href="#/revisao/ciclo">' + (ciclo ? "O ciclo aberto" : rasc ? "Continuar a abertura do ciclo" : "Preparar a abertura do ciclo") + "</a>" +
       (ultimo ? '<a class="btn sec" href="#/revisao/relatorio">Relatório 360°</a>' : "");
     if (E().visao !== "membro") acoes += '<a class="btn sec" href="#/revisao/matriz">Matrizes dos cargos</a>';
+    if (ehRH() || eu().admin) acoes += '<a class="btn sec" href="#/revisao/formularios">Ver os formulários</a>';
     let h = c.cabecalho("desempenho", "Revisão de Progresso", ciclo ? "<span>" + c.tag("Ciclo aberto", "verde") + "</span><span>" + esc(ciclo.ciclo) + "</span>"
       : "<span>" + c.tag("Nenhum ciclo aberto", "cinza") + "</span><span>aberturas em junho e novembro</span>", acoes);
     if (semEstrutura()) return h + avisoSemEstrutura();
     if (ultimo) h += cicloHtml(ultimo);
     else h += '<div class="aviso-info" style="margin-bottom:16px">' + (ehRH() ? "Nenhum ciclo ainda. Prepare a abertura: período, prazos, quem participa e as regras da 360°."
-      : "O RH abre os ciclos em junho e novembro." + (E().visao === "membro" ? " A autoavaliação e a 360° aparecem aqui quando o ciclo abrir." : " Fora do ciclo, você já pode iniciar rascunhos das avaliações da sua equipe.")) + "</div>";
+      : "O RH abre os ciclos em junho e novembro." + (E().visao === "membro" ? " A Avaliação 360º aparece aqui quando o ciclo abrir." : " Fora do ciclo, você já pode iniciar rascunhos das avaliações da sua equipe.")) + "</div>";
     h += minhaParteHtml(ciclo, ultimo);
     if (E().visao !== "membro") h += equipeHtml(ciclo);
     if (ehRH() && ciclo) h += rhHtml(ciclo);
@@ -176,6 +218,7 @@
     // ciclo de teste do qual a pessoa não faz parte: nada a fazer, só o aviso
     const doTeste = R.usuariosDoTeste(ctx, ciclo);
     if (doTeste && !doTeste[id]) return cartao("Ciclo de teste", '<p class="muted" style="margin:0">O RH está testando a Revisão de Progresso com algumas pessoas. Você não participa deste teste; o ciclo de verdade abre depois.</p>');
+    if (anexoNoCiclo(ciclo)) return entregas360Html(ciclo);
     if (ciclo) {
       const part = minhaParticipacao(ciclo);
       if (part.ok) {
@@ -195,7 +238,8 @@
     const cicloRet = ciclo || ultimo;
     const ret = cicloRet ? R.retornoDe(ctx, id, cicloRet) : null;
     const liberado = R.devolutivaLiberada(ret);
-    if (ciclo || liberado) linhas.push(["#/revisao/retornos", "Seus retornos", liberado ? "Da sua liderança (devolutiva) e do RH" : "Aparecem aqui depois da conversa de devolutiva com a sua liderança",
+    // "Seus retornos" saiu do painel até o RH garantir a segurança dessas funções (23/11/2026)
+    if (LIB && (ciclo || liberado)) linhas.push(["#/revisao/retornos", "Seus retornos", liberado ? "Da sua liderança (devolutiva) e do RH" : "Aparecem aqui depois da conversa de devolutiva com a sua liderança",
       liberado && !ret.cienciaEm ? c.tag("Confirme a ciência", "ambar") : liberado ? c.tag("Ciência confirmada", "verde") : c.tag("Depois da conversa", "cinza")]);
     if (!linhas.length) return "";
     return cartao(ciclo ? "Sua parte neste ciclo" : "Seus retornos", '<div class="lista">' + linhas.map((l) => '<div class="item' + (l[0] ? " clicavel" : "") + '"' + (l[0] ? ' data-rota="' + l[0] + '"' : "") + '><div class="principal-item"><div class="t">' + esc(l[1]) +
@@ -271,7 +315,8 @@
     h += '<div class="card">' + c.dados([["Ciclo", ciclo ? ciclo.ciclo : "Fora do ciclo · rascunho"], ["Período avaliado", ciclo ? fmt(ciclo.periodoInicio) + " a " + fmt(ciclo.periodoFim) : "definido pelo RH na abertura"],
       ["Matriz do cargo", cargo ? plural(cargo.kpis.length, "KPI", "KPIs") + " · " + plural(cargo.competencias.length, "competência", "competências") : "—"], ["Liderança direta", nomeDe(dom.liderancaEfetiva(ctx, m))]]) +
       (!part.ok ? '<div class="aviso-atencao" style="margin-top:14px">' + (ciclo ? "Fora deste ciclo: " : "") + esc(part.motivo) + ".</div>" : "") + "</div>";
-    if (!cargo) return h;
+    const anexo = anexoNoCiclo(ciclo);
+    if (!cargo && !anexo) return h;
 
     // as três etapas da liderança
     const passo = (n, titulo, texto, botoes, estado) => '<div class="rv-etapa ' + (estado || "") + '"><div class="rv-etapa-n">Etapa ' + n + '</div><div class="rv-etapa-c"><div class="t">' + esc(titulo) + '</div><div class="d">' + texto + "</div>" + (botoes ? '<div class="rv-etapa-b">' + botoes + "</div>" : "") + "</div></div>";
@@ -285,15 +330,16 @@
     let b3 = "";
     if (a.avaliar && av && ["CALIBRADA", "DEVOLUTIVA"].indexOf(av.estagio) >= 0 && !(ret && ret.cienciaEm)) {
       if (liberada) b3 = '<button class="btn sec" data-acao="rev-devolutiva" data-id="' + esc(m.id) + '">Editar a devolutiva</button>';
-      else if (preparada) b3 = '<button class="btn" data-acao="rev-liberar-form" data-id="' + esc(m.id) + '">Conversa feita: liberar ao membro</button><button class="btn sec" data-acao="rev-devolutiva" data-id="' + esc(m.id) + '">Editar a devolutiva</button>';
+      else if (preparada) b3 = '<button class="btn" data-acao="rev-liberar-form" data-id="' + esc(m.id) + '">' + (LIB ? "Conversa feita: liberar ao membro" : "Registrar a conversa") + '</button><button class="btn sec" data-acao="rev-devolutiva" data-id="' + esc(m.id) + '">Editar a devolutiva</button>';
       else b3 = '<button class="btn" data-acao="rev-devolutiva" data-id="' + esc(m.id) + '">Preparar a devolutiva</button>';
     }
     const t3 = ret && ret.cienciaEm ? "Conversa em " + fmt(ret.devolutivaEm) + " · o membro confirmou a ciência em " + fmt(ret.cienciaEm) + "." :
-      liberada ? "Conversa em " + fmt(ret.devolutivaEm) + ", liberada ao membro · aguardando a ciência do membro." :
-      av && av.estagio === "CALIBRADA" && preparada ? "Devolutiva preparada, e o membro ainda não vê. Faça a conversa" + ate + " e depois libere o registro." :
-      av && av.estagio === "CALIBRADA" ? "Calibração concluída: prepare a devolutiva e converse com o membro" + ate + ". O registro só chega ao membro depois que você confirmar a conversa." :
-      "Depois da calibração do RH: a conversa com o membro, até 3 ações do PDI e as metas do próximo semestre. O membro só vê depois da conversa.";
-    h += cartao("Etapas", passo(1, "Avaliação da liderança", esc(t1), b1, enviada ? "feito" : "atual") + passo(2, "Autoavaliação do membro", esc(t2), "", auto && auto.estagio === "SUCCESS" && (enviada || a.rh) ? "feito" : "") +
+      liberada ? "Conversa em " + fmt(ret.devolutivaEm) + (LIB ? ", liberada ao membro · aguardando a ciência do membro." : ", registrada.") :
+      av && av.estagio === "CALIBRADA" && preparada ? (LIB ? "Devolutiva preparada, e o membro ainda não vê. Faça a conversa" + ate + " e depois libere o registro." : "Devolutiva preparada. Faça a conversa" + ate + " e depois registre-a.") :
+      av && av.estagio === "CALIBRADA" ? "Calibração concluída: prepare a devolutiva e converse com o membro" + ate + "." + (LIB ? " O registro só chega ao membro depois que você confirmar a conversa." : "") :
+      "Depois da calibração do RH: a conversa com o membro, até 3 ações do PDI e as metas do próximo semestre." + (LIB ? " O membro só vê depois da conversa." : "");
+    if (anexo) h += entregasDoMembroHtml(m, a, av, auto, ciclo) + cartao("Depois do envio", passo(3, "Devolutiva e PDI", esc(t3), b3, ret && ret.cienciaEm ? "feito" : av && av.estagio === "CALIBRADA" ? "atual" : ""));
+    else h += cartao("Etapas", passo(1, "Avaliação da liderança", esc(t1), b1, enviada ? "feito" : "atual") + passo(2, "Autoavaliação do membro", esc(t2), "", auto && auto.estagio === "SUCCESS" && (enviada || a.rh) ? "feito" : "") +
       passo(3, "Devolutiva e PDI", esc(t3), b3, ret && ret.cienciaEm ? "feito" : av && av.estagio === "CALIBRADA" ? "atual" : ""));
 
     // RH: calibração e retornos
@@ -305,8 +351,10 @@
         : '<p class="muted" style="margin:0">Depois da reunião de calibração, registre se houve ajuste de nível, o motivo e a evidência. A liderança é avisada para fazer a devolutiva.</p>') +
         (bt ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' + bt + "</div>" : ""), av.estagio === "ENVIADA" ? "até " + calc.fmtData(ciclo && ciclo.prazoCalibracao) : "", av.estagio === "ENVIADA" ? "acao" : "");
     }
-    if (av && (enviada || a.avaliar) && (a.avaliar || a.rh || enviada)) h += avaliacaoHtml(m, av, { decisao: a.avaliar || a.rh, calibracao: a.avaliar && !a.rh && av.calibradaEm, pdi: a.avaliar || a.rh });
-    if (ciclo && (a.rh || (a.avaliar && enviada)) && auto && auto.estagio === "SUCCESS") h += autoavaliacaoHtml(auto);
+    // a avaliação e a autoavaliação pelos formulários do app (no ciclo por anexo, só se alguém usou o formulário)
+    const temFormulario = av && Object.keys(R.lerJSON(av.avaliacao)).length && (MZ.CARGOS[av.cargo] || cargo);
+    if (temFormulario && (enviada || a.avaliar) && (a.avaliar || a.rh || enviada)) h += avaliacaoHtml(m, av, { decisao: a.avaliar || a.rh, calibracao: a.avaliar && !a.rh && av.calibradaEm, pdi: a.avaliar || a.rh });
+    if (ciclo && (a.rh || (a.avaliar && enviada)) && auto && auto.estagio === "SUCCESS" && R.AUTO.some((q) => auto[q.campo])) h += autoavaliacaoHtml(auto);
     if (ret && (liberada || preparada || a.rh)) h += devolutivaHtml(ret, a.rh);
     if (a.rh && ciclo) h += retornoRHHtml(m, ret);
     return h;
@@ -371,11 +419,11 @@
   }
   function devolutivaHtml(ret, rh) {
     const liberada = R.devolutivaLiberada(ret), preparada = R.devolutivaPreparada(ret);
-    return cartao("Devolutiva (vai para o membro depois da conversa)", (liberada || preparada ? (preparada ? '<div class="aviso-info" style="margin-bottom:12px">Preparada pela liderança. O membro ainda não vê: o registro chega ao membro quando a liderança confirmar que a conversa aconteceu.</div>' : "") +
+    return cartao(LIB ? "Devolutiva (vai para o membro depois da conversa)" : "Devolutiva (fica com a liderança e o RH)", (liberada || preparada ? (preparada ? '<div class="aviso-info" style="margin-bottom:12px">' + (LIB ? "Preparada pela liderança. O membro ainda não vê: o registro chega ao membro quando a liderança confirmar que a conversa aconteceu." : "Preparada pela liderança. Falta registrar a conversa.") + "</div>" : "") +
       '<div class="sci">' + c.textoRegistro("Pontos fortes combinados", ret.fortes) + c.textoRegistro("Pontos de desenvolvimento combinados", ret.desenvolver) + "</div>" +
       (metasHtml(ret) ? '<div class="rv-secao-t" style="margin-top:14px">Metas e entregas do próximo semestre</div>' + metasHtml(ret) : "") : c.vazio("A liderança ainda não preparou a devolutiva.")) +
-      (rh && ret.retornoPares ? '<div class="sci" style="margin-top:12px">' + c.textoRegistro("Retorno do RH sobre os pares (" + fmt(ret.retornoParesEm) + ")" + (liberada ? "" : " · chega ao membro depois da conversa"), ret.retornoPares) + "</div>" : ""),
-      liberada ? "conversa em " + fmt(ret.devolutivaEm) + " · " + (ret.cienciaEm ? "ciência em " + fmt(ret.cienciaEm) : "aguardando a ciência") : preparada ? "preparada · o membro ainda não vê" : "");
+      (rh && ret.retornoPares ? '<div class="sci" style="margin-top:12px">' + c.textoRegistro("Retorno do RH sobre os pares (" + fmt(ret.retornoParesEm) + ")" + (liberada || !LIB ? "" : " · chega ao membro depois da conversa"), ret.retornoPares) + "</div>" : ""),
+      liberada ? "conversa em " + fmt(ret.devolutivaEm) + (LIB ? " · " + (ret.cienciaEm ? "ciência em " + fmt(ret.cienciaEm) : "aguardando a ciência") : "") : preparada ? (LIB ? "preparada · o membro ainda não vê" : "preparada") : "");
   }
   function retornoRHHtml(m, ret) {
     const lidera = R.lideradosDe(X(), m.responsavel, R.cicloAberto(X()) || R.ultimoCiclo(X())).length > 0;
@@ -582,7 +630,7 @@
     ui.abrirPainel({
       titulo: "Retornos do RH · " + nomeDe(m.responsavel), sub: "Em temas, sem nomes e sem trechos literais. Só com respostas suficientes para proteger quem respondeu.",
       corpo: '<div id="form-retorno-rh">' + c.campo({ nome: "retornoPares", rotulo: "Retorno sobre os pares (2 ou 3 pontos fortes e 2 ou 3 de desenvolvimento)", tipo: "textoLongo", linhas: 7, valor: ret.retornoPares, opcional: true,
-        ajuda: "O membro lê no app dele, em Seus retornos, depois da conversa de devolutiva com a liderança. Conversa com o RH só se ele pedir." }) +
+        ajuda: LIB ? "O membro lê no app dele, em Seus retornos, depois da conversa de devolutiva com a liderança. Conversa com o RH só se ele pedir." : "Fica com o RH: neste ciclo, os retornos não aparecem para o membro no app." }) +
         c.campo({ nome: "retornoParesEm", rotulo: "Retorno dos pares enviado em", tipo: "data", valor: ret.retornoParesEm || ctx.hoje, opcional: true }) +
         (lidera ? c.campo({ nome: "retornoLideradosEm", rotulo: "Conversa do RH sobre os liderados em", tipo: "data", valor: ret.retornoLideradosEm, opcional: true, ajuda: "Depois que a liderança concluir as devolutivas da equipe. Os temas alimentam o PDI da própria liderança." }) : "") + "</div>",
       rodape: '<button class="btn" data-acao="rev-salvar-retorno-rh" data-id="' + esc(m.id) + '">Salvar</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
@@ -600,8 +648,8 @@
       if (ret) await ui.atualizar("revRetornos", ret.id, dados);
       // antes da conversa de devolutiva o item fica com a liderança: o membro não lê no CRM o que ainda não foi conversado
       else await ui.criar("revRetornos", Object.assign(dados, { titulo: "Retornos · " + nomeDe(m.responsavel) + " · " + ciclo.ciclo, membroId: m.id, responsavel: R.donoAntesDaConversa(ctx, m, ciclo, eu().id), cicloId: String(ciclo.id), estagio: "NEW" }));
-      if (novoPares && liberado) GP.app.avisar([m.responsavel], "Revisão de Progresso: o RH registrou o retorno sobre os seus pares. Veja em Revisão de Progresso → Seus retornos.");
-    }, { mensagem: liberado ? "Retornos do RH salvos." : "Retornos do RH salvos. O membro vê depois da conversa de devolutiva com a liderança." });
+      if (LIB && novoPares && liberado) GP.app.avisar([m.responsavel], "Revisão de Progresso: o RH registrou o retorno sobre os seus pares. Veja em Revisão de Progresso → Seus retornos.");
+    }, { mensagem: liberado || !LIB ? "Retornos do RH salvos." : "Retornos do RH salvos. O membro vê depois da conversa de devolutiva com a liderança." });
   };
 
   /* ---------------- liderança: devolutiva, PDI, metas e promoção (Etapa 3) ---------------- */
@@ -626,33 +674,34 @@
     const liberada = R.devolutivaLiberada(ret);
     const nome = nomeDe(m.responsavel);
     ui.abrirPainel({
-      titulo: "Devolutiva de " + nome, largo: true, sub: "Depois da calibração do RH. Prepare, converse e só então libere: a conversa e as metas chegam ao membro depois da conversa; o PDI e a promoção ficam só com o RH.",
+      titulo: "Devolutiva de " + nome, largo: true, sub: LIB ? "Depois da calibração do RH. Prepare, converse e só então libere: a conversa e as metas chegam ao membro depois da conversa; o PDI e a promoção ficam só com o RH." : "Depois da calibração do RH. Prepare, converse com o membro e registre a conversa. Fica com você e o RH.",
       corpo: '<div id="form-devolutiva" class="rv-form">' +
-        secao("1. A conversa", "exemplos no modelo SCI · vai para o membro depois da conversa",
+        secao("1. A conversa", LIB ? "exemplos no modelo SCI · vai para o membro depois da conversa" : "exemplos no modelo SCI · o que você leva à conversa",
           c.campo({ nome: "dev_fortes", rotulo: "Pontos fortes combinados", tipo: "textoLongo", linhas: 4, valor: ret.fortes }) +
           c.campo({ nome: "dev_desenv", rotulo: "Pontos de desenvolvimento combinados", tipo: "textoLongo", linhas: 4, valor: ret.desenvolver })) +
         secao("2. Plano de desenvolvimento (PDI)", "no máximo 3 ações · só o RH", [1, 2, 3].map(acao).join("")) +
-        secao("3. Metas e entregas do próximo semestre", "resultado ou aprendizado, combinado entre as partes · vai para o membro", [1, 2, 3].map(meta).join("")) +
+        secao("3. Metas e entregas do próximo semestre", "resultado ou aprendizado, combinado entre as partes" + (LIB ? " · vai para o membro" : ""), [1, 2, 3].map(meta).join("")) +
         secao("4. Promoção", "liga ao pipeline do Plano de Carreira · decisão da CEO · só o RH", c.campo({ nome: "promo_elegivel", rotulo: "A Revisão indica elegibilidade para promoção?", tipo: "escolha", opcoes: ["Sim", "Não"], valor: pdi.promo_elegivel }) +
           c.campo({ nome: "promo_evidencias", rotulo: "Evidências anexadas ao pipeline", tipo: "textoLongo", linhas: 3, valor: pdi.promo_evidencias, opcional: true })) +
         (liberada
-          ? secao("5. A conversa com " + nome, "já liberada ao membro: o que você mudar aqui ele vê",
+          ? secao("5. A conversa com " + nome, LIB ? "já liberada ao membro: o que você mudar aqui ele vê" : "já registrada",
             c.campo({ nome: "dev_data", rotulo: "Data da conversa", tipo: "data", valor: ret.devolutivaEm }))
-          : secao("5. Liberar ao membro", "só depois da conversa",
-            '<p class="muted rv-sub">Sem marcar, a devolutiva fica salva só com você e o RH. Dá para preparar antes e liberar depois, pelo botão "Conversa feita: liberar ao membro".</p>' +
-            c.campo({ nome: "dev_liberar", rotulo: "A conversa", tipo: "simNao", textoCheck: "Já conversei com " + nome + " sobre a devolutiva: liberar agora" }) +
+          : secao(LIB ? "5. Liberar ao membro" : "5. A conversa", "só depois da conversa",
+            '<p class="muted rv-sub">' + (LIB ? 'Sem marcar, a devolutiva fica salva só com você e o RH. Dá para preparar antes e liberar depois, pelo botão "Conversa feita: liberar ao membro".' : 'Dá para preparar antes e registrar a conversa depois, pelo botão "Registrar a conversa".') + "</p>" +
+            c.campo({ nome: "dev_liberar", rotulo: "A conversa", tipo: "simNao", textoCheck: "Já conversei com " + nome + " sobre a devolutiva" + (LIB ? ": liberar agora" : "") }) +
             c.campo({ nome: "dev_data", rotulo: "Data da conversa", tipo: "data", valor: ctx.hoje, opcional: true }))) +
-        '<p class="muted" style="font-size:12px">Depois que você libera, o membro lê em Seus retornos e confirma no app dele que a conversa aconteceu. É ciência, não concordância.</p></div>',
+        (LIB ? '<p class="muted" style="font-size:12px">Depois que você libera, o membro lê em Seus retornos e confirma no app dele que a conversa aconteceu. É ciência, não concordância.</p>' : "") + "</div>",
       rodape: '<button class="btn" data-acao="rev-salvar-devolutiva" data-id="' + esc(m.id) + '">' + (liberada ? "Salvar a devolutiva" : "Salvar") + '</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
     });
   };
-  /** Libera a devolutiva ao membro: data da conversa, o item de retornos passa ao membro e a avaliação vai para "Devolutiva feita" */
+  /** Registra a conversa de devolutiva: a data, a avaliação vai para "Devolutiva feita" e, com os retornos ligados (LIB),
+      o item de retornos passa ao membro, que é avisado. Com eles desligados (23/11/2026), o item continua com a liderança. */
   async function liberarDevolutiva(m, ret, av, data) {
     const ciclo = R.cicloAberto(X());
-    await ui.atualizar("revRetornos", ret.id, { devolutivaEm: data, estagio: "DEVOLUTIVA", responsavel: m.responsavel });
+    await ui.atualizar("revRetornos", ret.id, Object.assign({ devolutivaEm: data, estagio: "DEVOLUTIVA" }, LIB ? { responsavel: m.responsavel } : {}));
     if (av) await ui.atualizar("revAvaliacoes", av.id, { devolutivaEm: data, estagio: "DEVOLUTIVA" });
-    try { await E().repo.comentar("revRetornos", ret.id, "Conversa de devolutiva em " + calc.fmtDataAno(data) + ", confirmada por " + quem() + ". Liberada ao membro."); } catch (e) { /* o comentário não impede */ }
-    GP.app.avisar([m.responsavel], "Revisão de Progresso: depois da conversa de devolutiva, o que foi combinado está em Revisão de Progresso → Seus retornos" +
+    try { await E().repo.comentar("revRetornos", ret.id, "Conversa de devolutiva em " + calc.fmtDataAno(data) + ", confirmada por " + quem() + "." + (LIB ? " Liberada ao membro." : "")); } catch (e) { /* o comentário não impede */ }
+    if (LIB) GP.app.avisar([m.responsavel], "Revisão de Progresso: depois da conversa de devolutiva, o que foi combinado está em Revisão de Progresso → Seus retornos" +
       (ret.retornoPares ? ", junto com o retorno do RH sobre os seus pares" : "") + ". Confirme a ciência no app (ciência, não concordância)." + (ciclo && R.ehTeste(ciclo) ? " [Teste]" : ""));
   }
   ui.acoes["rev-liberar-form"] = function (el) {
@@ -660,11 +709,12 @@
     if (!m || !acessoAo(m).avaliar) return;
     const nome = nomeDe(m.responsavel);
     ui.abrirPainel({
-      titulo: "Conversa feita: liberar a devolutiva", sub: nome,
-      corpo: '<div id="form-liberar"><p class="muted" style="margin-top:0">Depois de liberar, ' + esc(nome) + " lê em Seus retornos os pontos combinados e as metas (e o retorno do RH sobre os pares, se houver) e confirma a ciência. Antes disso, nada aparece em Seus retornos.</p>" +
+      titulo: LIB ? "Conversa feita: liberar a devolutiva" : "Registrar a conversa de devolutiva", sub: nome,
+      corpo: '<div id="form-liberar"><p class="muted" style="margin-top:0">' + (LIB ? "Depois de liberar, " + esc(nome) + " lê em Seus retornos os pontos combinados e as metas (e o retorno do RH sobre os pares, se houver) e confirma a ciência. Antes disso, nada aparece em Seus retornos."
+          : "Registre a data da conversa. O registro fica com você e o RH.") + "</p>" +
         c.campo({ nome: "conversou", rotulo: "A conversa", tipo: "simNao", textoCheck: "Já conversei com " + nome + " sobre a devolutiva" }) +
         c.campo({ nome: "data", rotulo: "Data da conversa", tipo: "data", valor: ctx.hoje }) + "</div>",
-      rodape: '<button class="btn" data-acao="rev-liberar" data-id="' + esc(m.id) + '">Liberar ao membro</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+      rodape: '<button class="btn" data-acao="rev-liberar" data-id="' + esc(m.id) + '">' + (LIB ? "Liberar ao membro" : "Registrar") + '</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
     });
   };
   ui.acoes["rev-liberar"] = function (el) {
@@ -676,7 +726,7 @@
     if (d.data > ctx.hoje) { erroNoRodape("A data da conversa não pode ser depois de hoje: libere depois de conversar."); return; }
     const ret = R.retornoDe(ctx, m.responsavel, ciclo), av = R.avaliacaoDo(ctx, m.id, ciclo);
     if (!R.devolutivaPreparada(ret)) { erroNoRodape("Prepare a devolutiva antes de liberar."); return; }
-    ui.salvar(el, () => liberarDevolutiva(m, ret, av, d.data), { mensagem: "Devolutiva liberada. " + nomeDe(m.responsavel) + " recebeu o aviso para confirmar a ciência." });
+    ui.salvar(el, () => liberarDevolutiva(m, ret, av, d.data), { mensagem: LIB ? "Devolutiva liberada. " + nomeDe(m.responsavel) + " recebeu o aviso para confirmar a ciência." : "Conversa de devolutiva registrada." });
   };
   ui.acoes["rev-salvar-devolutiva"] = function (el) {
     const ctx = X(), m = ctx.idx.membro[el.dataset.id], ciclo = R.cicloAberto(ctx);
@@ -700,7 +750,8 @@
       else item = await ui.criar("revRetornos", Object.assign(dados, { titulo: "Retornos · " + nomeDe(m.responsavel) + " · " + ciclo.ciclo, membroId: m.id,
         responsavel: R.donoAntesDaConversa(ctx, m, ciclo, eu().id), cicloId: String(ciclo.id), estagio: "NEW" }));
       if (liberar) await liberarDevolutiva(m, Object.assign({}, item || {}, dados), av, d.dev_data);
-    }, { mensagem: jaLiberada ? "Devolutiva atualizada." : liberar ? "Devolutiva liberada. " + nomeDe(m.responsavel) + " recebeu o aviso para confirmar a ciência." : "Devolutiva preparada. " + nomeDe(m.responsavel) + " só vê depois que você liberar, depois da conversa." });
+    }, { mensagem: jaLiberada ? "Devolutiva atualizada." : liberar ? (LIB ? "Devolutiva liberada. " + nomeDe(m.responsavel) + " recebeu o aviso para confirmar a ciência." : "Devolutiva e conversa registradas.")
+      : LIB ? "Devolutiva preparada. " + nomeDe(m.responsavel) + " só vê depois que você liberar, depois da conversa." : "Devolutiva preparada." });
   };
 
   /* ================================================================ MINHA AUTOAVALIAÇÃO */
@@ -875,11 +926,214 @@
     }, { mensagem: "Resposta enviada ao RH. Obrigado!" });
   };
 
+  /* ================================================================ ENTREGA POR ANEXO (23/11/2026)
+     Pedido do RH para o primeiro ciclo: as avaliações chegam em arquivo, por categoria. A autoavaliação e a
+     avaliação da liderança vão pelo navegador (o item é de quem envia); a de lideranças e pares vai pelo servidor
+     (api/revisao360.js), como a 360° do formulário: na anônima, nem o item nem o arquivo têm autor. */
+  const TEXTO_360 = "A Avaliação 360º é um processo em que você avalia a si mesmo, suas lideranças e seus pares, reunindo diferentes percepções sobre desempenhos, comportamentos e oportunidades de desenvolvimento.";
+  const CATEGORIAS = {
+    auto: ["Faça sua autoavaliação", "Avalie seu próprio desempenho, considerando suas entregas, competências, comportamentos e oportunidades de desenvolvimento."],
+    lideranca: ["Avalie suas lideranças", "Avalie sua liderança imediata e, quando aplicável, as demais lideranças às quais você se reporta."],
+    pares: ["Pares", "Avalie seus colegas de equipe ou da mesma área, considerando a colaboração e a contribuição para os resultados coletivos."],
+  };
+  const avisoSemCampo = () => '<div class="aviso-atencao" style="margin-bottom:12px"><b>Falta o campo do arquivo no Bitrix.</b> ' +
+    (eu().admin ? 'Abra <a href="#/config">Configuração</a> e clique em "Criar ou completar a estrutura".' : "Avise o TI: um administrador precisa rodar Configuração → Criar ou completar a estrutura.") + "</div>";
+  const campoArquivo = () => c.campo({ nome: "arquivo", rotulo: "Arquivo", tipo: "arquivo", multiplo: true, ajuda: "PDF, Word, Excel, PowerPoint ou imagem · até 3 MB por envio, somando os arquivos." });
+  /** Os arquivos escolhidos, já conferidos, no formato do Bitrix: [[nome, base64], ...] */
+  async function lerArquivos(arquivos) {
+    const ca = R.conferirAnexos(arquivos);
+    if (!ca.ok) throw { descricao: ca.erros.join("; ") };
+    const lista = [];
+    for (const a of arquivos) lista.push([a.name, await GP.telas.rotinas.lerBase64(a)]);
+    return lista;
+  }
+  /** Confere no rodapé antes de enviar; devolve os arquivos ou null */
+  function arquivosDoForm(f) {
+    const arquivos = ui.lerForm(f).arquivo || [];
+    const ca = R.conferirAnexos(arquivos);
+    if (!ca.ok) { erroNoRodape(esc(ca.erros.join("; ")) + "."); return null; }
+    return arquivos;
+  }
+  const blocoModelo = (ciclo, tipo) => (linkModelo(ciclo, tipo) ? '<div style="margin-bottom:12px">' + linkModelo(ciclo, tipo) + "</div>" : "");
+  const descricaoAnexos = (x) => { const n = nomesAnexos(x); return n.length ? esc(n.join(", ")) : qtdAnexos(x) ? plural(qtdAnexos(x), "arquivo", "arquivos") : ""; };
+
+  /** O cartão "Avaliação 360º" do início, com as três categorias (texto do RH, 23/11/2026) */
+  function entregas360Html(ciclo) {
+    const ctx = X(), id = String(eu().id);
+    const regras = R.regrasDo(ciclo);
+    const fim = R.encerramentoDo(ciclo);
+    const aberto = ciclo.estagio === "ABERTO", verComo = !!E().verComo;
+    const sec = (cat, corpo, extra) => '<div class="rv-secao"><div class="rv-secao-t">' + esc(CATEGORIAS[cat][0]) + (extra ? ' <span class="rv-secao-x">' + extra + "</span>" : "") + "</div>" +
+      '<p class="muted rv-sub" style="margin:2px 0 10px">' + esc(CATEGORIAS[cat][1]) + "</p>" + corpo + "</div>";
+    const item = (foto, t, d, lado) => '<div class="item">' + foto + '<div class="principal-item"><div class="t">' + t + '</div><div class="d">' + d + '</div></div><div class="lado">' + lado + "</div></div>";
+    let h = '<p style="margin-top:0">' + esc(TEXTO_360) + "</p>";
+    // 1. autoavaliação
+    const part = minhaParticipacao(ciclo);
+    let c1;
+    if (!part.ok) c1 = '<p class="muted" style="margin:0">Você não participa deste ciclo: ' + esc(part.motivo) + ".</p>";
+    else {
+      const a = R.autoavaliacaoDe(ctx, id, ciclo);
+      const enviada = a && a.estagio === "SUCCESS";
+      c1 = '<div class="lista">' + item("", "Sua autoavaliação", enviada ? "enviada em " + fmt(a.enviadaEm) + (descricaoAnexos(a) ? " · " + descricaoAnexos(a) : "") : "quem lê: sua liderança direta e o RH",
+        enviada ? c.tag("Enviada", "verde") : aberto ? '<button class="btn peq" data-acao="rev-anexo-auto">Anexar</button>' : c.tag("A enviar", "ambar")) + "</div>";
+    }
+    h += sec("auto", c1, linkModelo(ciclo, "auto"));
+    // 2 e 3. lideranças e pares
+    const ctrl = controle360(ciclo);
+    const status = (uid) => (ctrl.e.indexOf(uid) >= 0 ? c.tag("Enviada", "verde") : ctrl.p.indexOf(uid) >= 0 ? c.tag("Pulada", "cinza") : "");
+    const linha = (x) => {
+      const u = dom.pessoa(ctx, x.uid);
+      return item(c.avatar(u, 30), esc(u.nome), esc([u.cargo, x.papel].filter(Boolean).join(" · ")),
+        status(x.uid) || (aberto && !verComo ? '<button class="btn peq" data-acao="rev-anexo-360" data-uid="' + esc(x.uid) + '">Anexar</button>' : c.tag("Pendente", "ambar")));
+    };
+    if (regras.liberarLideranca) {
+      const sup = R.superioresDe(ctx, id, ciclo);
+      h += sec("lideranca", sup.length ? '<div class="lista">' + sup.map(linha).join("") + "</div>" : '<p class="muted" style="margin:0">Pela estrutura do Bitrix, você não tem liderança para avaliar.</p>', linkModelo(ciclo, "lideranca"));
+    }
+    if (regras.liberarPares) {
+      const pares = R.paresDe(ctx, id, ciclo);
+      const area = R.colegasDaArea(ctx, id, ciclo);
+      const feitos = area.filter((x) => status(x.uid)), restam = area.filter((x) => !status(x.uid));
+      let c3 = pares.length || feitos.length ? '<div class="lista">' + pares.concat(feitos).map(linha).join("") + "</div>"
+        : '<p class="muted" style="margin:0">Pela estrutura do Bitrix, ninguém tem a mesma liderança direta que você.' + (restam.length ? " Você pode avaliar um colega da sua área:" : "") + "</p>";
+      if (restam.length && aberto && !verComo) c3 += '<div class="rv-colega"><select class="entrada" id="rv-colega" aria-label="Outro colega da sua área"><option value="">Avaliar outro colega da sua área…</option>' +
+        restam.map((x) => '<option value="' + esc(x.uid) + '">' + esc(dom.pessoa(ctx, x.uid).nome) + "</option>").join("") + '</select><button class="btn sec peq" data-acao="rev-anexo-colega">Anexar</button></div>';
+      h += sec("pares", c3, linkModelo(ciclo, "pares"));
+    }
+    if (verComo && (regras.liberarLideranca || regras.liberarPares)) h += '<p class="muted" style="font-size:12px;margin:10px 0 0">Em "Ver como", a avaliação de lideranças e pares fica fechada: só a própria pessoa envia, com o login dela.</p>';
+    return cartao("Avaliação 360º", h, fim ? "até " + calc.fmtData(fim) : "");
+  }
+
+  /* ---------------- autoavaliação em arquivo ---------------- */
+  ui.acoes["rev-anexo-auto"] = function () {
+    const ctx = X(), ciclo = R.cicloAberto(ctx);
+    if (!ciclo) return;
+    const a = R.autoavaliacaoDe(ctx, eu().id, ciclo);
+    if (a && a.estagio === "SUCCESS") return;
+    const falta = semCampoAnexo("revAutoavaliacoes"), fim = R.encerramentoDo(ciclo);
+    ui.abrirPainel({
+      titulo: "Sua autoavaliação", sub: esc(ciclo.ciclo) + (fim ? " · até " + calc.fmtData(fim) : "") + " · quem lê: sua liderança direta e o RH",
+      corpo: '<div id="form-anexo">' + (falta ? avisoSemCampo() : "") + '<p class="muted" style="margin-top:0">' + esc(CATEGORIAS.auto[1]) + " Sua liderança lê só depois de enviar a avaliação dela ao RH, para não ser influenciada.</p>" +
+        blocoModelo(ciclo, "auto") + campoArquivo() + "</div>",
+      rodape: (falta ? "" : '<button class="btn" data-acao="rev-enviar-anexo-auto">Enviar ao RH</button>') + '<button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+    });
+  };
+  ui.acoes["rev-enviar-anexo-auto"] = function (el) {
+    const arquivos = arquivosDoForm(document.getElementById("form-anexo"));
+    if (!arquivos) return;
+    if (!window.confirm("Enviar a autoavaliação?\n\nConfira o arquivo: depois de enviar, não dá para trocar. Sua liderança lê depois de enviar a avaliação dela ao RH.")) return;
+    ui.salvar(el, async () => {
+      const ctx = X(), ciclo = R.cicloAberto(ctx), id = String(eu().id);
+      const anexos = await lerArquivos(arquivos);
+      const a = R.autoavaliacaoDe(ctx, id, ciclo);
+      const dados = { anexos, estagio: "SUCCESS", enviadaEm: ui.agoraISO() };
+      if (a) await ui.atualizar("revAutoavaliacoes", a.id, dados);
+      else {
+        const m = ctx.idx.membroPorUsuario[id];
+        await ui.criar("revAutoavaliacoes", Object.assign(dados, { titulo: "Autoavaliação · " + eu().nome + " · " + ciclo.ciclo, responsavel: id, membroId: m ? m.id : "", cicloId: String(ciclo.id) }));
+      }
+      const lider = R.liderDe(X(), id);
+      if (lider) GP.app.avisar([lider], "Revisão de Progresso: " + eu().nome + " enviou a autoavaliação. Você lê depois de enviar a sua avaliação ao RH.");
+    }, { mensagem: "Autoavaliação enviada." });
+  };
+
+  /* ---------------- lideranças e pares em arquivo (pelo servidor, sem autor na anônima) ---------------- */
+  function abrirAnexo360(uid) {
+    const ctx = X(), ciclo = R.cicloAberto(ctx);
+    if (!ciclo || E().verComo) return;
+    const relacao = R.relacaoCom(ctx, eu().id, uid, ciclo);
+    if (!relacao) { ui.avisar("Pela estrutura do Bitrix, você não avalia esta pessoa neste ciclo.", "erro"); return; }
+    const regras = R.regrasDo(ciclo);
+    const pequeno = R.grupoPequeno(ctx, uid, relacao, regras, ciclo);
+    const u = dom.pessoa(ctx, uid);
+    const cat = relacao === "Superior" ? "lideranca" : "pares";
+    const modos = [["Anônima", "Seu nome não fica gravado com o arquivo. O RH lê, mas não sabe quem enviou e não consegue te procurar para entender melhor."],
+      ["Identificada", "Seu nome vai junto, visível só para o RH. O RH pode te procurar para entender um ponto. A pessoa avaliada não recebe esta avaliação."]];
+    ui.abrirPainel({
+      titulo: (relacao === "Superior" ? "Avaliação da liderança · " : "Avaliação de par · ") + u.nome, sub: esc(u.cargo || CATEGORIAS[cat][0]),
+      corpo: '<div id="form-anexo" class="rv-form">' +
+        (pequeno ? '<div class="aviso-atencao" style="margin-bottom:14px"><b>Grupo pequeno.</b> Esta pessoa tem menos avaliadores do que o mínimo para proteger o anonimato. Você pode enviar normalmente: ' +
+          (regras.abaixoMinimo === "nao_usar" ? "neste ciclo, o resultado de grupos pequenos não é usado" : "sua avaliação só é usada junto com as de outras pessoas da área") + ", e não gera retorno individual para essa pessoa.</div>" : "") +
+        secao("Você convive com essa pessoa no trabalho?", "", '<p class="muted" style="margin:0 0 10px">Avalie só quem você acompanha de perto. Se não for o caso, pule. Isso não conta contra ninguém.</p><button class="btn sec peq" data-acao="rev-360-pular" data-uid="' + esc(uid) + '">Não convivo o bastante · pular esta pessoa</button>') +
+        secao("Como você quer enviar?", "escolha antes de enviar; vale só para esta avaliação", '<div class="campo" data-campo="modo"><div class="escolhas empilhadas">' + modos.map((x) => '<label class="escolha"><input type="radio" name="modo" value="' + x[0] + '"><span><b>' + x[0] + '</b><span class="op-d">' + esc(x[1]) + "</span></span></label>").join("") + "</div></div>") +
+        secao("O arquivo", "só o RH lê · a pessoa avaliada não recebe", blocoModelo(ciclo, cat) +
+          '<p class="muted rv-sub" style="margin:0 0 10px">Na anônima, não escreva o seu nome no arquivo e confira as propriedades do documento: o Word e o Excel gravam o autor, e o app não tira essa informação.</p>' + campoArquivo()) + "</div>",
+      rodape: '<button class="btn" data-acao="rev-enviar-anexo-360" data-uid="' + esc(uid) + '">Enviar ao RH</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+    });
+  }
+  ui.acoes["rev-anexo-360"] = function (el) { abrirAnexo360(el.dataset.uid); };
+  ui.acoes["rev-anexo-colega"] = function () {
+    const s = document.getElementById("rv-colega");
+    if (!s || !s.value) { ui.avisar("Escolha o colega na lista.", "erro"); return; }
+    abrirAnexo360(s.value);
+  };
+  ui.acoes["rev-enviar-anexo-360"] = function (el) {
+    const ciclo = R.cicloAberto(X()), uid = el.dataset.uid;
+    const f = document.getElementById("form-anexo");
+    if (!ui.validar(f, ["modo"])) { erroNoRodape("Escolha anônima ou identificada para liberar o envio."); return; }
+    const modo = ui.lerForm(f).modo;
+    const arquivos = arquivosDoForm(f);
+    if (!arquivos) return;
+    ui.salvar(el, async () => {
+      const anexos = await lerArquivos(arquivos);
+      await E().repo.enviar360({ cicloId: ciclo.id, avaliado: uid, modo, respostas: {}, anexos });
+      marcar360(ciclo, uid, "e");
+      apagarRasc(ciclo, uid);
+    }, { mensagem: "Avaliação enviada ao RH. Obrigado!" });
+  };
+
+  /* ---------------- liderança: a avaliação de cada liderado em arquivo ---------------- */
+  ui.acoes["rev-anexo-lider"] = function (el) {
+    const ctx = X(), m = ctx.idx.membro[el.dataset.id], ciclo = R.cicloAberto(ctx);
+    if (!m || !ciclo || !acessoAo(m).avaliar) return;
+    const nome = nomeDe(m.responsavel), falta = semCampoAnexo("revAvaliacoes"), fim = R.encerramentoDo(ciclo);
+    ui.abrirPainel({
+      titulo: "Avaliação de " + nome, sub: esc(ciclo.ciclo) + (fim ? " · até " + calc.fmtData(fim) : "") + " · fica com você e o RH; o membro não recebe",
+      corpo: '<div id="form-anexo">' + (falta ? avisoSemCampo() : "") +
+        '<p class="muted" style="margin-top:0">Preencha o modelo do RH com as entregas, as competências e os comportamentos de ' + esc(nome) + " no período, com evidências (Situação, Comportamento e Impacto), e anexe aqui. Depois do envio, a autoavaliação fica liberada para você.</p>" +
+        blocoModelo(ciclo, "liderados") + campoArquivo() + "</div>",
+      rodape: (falta ? "" : '<button class="btn" data-acao="rev-enviar-anexo-lider" data-id="' + esc(m.id) + '">Enviar ao RH</button>') + '<button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+    });
+  };
+  ui.acoes["rev-enviar-anexo-lider"] = function (el) {
+    const m = X().idx.membro[el.dataset.id];
+    if (!m) return;
+    const arquivos = arquivosDoForm(document.getElementById("form-anexo"));
+    if (!arquivos) return;
+    const nome = nomeDe(m.responsavel);
+    if (!window.confirm("Enviar a avaliação de " + nome + " ao RH?\n\nConfira o arquivo: depois de enviar, não dá para trocar. A autoavaliação do membro fica liberada para você.")) return;
+    ui.salvar(el, async () => {
+      const ctx = X(), ciclo = R.cicloAberto(ctx);
+      const anexos = await lerArquivos(arquivos);
+      const av = R.avaliacaoDo(ctx, m.id, ciclo);
+      const dados = { anexos, cargo: R.cargoDo(m), cicloId: String(ciclo.id), estagio: "ENVIADA", enviadaEm: ui.agoraISO() };
+      // responsável = quem avalia: o membro nunca é dono do item (não lê a avaliação, mesmo com "Próprios" no CRM)
+      if (av) await ui.atualizar("revAvaliacoes", av.id, dados);
+      else await ui.criar("revAvaliacoes", Object.assign(dados, { titulo: "Revisão · " + nome + " · " + ciclo.ciclo, membroId: m.id, responsavel: eu().id, avaliador: eu().id, autor: eu().id }));
+      GP.app.avisarRH("Revisão de Progresso: " + quem() + " enviou ao RH a avaliação de " + nome + " (em arquivo).");
+    }, { mensagem: "Avaliação de " + nome + " enviada ao RH." });
+  };
+
+  /** Na revisão de um membro, com entrega por anexo: o que já chegou e onde abrir */
+  function entregasDoMembroHtml(m, a, av, auto, ciclo) {
+    const enviada = R.avaliacaoEnviada(av);
+    const autoOk = auto && auto.estagio === "SUCCESS";
+    const podeLerAuto = a.rh || (a.avaliar && enviada);
+    const fim = R.encerramentoDo(ciclo);
+    const item = (t, d, lado) => '<div class="item"><div class="principal-item"><div class="t">' + esc(t) + '</div><div class="d">' + d + '</div></div><div class="lado">' + lado + "</div></div>";
+    const l1 = item("Avaliação da liderança", enviada ? "enviada ao RH em " + fmt(av.enviadaEm) + (descricaoAnexos(av) ? " · " + descricaoAnexos(av) : "") : "ainda não enviada" + (fim ? " · até " + calc.fmtData(fim) : ""),
+      (enviada ? c.tag("Enviada", "verde") : c.tag("A enviar", "ambar") + botaoAnexarAvaliacao(m, ciclo)) + (enviada && (a.rh || a.avaliar) ? linkBitrix("revAvaliacoes", av.id) : ""));
+    const l2 = item("Autoavaliação do membro", autoOk ? "recebida em " + fmt(auto.enviadaEm) + (podeLerAuto ? (descricaoAnexos(auto) ? " · " + descricaoAnexos(auto) : "") : " · liberada para você depois do seu envio") : "o membro ainda não enviou",
+      (autoOk ? c.tag("Recebida", "verde") : c.tag("Aguardando", "cinza")) + (autoOk && podeLerAuto ? linkBitrix("revAutoavaliacoes", auto.id) : ""));
+    return cartao("Entregas", '<div class="lista">' + l1 + l2 + "</div>", "em arquivo · os arquivos ficam no card do Bitrix");
+  }
+
   /* ================================================================ SEUS RETORNOS */
   function telaRetornos() {
     const ctx = X(), id = String(eu().id);
     const ciclo = R.cicloAberto(ctx) || R.ultimoCiclo(ctx);
     let h = voltar() + c.cabecalho("desempenho", "Seus retornos", ciclo ? "<span>" + esc(ciclo.ciclo) + "</span>" : "");
+    if (!LIB) return h + '<div class="card">' + c.vazio("Os retornos não aparecem no app neste ciclo. A conversa de devolutiva é com a sua liderança.") + "</div>";
     if (semEstrutura()) return h + avisoSemEstrutura();
     if (!ciclo) return h + '<div class="card">' + c.vazio("Os retornos chegam depois da calibração de cada ciclo.") + "</div>";
     const ret = R.retornoDe(ctx, id, ciclo);
@@ -951,6 +1205,13 @@
     registrarAcesso(ciclo);
     const rel = R.relatorio360(ctx, ciclo);
     const regras = R.regrasDo(ciclo);
+    // entrega por anexo (23/11/2026): os arquivos não entram nas médias; o RH abre cada um no card do Bitrix
+    const anx = R.anexos360(ctx, ciclo);
+    if (anx.length || R.porAnexo(ciclo)) h += cartao("Avaliações 360° em arquivo", anx.length ? '<div class="lista">' + anx.map((g) => '<div class="item"><div class="principal-item"><div class="t">' + esc(g.nome) +
+        '</div><div class="d">' + (g.relacao === "Superior" ? "como liderança" : "como par") + " · " + plural(g.itens.length, "avaliação recebida", "avaliações recebidas") +
+        " · " + esc(g.itens.map((x) => x.modo === "Identificada" ? "identificada (" + nomeDe(x.identificadoPor) + ")" : "anônima").join(", ")) + '</div></div><div class="lado">' +
+        g.itens.map((x, i) => linkBitrix("rev360", x.id, "Abrir " + (i + 1))).join("") + "</div></div>").join("") + "</div>"
+      : c.vazio("Nenhuma avaliação em arquivo ainda."), plural(anx.reduce((s, g) => s + g.itens.length, 0), "arquivo", "arquivos") + " · a anônima não tem autor");
     h += '<div class="aviso-info" style="margin-bottom:16px"><b>Regras fixas de anonimato.</b> A pessoa avaliada nunca recebe a avaliação, nem individual nem em resumo: o retorno é do RH, em temas. Resposta anônima é gravada sem autor. Grupos abaixo de ' + regras.minimoNotas +
       " respostas não aparecem sozinhos (" + (regras.abaixoMinimo === "nao_usar" ? "ficam fora deste ciclo" : "entram juntos na área") + "). Comentários só com " + regras.minimoComentarios + " ou mais respostas. Cada abertura deste relatório fica registrada no histórico do ciclo.</div>";
     h += c.kpis([{ valor: rel.total, rotulo: "respostas recebidas", tom: "azul" }, { valor: rel.pessoas.length, rotulo: "pessoas no relatório", tom: "verde" }, { valor: rel.areas.length, rotulo: "grupos por área", tom: "roxo" },
@@ -960,6 +1221,44 @@
     rel.areas.forEach((a) => { h += grupoHtml("Área " + a.area + " · " + (a.relacao === "Superior" ? "lideranças" : "pares") + " (grupos pequenos juntos)", a, regras); });
     return h;
   }
+
+  /* ================================================================ RH: OS FORMULÁRIOS DO APP (23/11/2026)
+     O RH pediu para ver os formulários e revisá-los com calma para 2027. Mostra cada um como a pessoa vê, sem gravar. */
+  function afirmacoesPrevia(relacao) {
+    const itens = relacao === "Superior" ? R.SOBRE_LIDERANCA.map((t) => ["", t]) : R.SOBRE_PAR;
+    return secao("1. " + (relacao === "Superior" ? "Sobre esta liderança" : "Sobre este par"), relacao === "Superior" ? "8 afirmações" : "8 critérios de trabalho em equipe",
+      itens.map((x, i) => '<div class="rv-afirm"><div class="rv-afirm-t"><span class="rv-n">' + pad(i + 1) + "</span><span>" + (x[0] ? "<b>" + esc(x[0]) + "</b> · " : "") + esc(x[1]) + "</span></div>" +
+        '<div class="escolhas">' + R.ACORDO.concat([R.NAO_SEI]).map((op) => '<label class="escolha"><input type="radio" name="pv_' + relacao + "_" + (i + 1) + '">' + esc(op) + "</label>").join("") + "</div></div>").join("")) +
+      secao("2. Em palavras", "continuar, começar e um exemplo",
+        c.campo({ nome: "pv_continuar", rotulo: "O que essa pessoa deveria continuar fazendo?", tipo: "textoLongo", linhas: 2, opcional: true }) +
+        c.campo({ nome: "pv_comecar", rotulo: "O que poderia começar a fazer ou fazer de outro jeito?", tipo: "textoLongo", linhas: 2, opcional: true }) +
+        c.campo({ nome: "pv_exemplo", rotulo: "Um exemplo concreto · Situação, Comportamento, Impacto", tipo: "textoLongo", linhas: 2, opcional: true })) +
+      '<p class="muted rv-sub">Antes das afirmações, a pessoa escolhe se envia anônima ou identificada e pode pular quem não acompanha de perto.</p>';
+  }
+  function telaFormularios(codigo) {
+    let h = voltar() + c.cabecalho("desempenho", "Formulários da Revisão", "<span>só leitura</span><span>nada é gravado</span>");
+    if (!(ehRH() || eu().admin)) return h + '<div class="card">' + c.vazio("Os formulários ficam com o RH.") + "</div>";
+    const cg = codigo && MZ.CARGOS[codigo] ? codigo : R.CODIGOS[0];
+    const previa = (html) => '<fieldset class="rv-previa" disabled>' + html + "</fieldset>";
+    h += '<div class="aviso-info" style="margin-bottom:16px">Os formulários do app, como cada pessoa os vê. Neste ciclo as avaliações chegam em arquivo; para voltar aos formulários, escolha "Pelos formulários do app" na abertura do ciclo (Entrega das avaliações).</div>';
+    h += cartao("Autoavaliação", previa('<div class="rv-form">' + R.AUTO.map((q, i) => c.campo({ nome: "pv_" + q.campo, rotulo: pad(i + 1) + " · " + q.pergunta, ajuda: q.dica, tipo: "textoLongo", linhas: 2 })).join("") + "</div>"),
+      "quem responde: o membro · quem lê: a liderança direta e o RH");
+    h += cartao("Avaliação 360° · sobre a liderança", previa('<div class="rv-form">' + afirmacoesPrevia("Superior") + "</div>"), "quem responde: os liderados · só o RH lê");
+    h += cartao("Avaliação 360° · sobre um par", previa('<div class="rv-form">' + afirmacoesPrevia("Par") + "</div>"), "quem responde: os pares · só o RH lê");
+    const seletor = '<div class="campo" style="max-width:420px"><label for="pv-cargo">Cargo da matriz</label><select class="entrada" id="pv-cargo" data-mudar="rev-previa-cargo">' +
+      R.CODIGOS.map((x) => '<option value="' + x + '"' + (x === cg ? " selected" : "") + ">" + esc(R.rotuloCargo(E().config, x)) + "</option>").join("") + "</select></div>";
+    h += cartao("Avaliação da liderança", seletor + previa(formAvaliacao(MZ.CARGOS[cg], {}).replace('id="form-avaliacao"', 'id="previa-avaliacao"')),
+      "quem responde: a liderança direta · muda com o cargo");
+    h += cartao("Devolutiva (liderança, depois da calibração)", '<div class="sci">' + [
+      ["1. A conversa", "Pontos fortes combinados e pontos de desenvolvimento combinados (modelo SCI)."],
+      ["2. Plano de desenvolvimento (PDI)", "Até 3 ações: ligada a qual competência ou KPI, ação concreta, prazo, como saberemos que deu certo, apoio necessário, responsável e observações."],
+      ["3. Metas e entregas do próximo semestre", "Até 3: tipo (resultado ou aprendizado), meta, prazo, indicador, se foi combinada entre as partes e observações."],
+      ["4. Promoção", "A Revisão indica elegibilidade para promoção? Evidências anexadas ao pipeline."],
+      ["5. A conversa", "Data da conversa de devolutiva."],
+    ].map((x) => c.textoRegistro(x[0], x[1])).join("") + "</div>", "resumo dos campos");
+    return h;
+  }
+  ui.acoes["rev-previa-cargo"] = function (el) { ui.navegar("#/revisao/formularios/" + el.value); };
 
   /* ================================================================ RH: ABERTURA E ENCERRAMENTO DO CICLO */
   function regrasHtml(r) {
@@ -971,7 +1270,9 @@
       ["Membros fora deste ciclo", r.excluidos.length ? String(r.excluidos.length) : "nenhum"], ["360° de superiores", r.liberarLideranca ? "liberada" : "fechada"], ["360° de pares", r.liberarPares ? "liberada" : "fechada"],
       ["Mínimo para notas", String(r.minimoNotas)], ["Mínimo para comentários", String(r.minimoComentarios)], ["Abaixo do mínimo", r.abaixoMinimo === "nao_usar" ? "não usar neste ciclo" : "juntar com a área"],
       ["Liderança com poucos liderados", r.retornoLidPequeno === "nao_usar" ? "não usar neste ciclo" : "sem retorno individual · diagnóstico da área"],
-      ["Retorno à CEO e ao RH", r.retornoTopo === "consultoria" ? "consultoria externa para os dois" : "CEO dá ao RH · consultoria dá à CEO"]]) +
+      ["Retorno à CEO e ao RH", r.retornoTopo === "consultoria" ? "consultoria externa para os dois" : "CEO dá ao RH · consultoria dá à CEO"],
+      ["Entrega das avaliações", r.entrega === "anexos" ? "em arquivo, por categoria" : "pelos formulários do app"],
+      ["Modelos", MODELOS.filter((x) => (r.modelos || {})[x[0]]).map((x) => x[1]).join(", ") || "nenhum link"]]) +
       (r.excecoes ? '<div class="sci" style="margin-top:12px">' + c.textoRegistro("Exceções", r.excecoes) + "</div>" : ""));
   }
   function telaCiclo() {
@@ -1021,15 +1322,21 @@
       titulo: aberto ? "Editar o ciclo aberto" : "Abertura do ciclo", largo: true, sub: "Revisão de Progresso · uso exclusivo do RH",
       corpo: '<div id="form-ciclo" class="rv-form">' +
         secao("1. Ciclo e período", "qual ciclo e qual período será avaliado", c.campo({ nome: "ciclo", rotulo: "Ciclo", tipo: "lista", opcoes: R.CICLOS.indexOf(v.ciclo) >= 0 || !v.ciclo ? R.CICLOS : [v.ciclo].concat(R.CICLOS), valor: v.ciclo }) +
-          '<div class="linha-campos">' + prazo("periodoInicio", "Início do período avaliado") + prazo("periodoFim", "Fim do período avaliado") + "</div>" + prazo("dataAbertura", "Data de abertura")) +
-        secao("2. Prazos de cada etapa", "aparecem para lideranças e membros", '<div class="linha-campos">' + prazo("prazoAuto", "Autoavaliação do membro até") + prazo("prazoLideranca", "Avaliação da liderança até") + "</div>" +
+          '<div class="linha-campos">' + prazo("periodoInicio", "Início do período avaliado") + prazo("periodoFim", "Fim do período avaliado") + "</div>" +
+          '<div class="linha-campos">' + prazo("dataAbertura", "Abertura") + c.campo({ nome: "encerramento", rotulo: "Encerramento das entregas", tipo: "data", valor: v.encerramento || (!v.id ? "" : v.prazoLideranca) }) + "</div>" +
+          '<p class="muted rv-sub">As pessoas veem só a abertura e o encerramento.</p>') +
+        secao("Entrega das avaliações", "neste primeiro ciclo, em arquivo; os formulários do app ficam para quando o RH revisar",
+          c.campo({ nome: "entrega", rotulo: "Como as avaliações chegam", tipo: "escolha", valor: r.entrega, opcoes: [{ valor: "anexos", rotulo: "Em arquivo (anexo), por categoria: autoavaliação, lideranças, pares e liderados" }, { valor: "formularios", rotulo: "Pelos formulários do app" }] }) +
+          '<p class="muted rv-sub">Links dos modelos que cada pessoa baixa, preenche e anexa (por exemplo, o arquivo no Bitrix Drive com acesso para a empresa). Sem link, a pessoa só anexa.</p>' +
+          MODELOS.map((x) => c.campo({ nome: "modelo_" + x[0], rotulo: "Modelo · " + x[1], valor: (r.modelos || {})[x[0]] || "", opcional: true, placeholder: "https://…" })).join("")) +
+        secao("2. Prazos internos de cada etapa", "para o RH · com entrega por arquivo, a autoavaliação e a liderança seguem o encerramento", '<div class="linha-campos">' + prazo("prazoAuto", "Autoavaliação do membro até") + prazo("prazoLideranca", "Avaliação da liderança até") + "</div>" +
           '<div class="linha-campos">' + prazo("prazoCalibracao", "Calibração até") + prazo("prazoDevolutiva", "Devolutivas das lideranças até") + "</div>" + prazo("prazoRetornos", "Retornos do RH até") +
           '<p class="muted rv-sub">O retorno dos liderados chega à liderança só depois que ela conclui as devolutivas da equipe, para não influenciar a conversa.</p>') +
         secao("3. Quem participa", "por padrão, todos os membros ativos com cargo na matriz", c.campo({ nome: "publico", rotulo: "Público", tipo: "escolha", valor: r.publico,
           opcoes: [{ valor: "todos", rotulo: "Todos os membros ativos" }, { valor: "sem_estagio", rotulo: "Todos, exceto estágios" }, { valor: "selecionar", rotulo: "Selecionar áreas" }]
             .concat(r.publico === "pessoas" ? [{ valor: "pessoas", rotulo: "Ciclo de teste (as pessoas escolhidas)" }] : []) }) +
           '<div class="campo"><label>Áreas (só com "Selecionar áreas")</label><div class="escolhas">' + R.areas(ctx).map((a) => check("area_" + a.id, a.nome, r.areas.indexOf(a.id) >= 0)).join("") + "</div></div>" +
-          '<div class="campo"><label>Membros fora deste ciclo</label><div class="ajuda">Marque quem não participa (licença, desligamento combinado, entrada recente). O motivo vai em Exceções.</div><div class="rv-caixa">' +
+          '<div class="campo"><label>Membros fora deste ciclo</label><div class="ajuda">Marque quem não participa (licença, encerramento combinado, entrada recente). O motivo vai em Exceções.</div><div class="rv-caixa">' +
             membros.map((m) => check("excl_" + m.id, nomeDe(m.responsavel) + (R.cargoDo(m) ? "" : " (sem cargo na matriz)"), r.excluidos.map(String).indexOf(String(m.id)) >= 0)).join("") + "</div></div>" +
           c.campo({ nome: "excecoes", rotulo: "Exceções (nomes ou áreas fora deste ciclo, com motivo)", tipo: "textoLongo", linhas: 3, valor: r.excecoes, opcional: true }) +
           '<p class="muted rv-sub">Estágios: o formato da avaliação segue pendente de validação jurídica (Lei 11.788/2008).</p>') +
@@ -1063,11 +1370,15 @@
       liberarLideranca: !!d.liberarLideranca, liberarPares: !!d.liberarPares, minimoNotas: Number(d.minimoNotas) || 3, minimoComentarios: Number(d.minimoComentarios) || 5,
       abaixoMinimo: d.abaixoMinimo || "juntar_area", retornoLidPequeno: d.retornoLidPequeno || "diagnostico_area", retornoTopo: d.retornoTopo || "consultoria",
       conferencias: { lista: !!d.ok_lista, matriz: !!d.ok_matriz, anonimato: !!d.ok_anonimato },
+      entrega: d.entrega === "formularios" ? "formularios" : "anexos",
+      modelos: MODELOS.reduce((o, x) => { const u = String(d["modelo_" + x[0]] || "").trim(); if (u) o[x[0]] = u; return o; }, {}),
     };
     // o ciclo de teste guarda quem participa; a tela de edição não mostra a lista
     if (regras.publico === "pessoas") Object.assign(regras, { pessoas: antes.pessoas, teste: true });
     const dados = { ciclo: d.ciclo, regras: JSON.stringify(regras), mensagem: String(d.mensagem || "").trim() };
-    ["periodoInicio", "periodoFim", "dataAbertura", "prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"].forEach((k) => { dados[k] = d[k] || ""; });
+    ["periodoInicio", "periodoFim", "dataAbertura", "encerramento", "prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"].forEach((k) => { dados[k] = d[k] || ""; });
+    // com entrega por arquivo, a autoavaliação e a avaliação da liderança vão até o encerramento
+    if (regras.entrega === "anexos" && dados.encerramento) { if (!dados.prazoAuto) dados.prazoAuto = dados.encerramento; if (!dados.prazoLideranca) dados.prazoLideranca = dados.encerramento; }
     return { dados, regras };
   }
   ui.acoes["rev-salvar-ciclo"] = function (el) {
@@ -1078,7 +1389,12 @@
     const abrir = el.dataset.abrir === "1";
     const jaAberto = ci && ci.estagio === "ABERTO";
     const { dados, regras } = lerCiclo(ci);
-    if (!ui.validar(f, abrir || jaAberto ? ["ciclo", "periodoInicio", "periodoFim", "dataAbertura", "prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"] : ["ciclo"])) return;
+    const obrigatorios = regras.entrega === "anexos" ? ["ciclo", "periodoInicio", "periodoFim", "dataAbertura", "encerramento"]
+      : ["ciclo", "periodoInicio", "periodoFim", "dataAbertura", "prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"];
+    if (!ui.validar(f, abrir || jaAberto ? obrigatorios : ["ciclo"])) return;
+    if (dados.encerramento && dados.dataAbertura && dados.encerramento < dados.dataAbertura) { erroNoRodape("O encerramento é antes da abertura."); return; }
+    const malLink = Object.keys(regras.modelos).filter((k) => !/^https?:\/\//i.test(regras.modelos[k]));
+    if (malLink.length) { erroNoRodape("Os links dos modelos precisam começar com https://."); return; }
     if (dados.periodoFim && dados.periodoInicio && dados.periodoFim < dados.periodoInicio) { erroNoRodape("O fim do período avaliado é antes do início."); return; }
     if (regras.publico === "selecionar" && !regras.areas.length) { erroNoRodape("Com \"Selecionar áreas\", marque pelo menos uma área."); return; }
     if (abrir) {
@@ -1089,7 +1405,8 @@
     }
     const titulo = "Revisão de Progresso · " + dados.ciclo;
     const participantes = abrir ? R.participantes(Object.assign({}, ctx), { regras: dados.regras }).filter((x) => x.ok).map((x) => x.m) : [];
-    if (abrir && !window.confirm("Abrir o ciclo " + dados.ciclo + "?\n\n" + participantes.length + " pessoas participam. Lideranças passam a enviar as avaliações ao RH; membros recebem a autoavaliação" + (regras.liberarLideranca || regras.liberarPares ? " e a 360°" : "") + ". Todos recebem um aviso no Bitrix.")) return;
+    if (abrir && !window.confirm("Abrir o ciclo " + dados.ciclo + "?\n\n" + participantes.length + " pessoas participam. Lideranças passam a enviar as avaliações ao RH; membros recebem a autoavaliação" + (regras.liberarLideranca || regras.liberarPares ? " e a 360°" : "") +
+      (regras.entrega === "anexos" ? ", tudo em arquivo, até " + calc.fmtData(dados.encerramento) : "") + ". Todos recebem um aviso no Bitrix.")) return;
     ui.salvar(el, async () => {
       const base = Object.assign({ titulo }, dados, abrir ? { estagio: "ABERTO" } : {});
       if (ci) await ui.atualizar("revCiclos", ci.id, base);
@@ -1097,7 +1414,9 @@
       if (abrir) {
         const ids = {};
         participantes.forEach((m) => { ids[m.responsavel] = true; const l = dom.liderancaEfetiva(X(), m); if (l) ids[l] = true; });
-        GP.app.avisar(Object.keys(ids), "O RH abriu a Revisão de Progresso (" + dados.ciclo + "). Autoavaliação até " + calc.fmtData(dados.prazoAuto) + "; avaliação das lideranças e 360° até " + calc.fmtData(dados.prazoLideranca) + ". Abra o app Gestão de Pessoas → Revisão de Progresso.");
+        GP.app.avisar(Object.keys(ids), "O RH abriu a Revisão de Progresso (" + dados.ciclo + "). " + (regras.entrega === "anexos"
+          ? "Envie as suas avaliações em arquivo (autoavaliação, lideranças, pares e, para quem lidera, liderados) até " + calc.fmtData(dados.encerramento) + "."
+          : "Autoavaliação até " + calc.fmtData(dados.prazoAuto) + "; avaliação das lideranças e 360° até " + calc.fmtData(dados.prazoLideranca) + ".") + " Abra o app Gestão de Pessoas → Revisão de Progresso.");
       }
     }, { mensagem: abrir ? "Ciclo aberto. Lideranças e membros foram avisados." : jaAberto ? "Ciclo atualizado." : "Rascunho do ciclo salvo." });
   };
@@ -1180,13 +1499,15 @@
     const dados = { ciclo: nome, regras: JSON.stringify(regras), mensagem: "Ciclo de teste do RH e da TI.",
       periodoInicio: calc.addDias(hoje, -180), periodoFim: hoje, dataAbertura: hoje };
     prazos.forEach((k) => { dados[k] = d[k]; });
+    dados.encerramento = d.prazoLideranca;
     const pessoas = ids.map((id) => nomeDe(ctx.idx.membro[id].responsavel));
     if (!window.confirm("Abrir o ciclo de teste com " + pessoas.join(", ") + "?\n\nSó essas pessoas recebem aviso no Bitrix e veem a Revisão de Progresso aberta.")) return;
     ui.salvar(el, async () => {
       for (const id of ids) if (d["cargo_" + id] && d["cargo_" + id] !== R.cargoDo(X().idx.membro[id])) await ui.atualizar("membros", id, { cargoMatriz: d["cargo_" + id] });
       await ui.criar("revCiclos", Object.assign({ titulo: "Revisão de Progresso · " + nome, autor: eu().id, responsavel: eu().id, estagio: "ABERTO" }, dados));
       const avisar = ids.map((id) => X().idx.membro[id].responsavel).filter(Boolean);
-      GP.app.avisar(avisar, "[Teste] O RH abriu um ciclo de teste da Revisão de Progresso. Autoavaliação até " + calc.fmtData(dados.prazoAuto) + "; avaliação da liderança e 360° até " + calc.fmtData(dados.prazoLideranca) + ". Abra o app Gestão de Pessoas → Revisão de Progresso.");
+      GP.app.avisar(avisar, "[Teste] O RH abriu um ciclo de teste da Revisão de Progresso. " + (regras.entrega === "anexos" ? "Envie as avaliações em arquivo até " + calc.fmtData(dados.encerramento) + "."
+        : "Autoavaliação até " + calc.fmtData(dados.prazoAuto) + "; avaliação da liderança e 360° até " + calc.fmtData(dados.prazoLideranca) + ".") + " Abra o app Gestão de Pessoas → Revisão de Progresso.");
     }, { mensagem: "Ciclo de teste aberto. Só as pessoas escolhidas foram avisadas." });
   };
   ui.acoes["rev-teste-descartar"] = function (el) {

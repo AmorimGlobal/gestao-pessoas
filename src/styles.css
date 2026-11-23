@@ -526,6 +526,11 @@ details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy)
 .rv-teste-cargo { max-width: 260px; font-size: 12px; }
 select.rv-teste-cargo { padding: 4px 8px; }
 .btn.link.rv-cargo-btn { font-size: 12px; }
+/* entrega por anexo (23/11/2026): o link do modelo ao lado da categoria, o seletor de colega da área e a prévia dos formulários */
+.rv-secao-t .rv-secao-x { float: right; font-weight: 500; }
+.rv-colega { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.rv-colega select { flex: 1 1 240px; max-width: 420px; }
+fieldset.rv-previa { border: 0; margin: 0; padding: 0; min-width: 0; }
 /* Perfil: feedbacks e alinhamento semanal do próprio membro */
 .perfil-feedback { padding: 10px 0; border-bottom: 1px solid var(--borda); }
 .perfil-feedback:last-child { border-bottom: 0; padding-bottom: 0; }

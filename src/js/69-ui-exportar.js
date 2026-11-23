@@ -83,7 +83,7 @@
       }),
     },
     desligamentos: {
-      rotulo: "Desligamentos", nota: "Membros que passaram para Encerrado no processo Membros, pela data da mudança.",
+      rotulo: "Encerramentos", arquivo: "encerramentos", nota: "Membros que passaram para Encerrado no processo Membros, pela data da mudança.",
       linhas: (ctx) => (ctx.registros.membros || []).filter((m) => m.estagio === "SUCCESS").map((m0) => {
         const m = dom.infoMembro(ctx, m0);
         const data = dia(m0.movidoEm || m0.atualizadoEm);
@@ -167,7 +167,7 @@
     const p = periodoPadrao();
     const linhas = linhasDoPeriodo(chave, p.de, p.ate);
     if (!linhas.length) { ui.avisar("Nada para exportar neste período."); return; }
-    const arquivo = "gestao-pessoas_" + chave + (CONJUNTOS[chave].semPeriodo ? "_" + E().ctx.hoje : "_" + p.de + "_a_" + p.ate) + ".csv";
+    const arquivo = "gestao-pessoas_" + (CONJUNTOS[chave].arquivo || chave) + (CONJUNTOS[chave].semPeriodo ? "_" + E().ctx.hoje : "_" + p.de + "_a_" + p.ate) + ".csv";
     if (baixar(arquivo, csv(linhas))) ui.avisar(plural(linhas.length, "linha exportada", "linhas exportadas") + ": " + arquivo + ".");
     else ui.avisar("O navegador bloqueou o download. Tente pelo Bitrix no navegador do computador.", "erro");
   };

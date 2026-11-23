@@ -51,7 +51,7 @@
     const ano = ctx.hoje.slice(0, 4);
     const doAno = (dom.historicoDesligamentos(ctx, "ano", filtroHistorico()).find((l) => l.periodo.chave === ano) || { desligamentos: [] }).desligamentos.length;
     let h = c.cabecalho("offboarding", "Offboarding", "<span><b>" + (abertas.length + andamentoApp.length) + "</b> " + (abertas.length + andamentoApp.length === 1 ? "solicitação" : "solicitações") + " em andamento</span>" +
-      "<span><b>" + doAno + "</b> " + (doAno === 1 ? "desligamento" : "desligamentos") + " em " + ano + "</span>");
+      "<span><b>" + doAno + "</b> " + (doAno === 1 ? "encerramento" : "encerramentos") + " em " + ano + "</span>");
     if (rh) h += alertaRH(funil.filter((s) => s.nova), dom.filaRH(ctx));
     h += cartaoSolicitar();
     h += '<details class="card" style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700;color:var(--navy)">' + icone("manual", 15) + " Guia da liderança para o encerramento de contrato</summary>" +
@@ -148,13 +148,13 @@
     const linhas = dom.historicoDesligamentos(ctx, g, filtroHistorico());
     const rh = E().visao === "rh";
     const seletor = '<select class="entrada" style="width:auto;padding:4px 8px" data-mudar="off-periodo" aria-label="Agrupar por">' + GRANULARIDADES.map((x) => '<option value="' + x[0] + '"' + (x[0] === g ? " selected" : "") + ">" + x[1] + "</option>").join("") + "</select>";
-    const corpo = linhas.length ? '<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Período</th><th class="n">Desligamentos</th><th class="n">Solicitações</th><th>Motivos (solicitações concluídas)</th></tr></thead><tbody>' +
+    const corpo = linhas.length ? '<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Período</th><th class="n">Encerramentos</th><th class="n">Solicitações</th><th>Motivos (solicitações concluídas)</th></tr></thead><tbody>' +
       linhas.map((l) => "<tr><td><b>" + esc(l.periodo.rotulo) + "</b>" + (l.desligamentos.length ? '<div class="muted" style="font-size:12px">' + esc(l.desligamentos.map((d) => d.nome + " (" + calc.fmtData(d.data) + ")").join(", ")) + "</div>" : "") + "</td>" +
         '<td class="n"><b>' + l.desligamentos.length + '</b></td><td class="n">' + l.solicitacoes + "</td><td>" +
         (Object.keys(l.motivos).length ? Object.keys(l.motivos).map((k) => esc(k) + " (" + l.motivos[k] + ")").join(" · ") : '<span class="muted">—</span>') + "</td></tr>").join("") + "</tbody></table></div>"
-      : c.vazio("Nenhum desligamento registrado ainda.");
-    return '<div class="card"><h3>Histórico de desligamentos<span class="extra">' + seletor + (rh ? ' <button class="btn peq sec" data-acao="exportar-csv" data-conjunto="desligamentos">' + icone("baixar", 13) + " CSV</button>" : "") + "</span></h3>" +
-      '<p class="muted" style="margin-top:0;font-size:12px">Desligamentos: membros que passaram para Encerrado no processo Membros, na data da mudança. Solicitações: as que entraram pela esteira' + (rh ? "" : " (o RH vê as da esteira)") + " e pelo app, na data em que foram criadas.</p>" + corpo + "</div>";
+      : c.vazio("Nenhum encerramento registrado ainda.");
+    return '<div class="card"><h3>Histórico de encerramentos<span class="extra">' + seletor + (rh ? ' <button class="btn peq sec" data-acao="exportar-csv" data-conjunto="desligamentos">' + icone("baixar", 13) + " CSV</button>" : "") + "</span></h3>" +
+      '<p class="muted" style="margin-top:0;font-size:12px">Encerramentos: membros que passaram para Encerrado no processo Membros, na data da mudança. Solicitações: as que entraram pela esteira' + (rh ? "" : " (o RH vê as da esteira)") + " e pelo app, na data em que foram criadas.</p>" + corpo + "</div>";
   }
   ui.acoes["off-periodo"] = function (el) { E().filtros.offPeriodo = el.value; E().manterRolagem = true; ui.render(); };
 
@@ -270,7 +270,7 @@
   function confirmarData(iso) {
     const ctx = E().ctx;
     if (!iso) return true;
-    if (iso < ctx.hoje) { ui.erroNoPainel("A data limite para o desligamento não pode ficar no passado."); return false; }
+    if (iso < ctx.hoje) { ui.erroNoPainel("A data limite para o encerramento não pode ficar no passado."); return false; }
     if (calc.diffDias(ctx.hoje, iso) < 7 && !window.confirm("A data limite fica a menos de 7 dias de hoje. O RH pede pelo menos 7 dias. Enviar mesmo assim?")) return false;
     if (calc.diaSemana(iso) === 5 && !window.confirm("A data limite é uma sexta-feira, que o RH pede para evitar. Enviar mesmo assim?")) return false;
     return true;

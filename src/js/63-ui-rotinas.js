@@ -109,18 +109,23 @@
         : c.vazio("Nenhum membro ativo na equipe. Membros em onboarding acompanham pelas avaliações do onboarding.")) + "</div>";
   }
 
-  /** O2O do trimestre: a sessão de desenvolvimento, uma por membro ativo no início do trimestre */
+  /** O2O do trimestre: a sessão de desenvolvimento, uma por membro ativo no início do trimestre.
+      Desde 23/11/2026 (pedido do RH) o registro abre sozinho na janela do trimestre (dom.janelaO2O: primeiro dia útil
+      + 14 dias): sem o item criado pelo RH, "Registrar O2O" cria o item já com o registro. */
   function cartaoO2O(membros) {
     const ctx = E().ctx;
+    const jan = dom.janelaO2O(ctx), prox = dom.proximaJanelaO2O(ctx);
+    const textoJanela = jan.aberta ? "registro aberto até " + calc.fmtData(jan.fim) : "o registro abre de " + calc.fmtData(prox.inicio) + " a " + calc.fmtData(prox.fim);
     const linhas = membros.filter((m) => m.estagio === "ATIVO").map((m0) => {
       const m = dom.infoMembro(ctx, m0);
       const cic = dom.cicloDo(ctx, m.id, ctx.tri.chave);
       return { m, cic, s: cic ? dom.statusCiclo(ctx, cic) : null };
     }).sort((a, b) => a.m.nome.localeCompare(b.m.nome, "pt-BR"));
-    return '<div class="card" style="margin-top:16px"><h3>O2O do ' + esc(ctx.tri.rotulo) + '<span class="extra muted">sessão de desenvolvimento no início do trimestre, de 45 a 60 minutos</span></h3>' +
+    return '<div class="card" style="margin-top:16px"><h3>O2O do ' + esc(ctx.tri.rotulo) + '<span class="extra muted">sessão de desenvolvimento no início do trimestre, de 45 a 60 minutos · ' + esc(textoJanela) + "</span></h3>" +
       (linhas.length ? '<div class="lista">' + linhas.map((l) => {
-        const btn = !l.cic ? '<span class="muted" style="font-size:12px">sem item do ciclo (o RH cria no 1º dia útil)</span>'
-          : l.s.acao === "agendar" ? '<button class="btn peq" data-acao="agendar-1a1" data-id="' + esc(l.cic.id) + '">' + icone("calendario", 14) + " Agendar</button>"
+        const btn = !l.cic ? (jan.aberta ? '<button class="btn peq" data-acao="registrar-1a1" data-membro="' + esc(l.m.id) + '">Registrar O2O</button>'
+            : '<span class="muted" style="font-size:12px">' + esc(textoJanela) + "</span>")
+          : l.s.acao === "agendar" ? '<button class="btn peq sec" data-acao="agendar-1a1" data-id="' + esc(l.cic.id) + '">' + icone("calendario", 14) + ' Agendar</button><button class="btn peq" data-acao="registrar-1a1" data-id="' + esc(l.cic.id) + '">Registrar O2O</button>'
           : l.s.acao === "registrar-1a1" || l.s.chave === "agendado" ? '<button class="btn peq ' + (l.s.chave === "agendado" ? "sec" : "") + '" data-acao="registrar-1a1" data-id="' + esc(l.cic.id) + '">Registrar O2O</button>' : "";
         return '<div class="item clicavel" data-rota="' + (l.cic ? "#/rotinas/ciclo/" + esc(l.cic.id) : "#/membro/" + esc(l.m.id)) + '">' + c.avatar(l.m, 34) +
           '<div class="principal-item"><div class="t">' + esc(l.m.nome) + '</div><div class="d">' + (l.cic && l.cic.link1a1 ? esc(l.cic.link1a1) : esc(l.m.funcao || "")) + "</div></div>" +
@@ -422,9 +427,16 @@
   };
 
   /* ---------------- registrar o 1:1 ---------------- */
+  /** O item do ciclo ainda não existe (janela do O2O, 23/11/2026): um item provisório do trimestre atual, criado ao salvar */
+  function cicloNovoO2O(ctx, membroId) {
+    if (!membroId || !ctx.idx.membro[membroId]) return null;
+    return dom.cicloDo(ctx, membroId, ctx.tri.chave) || { id: "", membroId: String(membroId), trimestre: ctx.tri.chave, estagio: "NEW" };
+  }
   ui.acoes["registrar-1a1"] = function (el) {
     const ctx = E().ctx;
-    const ci = ctx.idx.porId.ciclo[el.dataset.id];
+    const ci = el.dataset.id ? ctx.idx.porId.ciclo[el.dataset.id] : cicloNovoO2O(ctx, el.dataset.membro);
+    if (!ci) return;
+    if (!ci.id && !dom.janelaO2O(ctx).aberta) { ui.avisar("O registro do O2O abre no início do trimestre, por duas semanas.", "erro"); return; }
     const m = dom.infoMembro(ctx, ctx.idx.membro[ci.membroId]);
     const ant = dom.cicloAnterior(ctx, ci);
     const combAnt = ant ? dom.combinados(ant) : [];
@@ -448,7 +460,7 @@
         c.campo({ nome: "comb" + n + "Prazo", rotulo: "Prazo", tipo: "data", valor: v["comb" + n + "Prazo"] }) + "</div>").join("") + "</div></div>";
     ui.abrirPainel({
       titulo: "Registro do O2O de " + m.nome, sub: "Fica editável por 48 horas depois de salvo.", corpo, largo: true,
-      rodape: '<button class="btn" data-acao="salvar-1a1" data-id="' + esc(ci.id) + '" data-qtd-anteriores="' + combAnt.length + '">Salvar o registro</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+      rodape: '<button class="btn" data-acao="salvar-1a1" data-id="' + esc(ci.id) + '" data-membro="' + esc(ci.membroId) + '" data-qtd-anteriores="' + combAnt.length + '">Salvar o registro</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
     });
   };
   ui.acoes["salvar-1a1"] = function (el) {
@@ -459,7 +471,8 @@
     if (!ui.validar(f, obrig)) return;
     const d = ui.lerForm(f);
     const ctx = E().ctx;
-    const ci = ctx.idx.porId.ciclo[el.dataset.id];
+    const ci = el.dataset.id ? ctx.idx.porId.ciclo[el.dataset.id] : cicloNovoO2O(ctx, el.dataset.membro);
+    if (!ci) return;
     if (d.realizadoEm > ctx.hoje) { ui.erroNoPainel("A data do O2O não pode ser futura."); return; }
     for (const k of [2, 3]) {
       if (d["comb" + k + "Texto"] && (!d["comb" + k + "Resp"] || !d["comb" + k + "Prazo"])) { ui.erroNoPainel("Combinado " + k + ": informe o responsável e o prazo."); return; }
@@ -474,7 +487,13 @@
     [1, 2, 3].forEach((k) => { dados["comb" + k + "Texto"] = d["comb" + k + "Texto"] || ""; dados["comb" + k + "Resp"] = d["comb" + k + "Texto"] ? d["comb" + k + "Resp"] : ""; dados["comb" + k + "Prazo"] = d["comb" + k + "Texto"] ? d["comb" + k + "Prazo"] : ""; });
     if (!ci.registro1a1Em) dados.registro1a1Em = ui.agoraISO();
     if (!ci.data1a1) dados.data1a1 = d.realizadoEm;
-    ui.salvar(el, () => ui.atualizar("ciclo", ci.id, dados), { mensagem: "O2O registrado." });
+    // sem o item do RH, o registro cria o item do trimestre (janela do O2O); o membro é o responsável, como no item do RH
+    const criar = () => {
+      const m = dom.infoMembro(ctx, ctx.idx.membro[ci.membroId]);
+      const t = calc.trimestrePorChave(ci.trimestre);
+      return ui.criar("ciclo", Object.assign(dados, { titulo: m.nome + " · " + t.chave, membroId: m.id, responsavel: m.responsavel, trimestre: t.chave, fimTrimestre: t.fim, prazoEvidencias: calc.prazoEvidencias(t) }));
+    };
+    ui.salvar(el, () => (ci.id ? ui.atualizar("ciclo", ci.id, dados) : criar()), { mensagem: "O2O registrado." });
   };
 
   GP.telas = GP.telas || {};

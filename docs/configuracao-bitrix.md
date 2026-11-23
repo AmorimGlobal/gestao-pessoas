@@ -624,6 +624,37 @@ Para o RH e a TI testarem o ciclo inteiro antes do de verdade: Revisão de Progr
 
 Exemplo do primeiro teste: Fernando (membro), Mathias (a liderança dele) e Luciele (RH). Mathias avalia Fernando; Fernando faz a 360° do Mathias; Mathias e Luciele, que têm a mesma liderança, se avaliam como pares; a Luciele calibra e dá os retornos. Na devolutiva, o Mathias prepara, conversa com o Fernando e só então clica em "Conversa feita: liberar ao membro": antes disso, Seus retornos do Fernando fica vazio.
 
+### 5.2 Entrega por anexo e ajustes do RH (23/11/2026)
+
+O RH adaptou o primeiro ciclo para receber as avaliações **em arquivo**. Os formulários do app ficam para quando o RH revisar (2027). Pedidos e o que mudou:
+
+1. **Campos novos (falta criar no portal):** um administrador abre Configuração → **"Criar ou completar a estrutura"**. Sem eles, o app avisa "Falta o campo do arquivo no Bitrix" e não deixa enviar.
+   - "Encerramento das entregas" (`UF_CRM_<typeId>_ENCERRAMENTO`) em Revisão · Ciclos;
+   - "Avaliação em arquivo" / "Autoavaliação em arquivo" (`…_ANEXOS`, arquivo múltiplo) em Revisão · Avaliações da liderança, Revisão · Autoavaliações e Revisão · Respostas 360°.
+2. **Abertura do ciclo:** o RH escolhe "Como as avaliações chegam": em arquivo (padrão, `regras.entrega = "anexos"`) ou pelos formulários do app. No modo por arquivo:
+   - **Datas:** pede a abertura e o **encerramento das entregas**. As pessoas veem só essas duas datas, no lugar dos prazos de cada etapa. A autoavaliação e a avaliação da liderança vão até o encerramento; os prazos internos (calibração, devolutivas, retornos) ficam para o RH.
+   - **Modelos:** os links dos modelos de cada categoria (autoavaliação, lideranças, pares, liderados), por exemplo um arquivo no Bitrix Drive com acesso para a empresa. Cada pessoa vê "Baixar o modelo".
+   - **Sem cargo na matriz:** o cargo na matriz não é exigido, e a conferência das matrizes sai da lista para abrir.
+3. **No início da Revisão, o membro vê o cartão "Avaliação 360º"**, com o texto do RH e três categorias:
+   - **Faça sua autoavaliação:** o arquivo vai para o item da autoavaliação (responsável = o membro), pelo navegador.
+   - **Avalie suas lideranças** e **Pares:** cada pessoa tem o botão Anexar. O arquivo vai pelo servidor (`api/revisao360.js`), como a resposta da 360°: na anônima, o item e o arquivo não têm autor. O app avisa para tirar o nome do arquivo e conferir as propriedades do documento, porque o Word e o Excel gravam o autor.
+   - **Colegas da área:** em Pares, além de quem tem a mesma liderança direta, dá para escolher outro colega da mesma área. Ficam de fora quem está acima ou abaixo na cadeia de liderança.
+4. **A liderança** anexa a avaliação de cada liderado em "Sua equipe direta" (Anexar avaliação). A avaliação vai direto para "Enviada ao RH", e o RH é avisado. A autoavaliação do membro fica liberada para a liderança depois do envio, como antes.
+5. **O RH** vê o que chegou na revisão de cada membro (cartão "Entregas", com "Abrir no Bitrix") e as avaliações 360° em arquivo no Relatório 360° (por pessoa avaliada, com o modo de cada uma). Os arquivos ficam no card de cada item do CRM. As respostas só com arquivo ficam fora das médias.
+6. **"Ver os formulários"** (Revisão de Progresso, só RH e administrador): os formulários do app como cada pessoa os vê, sem gravar nada (autoavaliação, 360° sobre a liderança e sobre um par, avaliação da liderança por cargo, resumo da devolutiva).
+7. **Retornos ao membro desligados** (`R.RETORNOS_AO_MEMBRO = false`). O RH quer garantir a segurança antes de algum membro receber algo que não deveria.
+   - O membro não vê "Seus retornos" nem recebe aviso de devolutiva ou de ciência.
+   - O item de retornos fica sempre com a liderança.
+   - O botão da liderança vira "Registrar a conversa".
+   - Para religar, troque a constante e publique.
+8. **Guia de preenchimento:** saiu "O PDI e a seção Promoção ficam só com o RH. Depois da conversa, o membro confirma a ciência no app dele". Em "Como ler os níveis", "Comportamento" virou "Competência".
+
+Fora da Revisão, no mesmo pedido:
+
+- **O2O sem esperar o RH** (`dom.janelaO2O`): o registro abre sozinho no primeiro dia útil de cada trimestre e fica aberto por 14 dias corridos. Em Feedbacks → O2O, quem não tem o item do RH ganha "Registrar O2O", que cria o item do trimestre já com o registro. A liderança cria esse item, com a permissão "Criar e editar: Do departamento" da seção 4. Quem já tem o item do RH segue como antes, agora também com "Registrar O2O" ao lado de "Agendar". A próxima janela é de 04/01 a 17/01/2027.
+- **Offboarding:** "desligamento" virou "encerramento" nos textos, no formulário de encerramento e no nome do CSV. O rótulo do campo `UF_CRM_OFF_DATA_DES` no Bitrix ("Data limite para o desligamento") só muda no editor do card do funil 79.
+- **Férias e ausências:** a pausa contratual saiu das opções e da política na tela. Os pedidos antigos dela continuam com as regras e os prazos.
+
 ### 6. Pendências do protótipo
 
 - **Estágios:** o formato da avaliação segue pendente de validação jurídica (Lei 11.788/2008). Na abertura, o RH pode escolher "Todos, exceto estágios".

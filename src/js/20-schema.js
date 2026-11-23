@@ -463,6 +463,7 @@
         c("periodoInicio", "PERIODO_INICIO", "data", "Início do período avaliado"),
         c("periodoFim", "PERIODO_FIM", "data", "Fim do período avaliado"),
         c("dataAbertura", "DATA_ABERTURA", "data", "Data de abertura"),
+        c("encerramento", "ENCERRAMENTO", "data", "Encerramento das entregas", { ajuda: "Até quando chegam as avaliações (autoavaliação, lideranças, pares e liderados). É a data que as pessoas veem (23/11/2026)." }),
         c("prazoAuto", "PRAZO_AUTO", "data", "Autoavaliação do membro até"),
         c("prazoLideranca", "PRAZO_LIDERANCA", "data", "Avaliação da liderança até"),
         c("prazoCalibracao", "PRAZO_CALIBRACAO", "data", "Calibração até"),
@@ -494,6 +495,7 @@
         c("calibradaEm", "CALIBRADA_EM", "dataHora", "Calibrada em"),
         c("pdi", "PDI", "textoLongo", "PDI e promoção (só o RH)", { ajuda: "Gravado pelo app: até 3 ações do PDI e a indicação de elegibilidade para promoção." }),
         c("devolutivaEm", "DEVOLUTIVA_EM", "data", "Data da devolutiva"),
+        c("anexos", "ANEXOS", "arquivo", "Avaliação em arquivo", { multiplo: true, ajuda: "Entrega por anexo (23/11/2026): o arquivo da avaliação da liderança." }),
         autor(),
       ],
     },
@@ -513,6 +515,7 @@
         c("auto4", "AUTO_4", "textoLongo", "O que eu preciso da minha liderança ou da empresa para entregar mais?"),
         c("auto5", "AUTO_5", "textoLongo", "O que eu quero desenvolver no próximo semestre?"),
         c("enviadaEm", "ENVIADA_EM", "dataHora", "Enviada em"),
+        c("anexos", "ANEXOS", "arquivo", "Autoavaliação em arquivo", { multiplo: true, ajuda: "Entrega por anexo (23/11/2026)." }),
       ],
     },
     {
@@ -530,6 +533,7 @@
         c("identificadoPor", "IDENTIFICADO_POR", "pessoa", "Quem respondeu (só na identificada)"),
         c("area", "AREA", "texto", "Área da pessoa avaliada", { ajuda: "Para juntar grupos abaixo do mínimo de respostas." }),
         c("respostas", "RESPOSTAS", "textoLongo", "Respostas", { ajuda: "Gravado pelo servidor: as 8 afirmações e os textos (continuar, começar, exemplo)." }),
+        c("anexos", "ANEXOS", "arquivo", "Avaliação em arquivo", { multiplo: true, ajuda: "Entrega por anexo (23/11/2026), gravada pelo servidor: na anônima, sem autor." }),
       ],
     },
     {
