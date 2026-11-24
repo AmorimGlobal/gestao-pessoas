@@ -204,6 +204,11 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - **O2O:** abre sozinho na janela do trimestre (`dom.janelaO2O`: primeiro dia útil + 14 dias). "Registrar O2O" cria o item quando o RH não criou.
   - **Outros:** "desligamento" virou "encerramento" no Offboarding. A pausa contratual saiu de Férias e ausências. No guia da Revisão, "Comportamento" virou "Competência" nos níveis, e saiu a frase do PDI e da ciência.
   - **Falta no portal:** um administrador roda "Criar ou completar a estrutura", que cria os 4 campos novos.
+- **24/11/2026, ajustes do RH depois do primeiro uso (docs seção 14, item 5.2.10; lançamento em 27/11):**
+  - **Tela principal simplificada:** no ciclo por anexo, `telaInicioSimples` mostra o topo com as datas, os avisos do RH e um cartão só, "Avaliação 360º" (`entregas360Html`). O cartão tem o contador e as categorias, com "Avalie seus liderados" para quem lidera. Para o RH, há ainda o acompanhamento (`acompanhamentoHtml`, com busca `data-filtro="rev-part"`).
+  - **O que saiu:** "Sua equipe direta", as equipes da coordenação, a matriz (botões, códigos de cargo, "Trocar cargo") e a escala dos níveis.
+  - **A CEO** é avaliada como liderança por quem se reporta a ela (`R.avaliavelComoLideranca`), mas não avalia ninguém.
+  - **Avisos do topo** (`avisosDoTopo`): "Encerrar e apagar o teste" e "Avisar as pessoas" na tela principal do RH, e a dica de trocar de visão para quem tem o papel de RH.
 - **05/11/2026, solicitação de promoção (pedido do usuário, docs seção 13):**
   - A liderança direta e a coordenação pedem (Recrutamento → "Solicitar promoção" e aba Carreira do membro). A coordenação e o RH aprovam no app.
   - O card cai no funil 77, o mesmo das vagas, com os campos `UF_CRM_PR_*` (`20-schema.js`, `CAMPOS_PROMOCAO`: texto, data ou pessoa, sem lista).

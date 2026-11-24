@@ -344,16 +344,28 @@
   /** No ciclo de teste, quem não está nele não responde a 360° de ninguém */
   const foraDoTeste = (ctx, ciclo, uid) => { const t = usuariosDoTeste(ctx, ciclo); return !!t && !t[String(uid)]; };
   const naEstrutura = (ctx, uid, ciclo) => ativos(ctx, ciclo).some((u) => String(u.id) === String(uid));
+  /** Quem pode ser avaliado como liderança (24/11/2026, pedido do RH: "falta aparecer a liderança acima de mim"):
+      também a CEO, que não avalia ninguém mas é a liderança direta de quem se reporta a ela. Fora: quem está fora
+      do app (Papéis → exceções), quem saiu ou está em encerramento. No ciclo de teste, só quem está no teste. */
+  function avaliavelComoLideranca(ctx, uid, ciclo) {
+    if (foraDoTeste(ctx, ciclo, uid)) return false;
+    const pc = (ctx.config && ctx.config.papeis) || {};
+    if ((pc.excecoes || []).some((p) => String(p.id) === String(uid))) return false;
+    const u = (ctx.usuarios || []).find((x) => String(x.id) === String(uid));
+    if (!u || !(u.departamentos || []).length || (u.tipo && u.tipo !== "employee")) return false;
+    const m = ctx.idx.membroPorUsuario[String(uid)];
+    return !m || ["SUCCESS", "FAIL", "EM_ENCERRAMENTO"].indexOf(m.estagio) < 0;
+  }
   /** Superiores: o imediato e, quando ele é uma supervisão, quem está acima dela (no ciclo de teste, só quem está no teste) */
   function superioresDe(ctx, uid, ciclo) {
     const lista = [];
     if (foraDoTeste(ctx, ciclo, uid)) return lista;
     const imediato = liderDe(ctx, uid);
-    if (!imediato || !naEstrutura(ctx, imediato, ciclo)) return lista;
-    lista.push({ uid: imediato, relacao: "Superior", papel: "superior imediato" });
+    if (!imediato || !avaliavelComoLideranca(ctx, imediato, ciclo)) return lista;
+    lista.push({ uid: imediato, relacao: "Superior", papel: "liderança imediata" });
     if (ehSupervisao(ctx, imediato)) {
       const acima = liderDe(ctx, imediato);
-      if (acima && acima !== String(uid) && naEstrutura(ctx, acima, ciclo)) lista.push({ uid: acima, relacao: "Superior", papel: "superior da sua supervisão" });
+      if (acima && acima !== String(uid) && avaliavelComoLideranca(ctx, acima, ciclo)) lista.push({ uid: acima, relacao: "Superior", papel: "liderança acima da sua supervisão" });
     }
     return lista;
   }
@@ -583,7 +595,7 @@
     nomeCargo, rotuloCargo, cargoDo, matrizDo, participa, areaDe, areas,
     avaliacaoDo, autoavaliacaoDe, retornoDe, devolutivaLiberada, devolutivaPreparada, donoAntesDaConversa, faltando, situacaoMinimo, ajustes, situacaoDo,
     equipeNoCiclo, participantes, euParticipo, avaliacaoEnviada,
-    ativos, liderDe, superioresDe, paresDe, lideradosDe, avaliadoresPossiveis, grupoPequeno, relacaoCom, validarResposta,
+    ativos, liderDe, avaliavelComoLideranca, superioresDe, paresDe, lideradosDe, avaliadoresPossiveis, grupoPequeno, relacaoCom, validarResposta,
     agregar, relatorio360, notificacoes,
   };
 });

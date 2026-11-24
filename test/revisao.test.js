@@ -142,12 +142,17 @@ function contextoSupervisao() {
     registros: { membros: [{ id: "m6", responsavel: "6", estagio: "EM_ENCERRAMENTO" }] },
   });
 }
-test("360°: superiores (com a supervisão, quem está acima dela), pares e liderados, sem a CEO, sem quem está fora do app", () => {
+test("360°: superiores (com a supervisão, quem está acima dela), pares e liderados; a CEO é avaliada, mas não avalia; sem quem está fora do app", () => {
   const ctx = contextoSupervisao();
-  assert.deepEqual(R.superioresDe(ctx, "4"), [{ uid: "3", relacao: "Superior", papel: "superior imediato" }, { uid: "2", relacao: "Superior", papel: "superior da sua supervisão" }]);
+  assert.deepEqual(R.superioresDe(ctx, "4"), [{ uid: "3", relacao: "Superior", papel: "liderança imediata" }, { uid: "2", relacao: "Superior", papel: "liderança acima da sua supervisão" }]);
   assert.deepEqual(R.paresDe(ctx, "4").map((x) => x.uid), ["5"], "Diana está em encerramento e o prestador está fora do app");
   assert.deepEqual(R.paresDe(ctx, "3").map((x) => x.uid), ["7"], "lideranças com o mesmo superior também são pares");
-  assert.deepEqual(R.superioresDe(ctx, "2"), [], "a CEO não entra na 360°");
+  // 24/11/2026, pedido do RH ("falta aparecer a liderança acima de mim"): quem se reporta à CEO avalia a CEO
+  assert.deepEqual(R.superioresDe(ctx, "2"), [{ uid: "1", relacao: "Superior", papel: "liderança imediata" }], "Helena avalia a CEO");
+  assert.deepEqual(R.superioresDe(ctx, "1"), [], "a CEO não avalia ninguém");
+  assert.deepEqual(R.paresDe(ctx, "1"), []);
+  assert.equal(R.avaliavelComoLideranca(ctx, "99"), false, "quem está fora do app não é avaliado");
+  assert.equal(R.avaliavelComoLideranca(ctx, "6"), false, "quem está em encerramento não é avaliado");
   assert.deepEqual(R.lideradosDe(ctx, "3"), ["4", "5"]);
   assert.equal(R.relacaoCom(ctx, "4", "2"), "Superior");
   assert.equal(R.relacaoCom(ctx, "4", "5"), "Par");
@@ -257,7 +262,7 @@ test("servidor: recusa ciclo fechado, 360° não liberada, quem não tem relaç�
   assert.equal((await enviar("4", "5", { par_1: "Concordo" })).status, 403, "pares não liberados neste ciclo");
   assert.equal((await enviar("4", "8")).status, 403, "o RH não é superior de quem está em SDR");
   assert.equal((await enviar("3", "4")).status, 403, "liderado direto é a Revisão formal");
-  assert.equal((await enviar("2", "1")).status, 403, "a CEO não entra na 360°");
+  assert.equal((await enviar("1", "2")).status, 403, "a CEO não avalia ninguém na 360°");
   assert.equal((await enviar("4", "4")).status, 400);
   assert.equal((await enviar("4", "3", { lid_1: "Ótimo" })).status, 400);
   await portal.atualizar("revCiclos", ciclo.id, { estagio: "SUCCESS" });

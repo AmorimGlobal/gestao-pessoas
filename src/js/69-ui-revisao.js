@@ -53,9 +53,9 @@
   ui.acoes["rev-abrir-card"] = function (el) { if (E().repo && E().repo.abrirCard) E().repo.abrirCard(el.dataset.chave, el.dataset.id); };
   /** O link do modelo de cada categoria, que o RH cola na abertura do ciclo */
   const MODELOS = [["auto", "Autoavaliação"], ["lideranca", "Avaliação das lideranças"], ["pares", "Avaliação dos pares"], ["liderados", "Avaliação dos liderados (liderança)"]];
-  function linkModelo(ciclo, tipo) {
+  function linkModelo(ciclo, tipo, botao) {
     const url = String(((R.regrasDo(ciclo).modelos || {})[tipo]) || "").trim();
-    return /^https?:\/\//i.test(url) ? '<a class="btn sec peq" href="' + esc(url) + '" target="_blank" rel="noopener">' + icone("baixar", 13) + " Baixar o modelo</a>" : "";
+    return /^https?:\/\//i.test(url) ? '<a class="' + (botao ? "btn sec peq" : "rv-modelo") + '" href="' + esc(url) + '" target="_blank" rel="noopener">' + icone("baixar", 13) + " Baixar o modelo</a>" : "";
   }
   const icone = (n, t) => (GP.util.icone ? GP.util.icone(n, t) : "");
 
@@ -132,31 +132,27 @@
     const membro = E().visao === "membro";
     const ciclo = R.cicloAberto(X());
     const anexo = !ciclo || anexoNoCiclo(ciclo);
-    const t = membro && anexo ? [
-      ["Como entregar", "Em cada categoria da Avaliação 360º (autoavaliação, lideranças e pares), preencha o modelo do RH e anexe o arquivo até o encerramento. Vale PDF, Word, Excel ou imagem, até 3 MB por envio. Confira o arquivo antes de enviar: depois do envio, não dá para trocar. Se precisar corrigir, fale com o RH."],
-      ["Quem lê", "Autoavaliação: sua liderança direta e o RH. Mais ninguém. Sua liderança lê só depois de enviar a avaliação dela ao RH, para não ser influenciada. Lideranças e pares: só o RH. A pessoa avaliada não recebe o seu arquivo."],
-      ["Lideranças e pares", "Lideranças: o superior imediato e, quando houver supervisão, quem está acima dela. Pares: quem tem a mesma liderança direta, e você pode incluir outro colega da sua área. Avalie só quem você acompanha de perto: se não for o caso, pule."],
-      ["Anônima ou identificada", "Anônima: seu nome não é gravado e nem o RH sabe quem enviou. Para isso, não escreva o seu nome no arquivo e confira as propriedades do documento (o Word e o Excel gravam o autor): o app não tira essa informação. Identificada: seu nome fica visível só para o RH, que pode te procurar para entender um ponto."],
+    const lidera = !!(ciclo && R.equipeNoCiclo(X(), eu().id, ciclo).length);
+    const t = anexo ? [
+      ["Como entregar", "Em cada categoria, baixe o modelo do RH (quando houver o link), preencha e anexe o arquivo até o encerramento. Vale PDF, Word, Excel ou imagem, até 3 MB por envio. Confira antes de enviar: depois do envio, não dá para trocar o arquivo. Se precisar corrigir, fale com o RH."],
+      ["Quem lê", "Autoavaliação: sua liderança direta e o RH; a liderança lê só depois de enviar a avaliação dela, para não ser influenciada. Lideranças e pares: só o RH; a pessoa avaliada não recebe o seu arquivo." + (lidera ? " Liderados: você e o RH; a pessoa não recebe a avaliação." : "")],
+      ["Quem aparece para avaliar", "Lideranças: a sua liderança imediata e, quando ela é uma supervisão, quem está acima dela. Pares: quem tem a mesma liderança direta que você; dá para incluir outro colega da sua área. Avalie só quem você acompanha de perto: se não for o caso, pule a pessoa."],
+      ["Anônima ou identificada", "Na avaliação de lideranças e pares, você escolhe. Anônima: seu nome não é gravado e nem o RH sabe quem enviou; para isso, não escreva o seu nome no arquivo e confira as propriedades do documento (o Word e o Excel gravam o autor). Identificada: seu nome fica visível só para o RH, que pode te procurar para entender um ponto."],
     ] : membro ? [
       ["Minha autoavaliação", "Quem lê: sua liderança direta e o RH. Mais ninguém. Sua liderança lê só depois de enviar a avaliação dela ao RH, para não ser influenciada. Responda com fatos, números e exemplos; depois de enviar, você não edita mais."],
       ["Avaliação 360°", "Você avalia seus superiores (o imediato e, quando houver supervisão, quem está acima dela) e seus pares (mesma liderança direta). Avalie só quem você acompanha de perto: se não for o caso, pule. Em cada afirmação existe \"Não sei avaliar\"."],
       ["Anônima ou identificada", "Anônima: seu nome não é gravado e nem o RH sabe quem escreveu; evite detalhes que só você viveu. Identificada: seu nome fica visível só para o RH, que pode te procurar para entender um ponto. Em grupos pequenos, sua resposta só é usada junto com as de outras pessoas da área."],
       ["Para onde vai", "Só para o RH. A pessoa avaliada não recebe o que você escreveu. Depois do ciclo, o RH leva a ela temas resumidos, sem identificar ninguém e sem trechos literais."],
     ].concat(LIB ? [["Seus retornos", "Primeiro a conversa: a sua liderança fala com você sobre a devolutiva. Só depois dessa conversa o que foi combinado (e o retorno do RH sobre os pares) aparece em Seus retornos, e você confirma a ciência. Ciência, não concordância."]] : [])
-    : anexo ? [
-      ["Como funciona o ciclo", "Neste ciclo as avaliações chegam em arquivo. Você preenche o modelo do RH para cada liderado e anexa o arquivo em Sua equipe direta (Anexar avaliação) até o encerramento. Você também faz a sua parte na Avaliação 360º: autoavaliação, lideranças e pares."],
-      ["Passo a passo", "Em Sua equipe direta, clique em Anexar avaliação em cada liderado e envie o arquivo. A autoavaliação do membro fica liberada para você depois do seu envio. Depois da calibração do RH, faça a conversa de devolutiva com o membro e registre-a no app."],
-      ["Para onde vai cada coisa", "O arquivo fica com você e o RH: o membro não recebe a avaliação. Na devolutiva, você leva ao membro os pontos em palavras e as metas do próximo semestre."],
-      ["Como escrever a evidência", "Modelo SCI: Situação, Comportamento e Impacto. Fatos e dados, não impressões; entregas e resultados, não horas trabalhadas. Ex.: \"Na reunião de 12/09 com o lead [Situação], fez três perguntas antes de qualificar [Comportamento], e a oportunidade avançou sem devolução [Impacto].\""],
-    ] : [
+    : [
       ["Como funciona o ciclo", "O RH abre os ciclos em junho e novembro. Fora do ciclo, você pode iniciar rascunhos e registrar evidências ao longo do semestre: nada vai ao RH e o membro não vê. Quando o RH abre o ciclo, o rascunho vira a avaliação do ciclo: você revisa e envia."],
       ["Passo a passo", "Clique no liderado e depois em Iniciar avaliação (ou Iniciar rascunho, fora do ciclo). Avalie cada KPI e cada competência, com evidência, e envie ao RH: o contador no rodapé mostra quantos itens faltam. Leia a autoavaliação do membro, liberada depois do seu envio. Depois da calibração do RH, prepare a devolutiva, converse com o membro e registre a conversa no app."],
       ["Para onde vai cada coisa", "O formulário fica com você e o RH: o membro não recebe o formulário. Na devolutiva, você leva ao membro os pontos em palavras e as metas do próximo semestre."],
       ["Quando algo não faz sentido para a função", "Você tem autonomia: dentro de cada KPI e competência há a opção Ajustar (texto, meta ou nível mínimo) ou Não se aplica neste ciclo, e no fim de cada seção dá para incluir até 2 itens. O ajuste vale na hora, sem aprovação: o RH só recebe o registro do que mudou."],
       ["Como escrever a evidência", "Modelo SCI: Situação, Comportamento e Impacto. Fatos e dados, não impressões; entregas e resultados, não horas trabalhadas. Ex.: \"Na reunião de 12/09 com o lead [Situação], fez três perguntas antes de qualificar [Comportamento], e a oportunidade avançou sem devolução [Impacto].\""],
     ];
-    return '<details class="card politica"><summary>Guia de preenchimento</summary><div class="corpo-politica">' + t.map((x) => "<h4>" + esc(x[0]) + "</h4><p>" + esc(x[1]) + "</p>").join("") + "</div></details>" +
-      (membro ? "" : escalasHtml());
+    return '<details class="card politica rv-guia"><summary>Guia de preenchimento</summary><div class="corpo-politica">' + t.map((x) => "<h4>" + esc(x[0]) + "</h4><p>" + esc(x[1]) + "</p>").join("") + "</div></details>" +
+      (membro || anexo ? "" : escalasHtml());
   }
 
   /* ================================================================ o ciclo (cabeçalho das telas) */
@@ -205,6 +201,7 @@
   function telaInicio() {
     const ctx = X();
     const ciclo = R.cicloAberto(ctx), ultimo = ciclo || R.ultimoCiclo(ctx);
+    if (!ciclo || anexoNoCiclo(ciclo)) return telaInicioSimples(ciclo);
     const rasc = ehRH() ? R.cicloRascunho(ctx) : null;
     let acoes = "";
     if (ehRH() && !semEstrutura()) acoes += '<a class="btn" href="#/revisao/ciclo">' + (ciclo ? "O ciclo aberto" : rasc ? "Continuar a abertura do ciclo" : "Preparar a abertura do ciclo") + "</a>" +
@@ -221,6 +218,78 @@
     if (E().visao !== "membro") h += equipeHtml(ciclo);
     if (ehRH() && ciclo) h += rhHtml(ciclo);
     h += guiaHtml();
+    return h;
+  }
+
+  /* ================================================================ INÍCIO SIMPLES (entrega por anexo, 24/11/2026)
+     Pedido do RH para o piloto: "o mais simples possível". Um topo com o ciclo e as datas, os avisos do RH, o cartão
+     "Avaliação 360º" de cada pessoa (com os liderados de quem lidera) e, para o RH, o acompanhamento de quem já entregou.
+     Sem matrizes, sem formulários e sem os estados do fluxo por formulário (rascunho, calibrada, devolutiva). */
+  function telaInicioSimples(ciclo) {
+    const ctx = X(), rh = ehRH();
+    const rasc = rh ? R.cicloRascunho(ctx) : null;
+    const fim = ciclo ? R.encerramentoDo(ciclo) : "";
+    const acoes = rh && !semEstrutura() ? '<a class="btn" href="#/revisao/ciclo">' + (ciclo ? "Abertura do ciclo" : rasc ? "Continuar a abertura do ciclo" : "Preparar a abertura do ciclo") + "</a>" +
+      (ciclo ? '<a class="btn sec" href="#/revisao/relatorio">Avaliações 360° recebidas</a>' : "") : "";
+    const meta = ciclo
+      ? "<span>" + (R.ehTeste(ciclo) ? c.tag("Ciclo de teste", "roxo") : c.tag("Ciclo aberto", "verde")) + "</span><span>" + esc(ciclo.ciclo) + "</span>" +
+        (ciclo.dataAbertura ? "<span>abertura " + calc.fmtData(ciclo.dataAbertura) + "</span>" : "") + (fim ? "<span>encerramento <b>" + calc.fmtData(fim) + "</b></span>" : "")
+      : "<span>" + c.tag("Nenhum ciclo aberto", "cinza") + "</span>";
+    let h = c.cabecalho("desempenho", "Revisão de Progresso", meta, acoes);
+    if (semEstrutura()) return h + avisoSemEstrutura();
+    h += avisosDoTopo(ciclo);
+    if (!ciclo) return h + '<div class="card">' + c.vazio(rh ? "Nenhum ciclo aberto. Comece em \"" + (rasc ? "Continuar a abertura do ciclo" : "Preparar a abertura do ciclo") + "\", no alto da tela."
+      : "A Revisão de Progresso aparece aqui quando o RH abrir o ciclo.") + "</div>";
+    if (ciclo.mensagem && E().visao !== "membro") h += '<div class="aviso-info rv-mensagem"><b>Mensagem do RH:</b> ' + esc(ciclo.mensagem) + "</div>";
+    h += minhaParteHtml(ciclo, ciclo);
+    if (rh) h += acompanhamentoHtml(ciclo);
+    return h + guiaHtml();
+  }
+  /** O que o RH precisa resolver antes de tudo: o ciclo de teste a encerrar e o ciclo aberto sem aviso. Quem tem o papel
+      de RH, mas está em outra visão, recebe a dica de trocar (24/11/2026: o RH não achou o "Encerrar e apagar o teste"). */
+  function avisosDoTopo(ciclo) {
+    if (!ehRH()) {
+      const real = E().euReal || eu();
+      return !E().verComo && dom.papeis(X(), real.id).rh ? '<div class="aviso-info rv-mensagem">Você também tem o papel de RH. Para abrir, encerrar ou acompanhar o ciclo, troque para <b>RH</b> em "Ver como", no rodapé do menu.</div>' : "";
+    }
+    const alerta = (t, texto, botao) => '<div class="card acao rv-alerta"><div class="rv-alerta-t">' + esc(t) + '</div><p class="muted">' + esc(texto) + "</p>" + botao + "</div>";
+    if (ciclo && R.ehTeste(ciclo)) return alerta("Há um ciclo de teste aberto", "Só as pessoas do teste participam. Para abrir o ciclo de verdade, encerre e apague o teste: os registros do teste saem das telas, e ninguém é avisado.",
+      '<button class="btn" data-acao="rev-teste-descartar" data-id="' + esc(ciclo.id) + '">Encerrar e apagar o teste</button>');
+    if (ciclo && R.silencioso(ciclo)) return alerta("Ciclo aberto sem aviso", "Ninguém foi notificado ainda, nem pelos envios. Quem abrir o app já vê a Revisão de Progresso. Quando quiserem anunciar, o aviso vai para " +
+      plural(idsDaAbertura(ciclo).length, "pessoa", "pessoas") + " (quem participa e as lideranças).", '<button class="btn" data-acao="rev-avisar-ciclo" data-id="' + esc(ciclo.id) + '">Avisar as pessoas</button>');
+    return "";
+  }
+  /** RH: quem já entregou o quê. A avaliação de lideranças e pares não aparece por pessoa (é anônima): o total fica no número. */
+  function acompanhamentoHtml(ciclo) {
+    const ctx = X();
+    const part = R.participantes(ctx, ciclo);
+    const dentro = part.filter((x) => x.ok), fora = part.filter((x) => !x.ok);
+    const pc = (ctx.config && ctx.config.papeis) || {};
+    const ehCEO = (uid) => (pc.ceo || []).some((p) => String(p.id) === String(uid));
+    const lin = dentro.map((x) => {
+      const m = x.m, u = dom.pessoa(ctx, m.responsavel), lider = dom.liderancaEfetiva(ctx, m);
+      const auto = R.autoavaliacaoDe(ctx, m.responsavel, ciclo);
+      return { m, u, lider, auto: !!(auto && auto.estagio === "SUCCESS"), av: R.avaliacaoEnviada(R.avaliacaoDo(ctx, m.id, ciclo)), pelaCEO: !lider || ehCEO(lider) };
+    }).sort((x, y) => x.u.nome.localeCompare(y.u.nome, "pt-BR"));
+    const comLideranca = lin.filter((l) => !l.pelaCEO);
+    const n360 = (ctx.registros.rev360 || []).filter((x) => String(x.cicloId) === String(ciclo.id) && x.estagio !== "FAIL").length;
+    let h = '<div class="rv-titulo-secao">Acompanhamento do RH</div>' + c.kpis([
+      { valor: lin.length, rotulo: "participantes", tom: "azul" },
+      { valor: lin.filter((l) => l.auto).length + " de " + lin.length, rotulo: "autoavaliações recebidas", tom: "roxo" },
+      { valor: comLideranca.filter((l) => l.av).length + " de " + comLideranca.length, rotulo: "avaliações das lideranças", tom: "azul" },
+      { valor: n360, rotulo: "avaliações de lideranças e pares", tom: "verde", rota: "#/revisao/relatorio" },
+    ]);
+    const filtro = String((E().filtros && E().filtros["rev-part"]) || "").trim();
+    const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const vis = filtro ? lin.filter((l) => norm(l.u.nome).indexOf(norm(filtro)) >= 0) : lin;
+    const marca = (ok, rotulo) => c.tag(rotulo, ok ? "verde" : "cinza");
+    h += cartao("Participantes", '<input class="entrada rv-busca" data-filtro="rev-part" placeholder="Buscar pessoa…" aria-label="Buscar pessoa" value="' + esc(filtro) + '">' +
+      (vis.length ? '<div class="lista">' + vis.map((l) => '<div class="item clicavel" data-rota="#/revisao/membro/' + esc(l.m.id) + '">' + c.avatar(l.u, 30) +
+        '<div class="principal-item"><div class="t">' + esc(l.u.nome) + '</div><div class="d">' + esc(l.lider ? "liderança: " + nomeDe(l.lider) : "sem liderança direta") + "</div></div>" +
+        '<div class="lado">' + marca(l.auto, "Autoavaliação") + (l.pelaCEO ? c.tag("Liderança: CEO", "cinza") : marca(l.av, "Avaliação da liderança")) + "</div></div>").join("") + "</div>"
+        : c.vazio("Ninguém com esse nome.")) +
+      (fora.length ? '<p class="muted rv-fora">Fora deste ciclo: ' + esc(fora.map((x) => nomeDe(x.m.responsavel) + " (" + x.motivo + ")").join("; ")) + ". As exceções ficam na abertura do ciclo.</p>" : ""),
+      plural(lin.length, "pessoa", "pessoas") + " · verde = recebida");
     return h;
   }
 
@@ -322,13 +391,15 @@
     const ret = R.retornoDe(ctx, m.responsavel, ciclo);
     const s = R.situacaoDo(ctx, ciclo, m);
     const part = ciclo ? R.participa(ctx, ciclo, m) : { ok: !!codigo, motivo: codigo ? "" : "sem cargo na matriz (o RH define no cadastro do membro)" };
-    let h = voltar() + c.cabecalho("desempenho", u.nome, "<span>" + esc(nomeCargo(codigo)) + "</span><span>" + tagSituacao(s, ciclo) + "</span>",
-      ehRH() ? '<button class="btn sec" data-acao="rev-cargo" data-id="' + esc(m.id) + '">' + (codigo ? "Trocar o cargo" : "Definir o cargo") + "</button>" : "");
-    if (semEstrutura()) return h + avisoSemEstrutura();
-    h += '<div class="card">' + c.dados([["Ciclo", ciclo ? ciclo.ciclo : "Fora do ciclo · rascunho"], ["Período avaliado", ciclo ? fmt(ciclo.periodoInicio) + " a " + fmt(ciclo.periodoFim) : "definido pelo RH na abertura"],
-      ["Matriz do cargo", cargo ? plural(cargo.kpis.length, "KPI", "KPIs") + " · " + plural(cargo.competencias.length, "competência", "competências") : "—"], ["Liderança direta", nomeDe(dom.liderancaEfetiva(ctx, m))]]) +
-      (!part.ok ? '<div class="aviso-atencao" style="margin-top:14px">' + (ciclo ? "Fora deste ciclo: " : "") + esc(part.motivo) + ".</div>" : "") + "</div>";
+    // 24/11/2026: no ciclo por anexo, nada da matriz dos cargos aparece (pedido do RH para o piloto)
     const anexo = anexoNoCiclo(ciclo);
+    let h = voltar() + c.cabecalho("desempenho", u.nome, anexo ? (u.cargo ? "<span>" + esc(u.cargo) + "</span>" : "") : "<span>" + esc(nomeCargo(codigo)) + "</span><span>" + tagSituacao(s, ciclo) + "</span>",
+      ehRH() && !anexo ? '<button class="btn sec" data-acao="rev-cargo" data-id="' + esc(m.id) + '">' + (codigo ? "Trocar o cargo" : "Definir o cargo") + "</button>" : "");
+    if (semEstrutura()) return h + avisoSemEstrutura();
+    h += '<div class="card">' + c.dados(anexo ? [["Ciclo", ciclo.ciclo], ["Liderança direta", nomeDe(dom.liderancaEfetiva(ctx, m))]]
+      : [["Ciclo", ciclo ? ciclo.ciclo : "Fora do ciclo · rascunho"], ["Período avaliado", ciclo ? fmt(ciclo.periodoInicio) + " a " + fmt(ciclo.periodoFim) : "definido pelo RH na abertura"],
+        ["Matriz do cargo", cargo ? plural(cargo.kpis.length, "KPI", "KPIs") + " · " + plural(cargo.competencias.length, "competência", "competências") : "—"], ["Liderança direta", nomeDe(dom.liderancaEfetiva(ctx, m))]]) +
+      (!part.ok ? '<div class="aviso-atencao" style="margin-top:14px">' + (ciclo ? "Fora deste ciclo: " : "") + esc(part.motivo) + ".</div>" : "") + "</div>";
     if (!cargo && !anexo) return h;
 
     // as três etapas da liderança
@@ -351,7 +422,9 @@
       av && av.estagio === "CALIBRADA" && preparada ? (LIB ? "Devolutiva preparada, e o membro ainda não vê. Faça a conversa" + ate + " e depois libere o registro." : "Devolutiva preparada. Faça a conversa" + ate + " e depois registre-a.") :
       av && av.estagio === "CALIBRADA" ? "Calibração concluída: prepare a devolutiva e converse com o membro" + ate + "." + (LIB ? " O registro só chega ao membro depois que você confirmar a conversa." : "") :
       "Depois da calibração do RH: a conversa com o membro, até 3 ações do PDI e as metas do próximo semestre." + (LIB ? " O membro só vê depois da conversa." : "");
-    if (anexo) h += entregasDoMembroHtml(m, a, av, auto, ciclo) + cartao("Depois do envio", passo(3, "Devolutiva e PDI", esc(t3), b3, ret && ret.cienciaEm ? "feito" : av && av.estagio === "CALIBRADA" ? "atual" : ""));
+    // a devolutiva só aparece depois da calibração do RH: durante as entregas, a tela fica só com o que chegou
+    if (anexo) h += entregasDoMembroHtml(m, a, av, auto, ciclo) + (av && ["CALIBRADA", "DEVOLUTIVA", "SUCCESS"].indexOf(av.estagio) >= 0
+      ? cartao("Depois da calibração", passo(3, "Devolutiva e PDI", esc(t3), b3, ret && ret.cienciaEm ? "feito" : av.estagio === "CALIBRADA" ? "atual" : "")) : "");
     else h += cartao("Etapas", passo(1, "Avaliação da liderança", esc(t1), b1, enviada ? "feito" : "atual") + passo(2, "Autoavaliação do membro", esc(t2), "", auto && auto.estagio === "SUCCESS" && (enviada || a.rh) ? "feito" : "") +
       passo(3, "Devolutiva e PDI", esc(t3), b3, ret && ret.cienciaEm ? "feito" : av && av.estagio === "CALIBRADA" ? "atual" : ""));
 
@@ -948,6 +1021,7 @@
     auto: ["Faça sua autoavaliação", "Avalie seu próprio desempenho, considerando suas entregas, competências, comportamentos e oportunidades de desenvolvimento."],
     lideranca: ["Avalie suas lideranças", "Avalie sua liderança imediata e, quando aplicável, as demais lideranças às quais você se reporta."],
     pares: ["Pares", "Avalie seus colegas de equipe ou da mesma área, considerando a colaboração e a contribuição para os resultados coletivos."],
+    liderados: ["Avalie seus liderados", "Avalie cada pessoa da sua equipe direta, considerando as entregas, as competências e os comportamentos no período. Fica com você e o RH: a pessoa não recebe a avaliação."],
   };
   const avisoSemCampo = () => '<div class="aviso-atencao" style="margin-bottom:12px"><b>Falta o campo do arquivo no Bitrix.</b> ' +
     (eu().admin ? 'Abra <a href="#/config">Configuração</a> e clique em "Criar ou completar a estrutura".' : "Avise o TI: um administrador precisa rodar Configuração → Criar ou completar a estrutura.") + "</div>";
@@ -967,54 +1041,73 @@
     if (!ca.ok) { erroNoRodape(esc(ca.erros.join("; ")) + "."); return null; }
     return arquivos;
   }
-  const blocoModelo = (ciclo, tipo) => (linkModelo(ciclo, tipo) ? '<div style="margin-bottom:12px">' + linkModelo(ciclo, tipo) + "</div>" : "");
+  const blocoModelo = (ciclo, tipo) => (linkModelo(ciclo, tipo) ? '<div style="margin-bottom:12px">' + linkModelo(ciclo, tipo, true) + "</div>" : "");
   const descricaoAnexos = (x) => { const n = nomesAnexos(x); return n.length ? esc(n.join(", ")) : qtdAnexos(x) ? plural(qtdAnexos(x), "arquivo", "arquivos") : ""; };
 
-  /** O cartão "Avaliação 360º" do início, com as três categorias (texto do RH, 23/11/2026) */
+  /** O cartão "Avaliação 360º" (texto do RH, 23/11/2026): autoavaliação, lideranças, pares e, para quem lidera, os liderados (24/11/2026).
+      Cada categoria tem o seu modelo; cada linha mostra "Enviada" ou o botão Anexar. No topo, quantas entregas já foram feitas. */
   function entregas360Html(ciclo) {
     const ctx = X(), id = String(eu().id);
     const regras = R.regrasDo(ciclo);
     const fim = R.encerramentoDo(ciclo);
     const aberto = ciclo.estagio === "ABERTO", verComo = !!E().verComo;
-    const sec = (cat, corpo, extra) => '<div class="rv-secao"><div class="rv-secao-t">' + esc(CATEGORIAS[cat][0]) + (extra ? ' <span class="rv-secao-x">' + extra + "</span>" : "") + "</div>" +
-      '<p class="muted rv-sub" style="margin:2px 0 10px">' + esc(CATEGORIAS[cat][1]) + "</p>" + corpo + "</div>";
-    const item = (foto, t, d, lado) => '<div class="item">' + foto + '<div class="principal-item"><div class="t">' + t + '</div><div class="d">' + d + '</div></div><div class="lado">' + lado + "</div></div>";
-    let h = '<p style="margin-top:0">' + esc(TEXTO_360) + "</p>";
+    let total = 0, feitos = 0;
+    const cat = (chave, corpo) => '<div class="rv-cat"><div class="rv-cat-topo"><div class="rv-cat-t">' + esc(CATEGORIAS[chave][0]) + "</div>" + linkModelo(ciclo, chave) + "</div>" +
+      '<div class="rv-cat-d">' + esc(CATEGORIAS[chave][1]) + "</div>" + corpo + "</div>";
+    const item = (foto, t, d, lado, rota) => '<div class="item' + (rota ? " clicavel" : "") + '"' + (rota ? ' data-rota="' + rota + '"' : "") + ">" + foto +
+      '<div class="principal-item"><div class="t">' + t + '</div><div class="d">' + d + '</div></div><div class="lado">' + lado + "</div></div>";
+    const vazio = (t) => '<p class="muted rv-cat-vazio">' + esc(t) + "</p>";
+    const anexar = (acao, attr) => '<button class="btn peq" data-acao="' + acao + '"' + (attr ? " " + attr : "") + ">Anexar</button>";
+    let h = '<p class="rv-intro">' + esc(TEXTO_360) + "</p>";
     // 1. autoavaliação
     const part = minhaParticipacao(ciclo);
-    let c1;
-    if (!part.ok) c1 = '<p class="muted" style="margin:0">Você não participa deste ciclo: ' + esc(part.motivo) + ".</p>";
+    if (!part.ok) h += cat("auto", vazio("Você não participa deste ciclo: " + part.motivo + "."));
     else {
-      const a = R.autoavaliacaoDe(ctx, id, ciclo);
-      const enviada = a && a.estagio === "SUCCESS";
-      c1 = '<div class="lista">' + item("", "Sua autoavaliação", enviada ? "enviada em " + fmt(a.enviadaEm) + (descricaoAnexos(a) ? " · " + descricaoAnexos(a) : "") : "quem lê: sua liderança direta e o RH",
-        enviada ? c.tag("Enviada", "verde") : aberto ? '<button class="btn peq" data-acao="rev-anexo-auto">Anexar</button>' : c.tag("A enviar", "ambar")) + "</div>";
+      const a = R.autoavaliacaoDe(ctx, id, ciclo), enviada = !!(a && a.estagio === "SUCCESS");
+      total++; if (enviada) feitos++;
+      h += cat("auto", '<div class="lista">' + item(c.avatar(dom.pessoa(ctx, id), 30), "Sua autoavaliação",
+        enviada ? "enviada em " + fmt(a.enviadaEm) + (descricaoAnexos(a) ? " · " + descricaoAnexos(a) : "") : "quem lê: sua liderança direta e o RH",
+        enviada ? c.tag("Enviada", "verde") : aberto ? anexar("rev-anexo-auto") : c.tag("A enviar", "ambar")) + "</div>");
     }
-    h += sec("auto", c1, linkModelo(ciclo, "auto"));
-    // 2 e 3. lideranças e pares
+    // 2 e 3. lideranças e pares (pelo servidor, sem autor na anônima)
     const ctrl = controle360(ciclo);
     const status = (uid) => (ctrl.e.indexOf(uid) >= 0 ? c.tag("Enviada", "verde") : ctrl.p.indexOf(uid) >= 0 ? c.tag("Pulada", "cinza") : "");
+    const conta = (lista) => { total += lista.length; feitos += lista.filter((x) => status(x.uid)).length; };
     const linha = (x) => {
       const u = dom.pessoa(ctx, x.uid);
       return item(c.avatar(u, 30), esc(u.nome), esc([u.cargo, x.papel].filter(Boolean).join(" · ")),
-        status(x.uid) || (aberto && !verComo ? '<button class="btn peq" data-acao="rev-anexo-360" data-uid="' + esc(x.uid) + '">Anexar</button>' : c.tag("Pendente", "ambar")));
+        status(x.uid) || (aberto && !verComo ? anexar("rev-anexo-360", 'data-uid="' + esc(x.uid) + '"') : c.tag("Pendente", "ambar")));
     };
     if (regras.liberarLideranca) {
       const sup = R.superioresDe(ctx, id, ciclo);
-      h += sec("lideranca", sup.length ? '<div class="lista">' + sup.map(linha).join("") + "</div>" : '<p class="muted" style="margin:0">Pela estrutura do Bitrix, você não tem liderança para avaliar.</p>', linkModelo(ciclo, "lideranca"));
+      conta(sup);
+      h += cat("lideranca", sup.length ? '<div class="lista">' + sup.map(linha).join("") + "</div>" : vazio("Pela estrutura do Bitrix, não há liderança para você avaliar."));
     }
     if (regras.liberarPares) {
       const pares = R.paresDe(ctx, id, ciclo);
+      conta(pares);
       const area = R.colegasDaArea(ctx, id, ciclo);
-      const feitos = area.filter((x) => status(x.uid)), restam = area.filter((x) => !status(x.uid));
-      let c3 = pares.length || feitos.length ? '<div class="lista">' + pares.concat(feitos).map(linha).join("") + "</div>"
-        : '<p class="muted" style="margin:0">Pela estrutura do Bitrix, ninguém tem a mesma liderança direta que você.' + (restam.length ? " Você pode avaliar um colega da sua área:" : "") + "</p>";
-      if (restam.length && aberto && !verComo) c3 += '<div class="rv-colega"><select class="entrada" id="rv-colega" aria-label="Outro colega da sua área"><option value="">Avaliar outro colega da sua área…</option>' +
+      const extras = area.filter((x) => status(x.uid)), restam = area.filter((x) => !status(x.uid));
+      let corpo = pares.length || extras.length ? '<div class="lista">' + pares.concat(extras).map(linha).join("") + "</div>"
+        : vazio("Pela estrutura do Bitrix, ninguém tem a mesma liderança direta que você." + (restam.length ? " Você pode avaliar um colega da sua área." : ""));
+      if (restam.length && aberto && !verComo) corpo += '<div class="rv-colega"><select class="entrada" id="rv-colega" aria-label="Outro colega da sua área"><option value="">Avaliar outro colega da sua área…</option>' +
         restam.map((x) => '<option value="' + esc(x.uid) + '">' + esc(dom.pessoa(ctx, x.uid).nome) + "</option>").join("") + '</select><button class="btn sec peq" data-acao="rev-anexo-colega">Anexar</button></div>';
-      h += sec("pares", c3, linkModelo(ciclo, "pares"));
+      h += cat("pares", corpo);
     }
-    if (verComo && (regras.liberarLideranca || regras.liberarPares)) h += '<p class="muted" style="font-size:12px;margin:10px 0 0">Em "Ver como", a avaliação de lideranças e pares fica fechada: só a própria pessoa envia, com o login dela.</p>';
-    return cartao("Avaliação 360º", h, fim ? "até " + calc.fmtData(fim) : "");
+    // 4. liderados (só para quem lidera alguém que participa)
+    const equipe = R.equipeNoCiclo(ctx, id, ciclo).slice().sort((x, y) => nomeDe(x.responsavel).localeCompare(nomeDe(y.responsavel), "pt-BR"));
+    if (equipe.length) {
+      const linhaLid = (m) => {
+        const u = dom.pessoa(ctx, m.responsavel), av = R.avaliacaoDo(ctx, m.id, ciclo), env = R.avaliacaoEnviada(av);
+        total++; if (env) feitos++;
+        return item(c.avatar(u, 30), esc(u.nome), env ? "enviada em " + fmt(av.enviadaEm) + (descricaoAnexos(av) ? " · " + descricaoAnexos(av) : "") : esc(u.cargo || "liderado direto"),
+          env ? c.tag("Enviada", "verde") : aberto && acessoAo(m).avaliar ? anexar("rev-anexo-lider", 'data-id="' + esc(m.id) + '"') : c.tag("A enviar", "ambar"), "#/revisao/membro/" + esc(m.id));
+      };
+      h += cat("liderados", '<div class="lista">' + equipe.map(linhaLid).join("") + "</div>");
+    }
+    if (verComo && (regras.liberarLideranca || regras.liberarPares)) h += '<p class="muted rv-cat-vazio">Em "Ver como", a avaliação de lideranças e pares fica fechada: só a própria pessoa envia, com o login dela.</p>';
+    const extra = (total ? '<span class="rv-progresso' + (feitos >= total ? " ok" : "") + '">' + feitos + " de " + total + " enviadas</span>" : "") + (fim ? "<span>até " + calc.fmtData(fim) + "</span>" : "");
+    return cartao("Avaliação 360º", h, extra, "rv-entregas");
   }
 
   /* ---------------- autoavaliação em arquivo ---------------- */
@@ -1209,7 +1302,8 @@
   }
   function telaRelatorio() {
     const ctx = X();
-    let h = voltar() + c.cabecalho("desempenho", "Relatório 360°", "<span>só o RH</span>");
+    const porArquivo = R.porAnexo(R.cicloAberto(ctx) || R.ultimoCiclo(ctx));
+    let h = voltar() + c.cabecalho("desempenho", porArquivo ? "Avaliações 360° recebidas" : "Relatório 360°", "<span>só o RH</span>");
     if (!ehRH()) return h + '<div class="card">' + c.vazio("O relatório da 360° é só do RH.") + "</div>";
     if (semEstrutura()) return h + avisoSemEstrutura();
     const ciclo = R.cicloAberto(ctx) || R.ultimoCiclo(ctx);
@@ -1225,6 +1319,8 @@
         " · " + esc(g.itens.map((x) => x.modo === "Identificada" ? "identificada (" + nomeDe(x.identificadoPor) + ")" : "anônima").join(", ")) + '</div></div><div class="lado">' +
         g.itens.map((x, i) => linkBitrix("rev360", x.id, "Abrir " + (i + 1))).join("") + "</div></div>").join("") + "</div>"
       : c.vazio("Nenhuma avaliação em arquivo ainda."), plural(anx.reduce((s, g) => s + g.itens.length, 0), "arquivo", "arquivos") + " · a anônima não tem autor");
+    // sem respostas pelo formulário, as médias e os grupos não têm o que mostrar
+    if (R.porAnexo(ciclo) && !rel.total) return h + '<p class="muted" style="font-size:12px">Cada linha é a pessoa avaliada; "Abrir" leva ao card da resposta no Bitrix, onde fica o arquivo. A anônima não tem autor; na identificada, o nome aparece só para o RH. A pessoa avaliada nunca recebe a avaliação. Cada abertura desta tela fica registrada no histórico do ciclo.</p>';
     h += '<div class="aviso-info" style="margin-bottom:16px"><b>Regras fixas de anonimato.</b> A pessoa avaliada nunca recebe a avaliação, nem individual nem em resumo: o retorno é do RH, em temas. Resposta anônima é gravada sem autor. Grupos abaixo de ' + regras.minimoNotas +
       " respostas não aparecem sozinhos (" + (regras.abaixoMinimo === "nao_usar" ? "ficam fora deste ciclo" : "entram juntos na área") + "). Comentários só com " + regras.minimoComentarios + " ou mais respostas. Cada abertura deste relatório fica registrada no histórico do ciclo.</div>";
     h += c.kpis([{ valor: rel.total, rotulo: "respostas recebidas", tom: "azul" }, { valor: rel.pessoas.length, rotulo: "pessoas no relatório", tom: "verde" }, { valor: rel.areas.length, rotulo: "grupos por área", tom: "roxo" },
@@ -1295,7 +1391,7 @@
     const aberto = R.cicloAberto(ctx), rasc = R.cicloRascunho(ctx);
     const ci = aberto || rasc;
     const acoes = aberto ? '<button class="btn sec" data-acao="rev-ciclo-form" data-id="' + esc(aberto.id) + '">Editar prazos e regras</button>' +
-        (R.ehTeste(aberto) ? '<button class="btn link" data-acao="rev-teste-descartar" data-id="' + esc(aberto.id) + '">Encerrar e apagar o teste</button>'
+        (R.ehTeste(aberto) ? '<button class="btn" data-acao="rev-teste-descartar" data-id="' + esc(aberto.id) + '">Encerrar e apagar o teste</button>'
           : '<button class="btn link" data-acao="rev-encerrar" data-id="' + esc(aberto.id) + '">Encerrar o ciclo</button>')
       : '<button class="btn" data-acao="rev-ciclo-form"' + (rasc ? ' data-id="' + esc(rasc.id) + '"' : "") + ">" + (rasc ? "Continuar a abertura" : "Preparar a abertura") + "</button>" +
         '<button class="btn sec" data-acao="rev-teste-form">Abrir um ciclo de teste</button>' +
@@ -1309,10 +1405,11 @@
     // a lista para conferir a liderança direta de cada membro antes de abrir
     const part = R.participantes(ctx, ci);
     const dentro = part.filter((x) => x.ok);
-    h += cartao("Quem participa" + (ci ? "" : " (com as regras padrão)"), '<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Membro</th><th>Cargo na matriz</th><th>Liderança direta</th><th>Situação</th></tr></thead><tbody>' +
-      part.map((x) => '<tr class="clicavel" data-rota="#/membro/' + esc(x.m.id) + '"><td>' + esc(nomeDe(x.m.responsavel)) + "</td><td>" + esc(R.cargoDo(x.m) ? nomeCargo(R.cargoDo(x.m)) : "—") + "</td><td>" + esc(nomeDe(dom.liderancaEfetiva(ctx, x.m))) + "</td><td>" +
+    const comMatriz = !R.porAnexo(ci);
+    h += cartao("Quem participa" + (ci ? "" : " (com as regras padrão)"), '<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Membro</th><th>' + (comMatriz ? "Cargo na matriz" : "Cargo") + "</th><th>Liderança direta</th><th>Situação</th></tr></thead><tbody>" +
+      part.map((x) => '<tr class="clicavel" data-rota="#/membro/' + esc(x.m.id) + '"><td>' + esc(nomeDe(x.m.responsavel)) + "</td><td>" + esc(comMatriz ? (R.cargoDo(x.m) ? nomeCargo(R.cargoDo(x.m)) : "—") : dom.pessoa(ctx, x.m.responsavel).cargo || "—") + "</td><td>" + esc(nomeDe(dom.liderancaEfetiva(ctx, x.m))) + "</td><td>" +
         (x.ok ? c.tag("participa", "verde") : '<span class="muted">' + esc(x.motivo) + "</span>") + "</td></tr>").join("") + "</tbody></table></div>" +
-      '<p class="muted" style="font-size:12px;margin-bottom:0">Confira no Bitrix a liderança direta de cada membro (Minha equipe → membro). O cargo na matriz fica no cadastro do membro.</p>', dentro.length + " de " + part.length + " participam");
+      '<p class="muted" style="font-size:12px;margin-bottom:0">Confira no Bitrix a liderança direta de cada membro (Minha equipe → membro).' + (comMatriz ? " O cargo na matriz fica no cadastro do membro." : "") + "</p>", dentro.length + " de " + part.length + " participam");
     h += '<details class="card politica"><summary>Guia da abertura</summary><div class="corpo-politica">' + [
       ["Calendário", "Ciclos abertos pelo RH em junho e novembro. Ordem das etapas: autoavaliação, avaliação da liderança e 360°, calibração, devolutivas das lideranças e retornos do RH."],
       ["O que a abertura libera", "Lideranças: o envio ao RH (rascunhos feitos antes entram no ciclo). Membros: a autoavaliação e a avaliação 360° de superiores e pares. Todos recebem um aviso no Bitrix."],
@@ -1371,7 +1468,7 @@
           check("avisar_agora", "Ao abrir, avisar agora quem participa e as lideranças (notificação do Bitrix e sino do app).", false) +
           '<p class="muted rv-sub">Sem marcar, o ciclo abre em silêncio: ninguém é notificado, nem pelos envios, até o RH clicar em "Avisar as pessoas" na tela do ciclo.</p>')) +
         secao("6. Conferência antes de abrir", "os itens marcados liberam o botão Abrir ciclo", check("ok_lista", "Conferi no Bitrix a liderança direta de cada membro.", r.conferencias.lista) +
-          check("ok_matriz", "Conferi que todos os cargos participantes têm matriz validada.", r.conferencias.matriz) +
+          check("ok_matriz", "Conferi as matrizes dos cargos (só para a entrega pelos formulários do app).", r.conferencias.matriz) +
           check("ok_anonimato", "A TI demonstrou com uma resposta de teste que a avaliação anônima é gravada sem autor, que os acessos ficam registrados e que a exportação bruta está bloqueada.", r.conferencias.anonimato)) +
         c.campo({ nome: "mensagem", rotulo: "Mensagem para as lideranças", tipo: "textoLongo", linhas: 3, valor: v.mensagem, opcional: true }) + "</div>",
       rodape: aberto ? '<button class="btn" data-acao="rev-salvar-ciclo" data-id="' + esc(ci.id) + '">Salvar</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>'
@@ -1496,8 +1593,8 @@
       const cargo = R.cargoDo(m);
       return '<div class="rv-teste-linha"><label class="escolha rv-check"><input type="checkbox" name="pt_' + esc(m.id) + '"><span>' + esc(nomeDe(m.responsavel)) +
         ' <span class="muted">· liderança: ' + esc(nomeDe(dom.liderancaEfetiva(ctx, m))) + "</span></span></label>" +
-        '<select class="entrada rv-teste-cargo" name="cargo_' + esc(m.id) + '"><option value="">Cargo na matriz…</option>' +
-        cargos.map((o) => '<option value="' + esc(o.valor) + '"' + (o.valor === cargo ? " selected" : "") + ">" + esc(o.rotulo) + "</option>").join("") + "</select></div>";
+        (R.REGRAS_PADRAO.entrega === "anexos" ? "" : '<select class="entrada rv-teste-cargo" name="cargo_' + esc(m.id) + '"><option value="">Cargo na matriz…</option>' +
+        cargos.map((o) => '<option value="' + esc(o.valor) + '"' + (o.valor === cargo ? " selected" : "") + ">" + esc(o.rotulo) + "</option>").join("") + "</select>") + "</div>";
     };
     const prazo = (nome, rot, dias) => c.campo({ nome, rotulo: rot, tipo: "data", valor: calc.addDias(hoje, dias) });
     ui.abrirPainel({
@@ -1521,7 +1618,7 @@
     const d = ui.lerForm(f);
     const ids = Object.keys(d).filter((k) => k.indexOf("pt_") === 0 && d[k] === true).map((k) => k.slice(3));
     if (!ids.length) { erroNoRodape("Marque pelo menos uma pessoa."); return; }
-    const semCargo = ids.filter((id) => !d["cargo_" + id]);
+    const semCargo = R.REGRAS_PADRAO.entrega === "anexos" ? [] : ids.filter((id) => !d["cargo_" + id]);
     if (semCargo.length) { erroNoRodape("Escolha o cargo na matriz de: " + esc(semCargo.map((id) => nomeDe(ctx.idx.membro[id].responsavel)).join(", ")) + "."); return; }
     if (R.cicloAberto(ctx)) { erroNoRodape("Já existe um ciclo aberto. Encerre-o antes de abrir um teste."); return; }
     const prazos = ["prazoAuto", "prazoLideranca", "prazoCalibracao", "prazoDevolutiva", "prazoRetornos"];

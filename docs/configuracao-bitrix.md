@@ -655,6 +655,19 @@ O RH adaptou o primeiro ciclo para receber as avaliações **em arquivo**. Os fo
 
    Na tela do ciclo, "Avisar as pessoas" manda o aviso de abertura e grava `regras.avisadoEm`. Daí em diante, tudo avisa normalmente. Ciclos abertos antes (o de teste) não têm a regra e avisam como antes.
 
+10. **Ajustes do RH depois do primeiro uso (24/11/2026, lançamento em 27/11):**
+    - **Tela principal mais simples:** no topo, o ciclo com a abertura e o encerramento, sem o cartão repetido. Depois vem um cartão só, "Avaliação 360º", com o contador de entregas ("3 de 9 enviadas") e as categorias: autoavaliação, lideranças, pares e, para quem lidera, **"Avalie seus liderados"**. O "Sua equipe direta" saiu: os liderados entram no cartão, cada um com Anexar ou Enviada. A coordenação não vê mais as equipes que coordena nessa tela.
+    - **Liderança acima:** a CEO passa a ser avaliada por quem se reporta a ela (`R.avaliavelComoLideranca`). Ela continua sem avaliar ninguém e fora da lista de quem participa. No ciclo de teste, só quem está no teste.
+    - **Sem matrizes e sem formulários na tela:** no ciclo por anexo, somem os botões "Matrizes dos cargos" e "Ver os formulários", o "Trocar cargo"/"Definir cargo", o código do cargo ("C06 · …") e a escala dos níveis. Na abertura, a coluna mostra o cargo do Bitrix. O teste não pede mais o cargo na matriz. As telas continuam no app para 2027.
+    - **RH:**
+      - O "Encerrar e apagar o teste" e o "Avisar as pessoas" aparecem num aviso no topo da tela principal.
+      - O botão do topo passou a se chamar "Abertura do ciclo", como no guia.
+      - Quem tem o papel de RH, mas está em outra visão, recebe a dica de trocar em "Ver como".
+      - Abaixo do próprio cartão vem o "Acompanhamento do RH": números, a lista com busca e, por pessoa, "Autoavaliação" e "Avaliação da liderança" em verde quando chegaram.
+      - Quem tem a CEO como liderança aparece com "Liderança: CEO".
+      - O "Relatório 360°" virou "Avaliações 360° recebidas" e, sem respostas por formulário, mostra só os arquivos.
+    - **Revisão de um membro:** só o ciclo, a liderança direta e as entregas. A devolutiva aparece depois da calibração.
+
 Fora da Revisão, no mesmo pedido:
 
 - **O2O sem esperar o RH** (`dom.janelaO2O`): o registro abre sozinho no primeiro dia útil de cada trimestre e fica aberto por 14 dias corridos. Em Feedbacks → O2O, quem não tem o item do RH ganha "Registrar O2O", que cria o item do trimestre já com o registro. A liderança cria esse item, com a permissão "Criar e editar: Do departamento" da seção 4. Quem já tem o item do RH segue como antes, agora também com "Registrar O2O" ao lado de "Agendar". A próxima janela é de 04/01 a 17/01/2027.

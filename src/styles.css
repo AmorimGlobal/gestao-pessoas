@@ -531,6 +531,29 @@ select.rv-teste-cargo { padding: 4px 8px; }
 .rv-colega { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
 .rv-colega select { flex: 1 1 240px; max-width: 420px; }
 fieldset.rv-previa { border: 0; margin: 0; padding: 0; min-width: 0; }
+
+/* tela principal da Revisão no ciclo por anexo (24/11/2026): um cartão por pessoa, categorias separadas por linha fina */
+.rv-intro { margin: 0 0 4px; color: var(--texto); font-size: 13px; line-height: 1.55; }
+.rv-cat { padding: 16px 0 6px; border-top: 1px solid var(--divisor); }
+.rv-cat:first-of-type { margin-top: 12px; }
+.rv-cat-topo { display: flex; align-items: baseline; gap: 12px; }
+.rv-cat-t { font-size: 13.5px; font-weight: 700; color: var(--navy); }
+.rv-cat-d { font-size: 12.5px; color: var(--muted); margin: 3px 0 6px; line-height: 1.5; }
+.rv-cat-vazio { font-size: 12.5px; margin: 6px 0 4px; }
+.rv-cat .lista .item:last-child { border-bottom: none; }
+.rv-modelo { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.rv-entregas h3 .extra { display: inline-flex; align-items: center; gap: 10px; }
+.rv-progresso { background: var(--ambar-bg); color: var(--ambar); font-weight: 600; font-size: 11.5px; padding: 3px 9px; border-radius: 20px; }
+.rv-progresso.ok { background: var(--verde-bg); color: var(--verde); }
+.rv-mensagem { margin-bottom: 16px; }
+.rv-alerta { margin-bottom: 16px; }
+.rv-alerta + .card { margin-top: 0; }
+.rv-alerta-t { font-size: 14.5px; font-weight: 600; color: var(--navy); }
+.rv-alerta p { margin: 6px 0 12px; font-size: 12.5px; }
+.rv-titulo-secao { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--suave); margin: 28px 0 12px; }
+.rv-busca { max-width: 320px; margin-bottom: 6px; }
+.rv-fora { font-size: 12px; margin: 12px 0 0; }
+.rv-guia { margin-top: 16px; }
 /* Perfil: feedbacks e alinhamento semanal do próprio membro */
 .perfil-feedback { padding: 10px 0; border-bottom: 1px solid var(--borda); }
 .perfil-feedback:last-child { border-bottom: 0; padding-bottom: 0; }
