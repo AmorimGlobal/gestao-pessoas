@@ -265,6 +265,9 @@
     antiga("3", "2", "312", "Férias", "2026-12-26", "2027-01-02");
     antiga("105", "3", "313", "Férias", "2026-12-28", "2027-01-05");
     antiga("103", "3", "314", "Pausa contratual", "2026-12-30", "2027-01-01");
+    // a Carla bloqueou duas semanas de abril (alta demanda): ninguém da equipe dela pede férias nesse período (25/11/2026)
+    add("ferias", { id: "320", titulo: "Período bloqueado · Carla Mendes", responsavel: "3", lideranca: "3", autor: "3", bloqueio: true, tipo: "",
+      inicio: "2027-04-12", fim: "2027-04-23", dias: 12, estagio: "SUCCESS", justificativa: "Fechamento do trimestre dos clientes de imigração.", criadoEm: "2026-09-30T10:00:00-03:00" });
     // a Júlia pediu uma pausa e cancelou: fica fora da agenda
     pedido("111", "4", { id: "303", tipo: "Pausa contratual", inicio: "2026-11-23", fim: "2026-11-27", dias: 5, estagio: "FAIL", criadoEm: "2026-09-20T10:00:00-03:00",
       justificativa: "Mudança de cidade.", cobertura: "Kátia cobre os pareceres.", canceladaEm: "2026-09-22T10:00:00-03:00" });
@@ -636,7 +639,7 @@
         const D = (typeof window !== "undefined" && window.GP && window.GP.dominio) || require("./50-dominio.js");
         const FE = (typeof window !== "undefined" && window.GP && window.GP.ferias) || require("./53-ferias.js");
         const ctx = D.indexar({ hoje, eu: { id: euId }, config: d.config, usuarios: d.usuarios, departamentos: d.departamentos, registros: d.registros });
-        return FE.reservasDaEquipe(ctx, euId).filter((r) => r.fim >= hoje).map((r) => ({ inicio: r.inicio, fim: r.fim, situacao: r.situacao }));
+        return FE.reservasDaEquipe(ctx, euId).filter((r) => r.fim >= hoje).map((r) => Object.assign({ inicio: r.inicio, fim: r.fim, situacao: r.situacao }, r.bloqueio ? { bloqueio: true } : {}));
       },
       /** Revisão de Progresso: as mesmas conferências de api/revisao360.js, e a resposta entra sem autor */
       enviar360: async function (dados) {

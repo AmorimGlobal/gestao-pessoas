@@ -859,7 +859,8 @@
   /* ================================================================ agenda da equipe (3.6) */
   /** As ausências do app: férias, day off e pausas que o RH registrou depois da aprovação por e-mail (o calendário do Bitrix não é lido), por data */
   function ausenciasAprovadas(ctx) {
-    return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => p.estagio === "SUCCESS" && p.inicio)
+    // o período que a liderança bloqueou (25/11/2026) não é ausência de ninguém
+    return ((ctx.registros && ctx.registros.ferias) || []).filter((p) => p.estagio === "SUCCESS" && p.inicio && !p.bloqueio)
       .map((p) => ({ pessoa: String(p.responsavel), inicio: p.inicio, fim: p.fim || p.inicio, origem: "app", tipo: p.tipo }))
       .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
   }

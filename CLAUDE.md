@@ -88,7 +88,7 @@ docs/                 configuração manual no Bitrix e tabela 2.7 / validaçõe
 
 ```
 node build.js                         # SEMPRE depois de mexer em src/ (gera dist/ e api/app.js)
-node --test test/*.test.js            # 205 testes; os exemplos da 4.5 são casos de teste
+node --test test/*.test.js            # 208 testes; os exemplos da 4.5 são casos de teste
 node tools/provisionar.js --webhook https://<portal>/rest/<user>/<token>/ --simular
 ```
 
@@ -204,6 +204,12 @@ Teste no navegador: rode `node build.js` e abra `dist/index.html` (é a demonstr
   - **O2O:** abre sozinho na janela do trimestre (`dom.janelaO2O`: primeiro dia útil + 14 dias). "Registrar O2O" cria o item quando o RH não criou.
   - **Outros:** "desligamento" virou "encerramento" no Offboarding. A pausa contratual saiu de Férias e ausências. No guia da Revisão, "Comportamento" virou "Competência" nos níveis, e saiu a frase do PDI e da ciência.
   - **Falta no portal:** um administrador roda "Criar ou completar a estrutura", que cria os 4 campos novos.
+- **25/11/2026, texto novo do RH para as férias e o formulário (docs seção 11, item 9):**
+  - **Fluxo:** as férias nascem em "Aguardando a liderança" (`F.estagioInicial`). Sem liderança direta, vão ao RH. `F.semRH` marca o pedido que foi direto, e `prazoLideranca` conta do pedido. O day off segue RH → liderança, com o e-mail; as férias não têm mais o e-mail.
+  - **Períodos de PJ e associação:** só numa segunda-feira (`proximaSegunda`, `liberacao().primeiraSegunda`).
+  - **Bloqueios:** item com `bloqueio = true`, sem tipo, em SUCCESS, com `lideranca` = quem bloqueou. `itensDe` os tira de pedidos, agenda e avisos; `reservasDaEquipe` os devolve com `bloqueio: true`. Quem lê `registros.ferias` direto precisa pular `bloqueio` (`dom.ausenciasAprovadas` e `54-notificacoes` já pulam).
+  - **Semana coletiva:** preferência; `prioridadeColetiva` (metade da equipe pelo `dom.equipeDe`, desempate por ingresso) aparece na conferência da liderança. A escolha abre na primeira segunda de outubro (`aberturaColetiva`).
+  - **Formulário:** sem "Seu modelo de contrato". A ordem é: 23 dias, já reservado, "Calendário" (`calendarioHtml`, 12 meses) e semana coletiva. "Ciclo" virou "calendário" nas mensagens do pedido; a Agenda de férias manteve "ciclo".
 - **24/11/2026, ajustes do RH depois do primeiro uso (docs seção 14, item 5.2.10; lançamento em 27/11):**
   - **Tela principal simplificada:** no ciclo por anexo, `telaInicioSimples` mostra o topo com as datas, os avisos do RH e um cartão só, "Avaliação 360º" (`entregas360Html`). O cartão tem o contador e as categorias, com "Avalie seus liderados" para quem lidera. Para o RH, há ainda o acompanhamento (`acompanhamentoHtml`, com busca `data-filtro="rev-part"`).
   - **O que saiu:** "Sua equipe direta", as equipes da coordenação, a matriz (botões, códigos de cargo, "Trocar cargo") e a escala dos níveis.

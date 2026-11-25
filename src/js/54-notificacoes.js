@@ -47,6 +47,7 @@
 
     /* Férias e ausências */
     ((ctx.registros && ctx.registros.ferias) || []).forEach((f) => {
+      if (ferias.ehBloqueio(f)) return; // período bloqueado pela liderança (25/11/2026): não avisa ninguém
       const meu = String(f.responsavel) === id, souLid = String(f.lideranca) === id;
       const oque = ferias.nomeDoPedido(f) + " (" + ferias.periodoCurto(f) + ")";
       const rota = "#/ferias/" + f.id;
@@ -60,10 +61,15 @@
       }
       // pedido feito no app: cada passo avisa quem precisa saber
       const quem = nome(f.responsavel);
+      // desde 25/11/2026 as férias vão direto para a liderança direta (sem o passo do RH)
+      const direto = ferias.semRH(f);
       if (!meu && (p.rh || souLid)) {
+        const prazoLid = direto ? calc.fmtData(ferias.prazoLideranca(ctx, f)) : "";
         add({ id: "ferias-pedido-" + f.id, quando: f.criadoEm, area: "Férias e ausências", rota,
-          titulo: quem + " pediu " + oque, texto: p.rh ? "O RH autoriza primeiro, até " + calc.fmtData(ferias.prazoRH(ctx, f)) + "." : "O RH autoriza primeiro; depois é a sua vez de validar.",
-          acao: p.rh && f.estagio === "NEW" });
+          titulo: quem + " pediu " + oque,
+          texto: direto ? (souLid ? "Valide até " + prazoLid + "." : "A liderança direta valida até " + prazoLid + ".")
+            : p.rh ? "O RH autoriza primeiro, até " + calc.fmtData(ferias.prazoRH(ctx, f)) + "." : "O RH autoriza primeiro; depois é a sua vez de validar.",
+          acao: (p.rh && f.estagio === "NEW") || (direto && souLid && f.estagio === "AG_LIDERANCA") });
       }
       if (f.rhEm && f.rhDecisao) {
         const aprovou = f.rhDecisao === "Aprovada";
@@ -79,7 +85,8 @@
         if (p.rh && !meu) add({ id: "ferias-lid-" + f.id, quando: f.liderancaEm, area: "Férias e ausências", rota,
           titulo: nome(f.lideranca) + (confirmou ? " validou" : " devolveu") + " o pedido de " + quem, texto: confirmou ? oque + ": aprovado, e já está na agenda da equipe." : oque + "." });
         if (meu) add({ id: "ferias-lid-" + f.id, quando: f.liderancaEm, area: "Férias e ausências", rota,
-          titulo: confirmou ? "Aprovado: " + oque : "A sua liderança devolveu o pedido de " + oque, texto: confirmou ? "O RH autorizou e a sua liderança validou. O período está na agenda da equipe." : (f.liderancaComentario || "") });
+          titulo: confirmou ? "Aprovado: " + oque : "A sua liderança devolveu o pedido de " + oque,
+          texto: confirmou ? (direto ? "A sua liderança validou." : "O RH autorizou e a sua liderança validou.") + " O período está na agenda da equipe." : (f.liderancaComentario || "") });
       }
       if (f.canceladaEm && !meu && (p.rh || souLid)) add({ id: "ferias-cancelado-" + f.id, quando: f.canceladaEm, area: "Férias e ausências", rota, titulo: quem + " cancelou o pedido de " + oque, texto: "" });
     });

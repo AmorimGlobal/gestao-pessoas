@@ -385,6 +385,23 @@ Pedidos do usuário de 04/11/2026, com base no PDF "Políticas de Férias e Aus�
      - Rode "Criar ou completar a estrutura": ela cria o campo "Semana de férias coletivas". Sem o campo, a escolha da semana fica desligada, com o aviso.
      - Na Vercel não entra variável nova: a rota usa o `BITRIX_WEBHOOK_URL` (escopos crm, user e department).
      - O projeto passa a ter 11 funções em `api/`. O plano Hobby da Vercel aceita até 12.
+9. **Texto novo do RH para a seção de férias (25/11/2026).** O RH mandou o texto ("Regras gerais" e "Como solicitar"), e o app passou a seguir o que ele diz. Isso muda três pontos do item 8.
+   - **Texto:** as regras das férias aparecem por blocos, com as palavras do RH (`F.POLITICA["Férias"]` e `F.POLITICA.comoSolicitar`), no formulário e em "Políticas de Férias e Ausências". O day off continua com o texto e o fluxo de 04/11.
+   - **Fluxo:** as férias não passam mais pelo RH. O app confere o pedido e o manda direto para a **liderança direta** ("Aguardando a liderança"), que valida em até **2 dias úteis contados do pedido**. Sem liderança direta no Bitrix, o pedido vai ao RH. O e-mail ao RH saiu das férias ("todas as solicitações pelo aplicativo"). O day off segue igual: o RH autoriza, depois a liderança, com o e-mail. Os pedidos de férias feitos antes de 25/11 terminam o caminho antigo.
+   - **Segunda-feira:** os períodos de PJ e associação começam sempre numa **segunda-feira**, o que desfaz o "qualquer dia da semana" do item 8. A lista de datas só traz segundas. CLT e estágio seguem a lei.
+   - **Períodos bloqueados:** a liderança com equipe direta bloqueia períodos de alta demanda em Férias e ausências → "Períodos bloqueados da sua equipe".
+     - O bloqueio é um item da tabela com o campo novo **"Período bloqueado pela liderança"** marcado, sem tipo, já em "Aprovada". A liderança é a responsável e também a liderança direta.
+     - Quem tem essa liderança direta não pede férias no período. A equipe vê só as datas, como "Bloqueado pela liderança", sem o motivo (`api/membro.js`).
+     - O bloqueio não é ausência: fica fora da agenda e dos avisos.
+     - Quem bloqueou e o RH tiram o bloqueio. Pedidos feitos antes do bloqueio não mudam, e a conferência de quem valida mostra que caem nele.
+   - **Semana coletiva:**
+     - É uma preferência. Quando mais da metade da equipe escolhe a mesma semana, a conferência da liderança mostra quem tem prioridade, que é quem tem mais tempo de contrato.
+     - A escolha abre na **primeira segunda-feira de outubro** do ano do Natal; antes disso, o formulário não a oferece.
+   - **Formulário (pedido do RH do mesmo dia):**
+     - Saiu o "Seu modelo de contrato". Sem contrato no cadastro, valem as regras da política.
+     - A ordem passou a ser: os 23 dias, o que a equipe já reservou, o **Calendário** e a semana coletiva. O "Ciclo" virou "Calendário", com os 12 meses marcados.
+     - A semana coletiva traz a observação do RH: "A escolha do período desejado não garante a aprovação da solicitação. Em caso de empate, terá prioridade de escolha o membro com maior tempo de contrato."
+   - **Para ligar:** rode "Criar ou completar a estrutura", que cria o campo do bloqueio. Sem ele, o cartão avisa e não deixa bloquear.
 
 
 ## 12. Revisões semanais: o alinhamento pelo WhatsApp no card do membro (04/11/2026)

@@ -447,6 +447,27 @@ details.politica summary { cursor: pointer; font-weight: 700; color: var(--navy)
 .corpo-politica h4 { margin: 14px 0 6px; color: var(--navy); font-size: 13px; }
 .corpo-politica ul, .corpo-politica ol, .regras ul, .regras ol { margin: 0; padding-left: 20px; }
 .corpo-politica li, .regras li { margin-bottom: 4px; }
+/* as regras das férias por blocos, com título (texto do RH de 25/11/2026) */
+.corpo-politica h5, .regras h5 { margin: 12px 0 4px; font-size: 12.5px; color: var(--navy); }
+.regras h5:first-of-type { margin-top: 2px; }
+.corpo-politica p, .regras p { margin: 0 0 6px; }
+.corpo-politica ul + p, .regras ul + p { margin-top: 6px; }
+/* o calendário do pedido de férias (no lugar do "Ciclo", pedido do RH de 25/11/2026) */
+.fe-cal { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 12px 16px; margin-top: 12px; }
+.fe-mes-t { font-size: 12px; font-weight: 600; color: var(--navy); text-transform: capitalize; margin-bottom: 4px; }
+.fe-dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; font-size: 10.5px; text-align: center; }
+.fe-dias span { padding: 2px 0; border-radius: 4px; color: var(--texto); }
+.fe-dias .cab { color: var(--suave); font-weight: 600; }
+.fe-dias .seg { font-weight: 700; }
+.fe-dias .antes { color: var(--suave); opacity: .5; font-weight: 400; }
+.fe-dias .col, .fe-legenda i.col { background: var(--roxo-bg); color: var(--roxo); }
+.fe-dias .res, .fe-legenda i.res { background: var(--ambar-bg); color: var(--ambar); }
+.fe-dias .blq, .fe-legenda i.blq { background: var(--vermelho-bg); color: var(--vermelho); }
+.fe-dias .meu, .fe-legenda i.meu { background: var(--verde); color: #fff; }
+.fe-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+.fe-legenda span { display: inline-flex; align-items: center; gap: 5px; }
+.fe-legenda i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid var(--borda); }
+.fe-legenda i.antes { background: var(--sutil); }
 .regras { background: var(--sutil); border-radius: 12px; padding: 12px 14px; margin: -4px 0 16px; font-size: 12.5px; }
 .regras .rotulo { font-weight: 700; color: var(--navy); margin: 4px 0 6px; }
 .regras .rotulo + ol { margin-bottom: 10px; }

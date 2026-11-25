@@ -395,6 +395,8 @@
         c("dias", "DIAS", "numero", "Dias corridos"),
         // protótipo do RH (06/11/2026): cada pessoa escolhe uma das duas semanas de férias coletivas do fim de ano
         c("coletiva", "COLETIVA", "simNao", "Semana de férias coletivas", { ajuda: "A semana do fim de ano que a pessoa escolheu (a do Natal ou a do Ano Novo). Não conta nos 23 dias nem na regra da equipe." }),
+        // texto do RH de 25/11/2026: "a liderança também pode bloquear previamente períodos de alta demanda"
+        c("bloqueio", "BLOQUEIO", "simNao", "Período bloqueado pela liderança", { ajuda: "Período de alta demanda em que a equipe da liderança (responsável) não pode pedir férias. Não é ausência de ninguém." }),
         c("cobertura", "COBERTURA", "textoLongo", "Cobertura das atividades no período"),
         c("justificativa", "JUSTIFICATIVA", "textoLongo", "Justificativa"),
         c("foraDaPolitica", "FORA_POLITICA", "textoLongo", "Pontos fora da política", { ajuda: "O que o app apontou na hora do pedido. A justificativa de quem pediu explica cada um." }),

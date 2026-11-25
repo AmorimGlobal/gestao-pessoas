@@ -16,6 +16,9 @@
    23 dias (23, 7 + 16 ou 8 + 15), e a data de início numa lista que já tira o que não pode (antes dos 12 meses de
    contrato e dos 60 dias, a semana coletiva dela e o que a equipe já reservou, pela rota api/ferias-equipe.js).
    O RH autoriza e a liderança valida (ou devolvem); a Agenda de férias mostra o ciclo inteiro por equipe.
+   Desde 25/11/2026 (texto novo do RH para a seção de férias): as férias vão direto para a liderança direta, sem o
+   passo do RH e sem o e-mail; os períodos começam numa segunda-feira; a liderança bloqueia períodos de alta demanda
+   ("Períodos bloqueados"); a semana coletiva é preferência, e a liderança vê a prioridade por tempo de contrato.
    Mora aqui também o "Meu aniversário" (perfil do Bitrix), que o day off de aniversário usa.
    ===================================================================================== */
 (function (raiz) {
@@ -48,15 +51,78 @@
   }
   function lista(itens, comPessoa, vazio) { return itens.length ? '<div class="lista">' + itens.map((p) => linha(p, comPessoa)).join("") + "</div>" : c.vazio(vazio); }
 
-  /** A política inteira (o fluxo, os três tipos e os feriados), para consultar a qualquer hora */
+  /** As regras de um tipo: as férias vêm por blocos, com título (texto do RH de 25/11/2026); o day off, numa lista */
+  const itemRegra = (x) => "<li>" + (Array.isArray(x) ? "<b>" + esc(x[0]) + "</b> " + esc(x[1]) : esc(x)) + "</li>";
+  function regrasDoTipoHtml(tipo) {
+    const R = F.POLITICA[tipo] || [];
+    if (typeof R[0] === "string") return "<ul>" + R.map(itemRegra).join("") + "</ul>";
+    const par = (lista) => (lista || []).map((t) => "<p>" + esc(t) + "</p>").join("");
+    return R.map((b) => "<h5>" + esc(b.t) + "</h5>" + par(b.p) + (b.itens ? "<ul>" + b.itens.map(itemRegra).join("") + "</ul>" : "") + par(b.depois)).join("");
+  }
+  /** Como o pedido anda: as férias, pelo "Como solicitar" do RH (25/11/2026); o day off, pelo fluxo de 04/11 */
+  function fluxoHtml(tipo) {
+    if (tipo === "Férias") {
+      const C = F.POLITICA.comoSolicitar;
+      return "<p>" + esc(C.intro) + "</p><ol>" + C.passos.map((x) => "<li><b>" + esc(x[0]) + ".</b> " + esc(x[1]) + "</li>").join("") + "</ol>" +
+        "<p><b>Importante:</b> " + esc(C.importante) + "</p>";
+    }
+    return "<ol>" + F.POLITICA.fluxo.map((x) => "<li><b>" + esc(x[0]) + ".</b> " + esc(x[1]) + "</li>").join("") + "</ol>";
+  }
+  /** A política inteira (as férias, o day off e os feriados), para consultar a qualquer hora */
   function politicaHtml(aberta) {
     const P = F.POLITICA;
-    const sec = (t, itens) => "<h4>" + esc(t) + "</h4><ul>" + itens.map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul>";
     return '<details class="card politica"' + (aberta ? " open" : "") + '><summary>' + icone("manual", 15) + " Políticas de Férias e Ausências</summary>" +
-      '<div class="corpo-politica"><h4>Fluxo de solicitação</h4><ol>' + P.fluxo.map((x) => "<li><b>" + esc(x[0]) + ".</b> " + esc(x[1]) + "</li>").join("") + "</ol>" +
-      sec("Férias", P["Férias"]) + sec("Day off", P["Day off"]) + sec("Feriados", P.feriados) +
+      '<div class="corpo-politica"><h4>Férias · regras gerais</h4>' + regrasDoTipoHtml("Férias") + "<h4>Férias · como solicitar</h4>" + fluxoHtml("Férias") +
+      "<h4>Day off</h4>" + regrasDoTipoHtml("Day off") + "<h5>Como o pedido de day off anda</h5>" + fluxoHtml("Day off") +
+      "<h4>Feriados</h4><ul>" + P.feriados.map(itemRegra).join("") + "</ul>" +
       '<p class="muted" style="font-size:12px">Dúvidas: ' + esc(F.EMAIL_RH) + ".</p></div></details>";
   }
+
+  /* ================================================================ PERÍODOS BLOQUEADOS (texto do RH de 25/11/2026) */
+  const bloqueioSemCampo = () => ((E().estrutura && E().estrutura.ausentes) || []).indexOf("ferias.bloqueio") >= 0;
+  /** A liderança bloqueia períodos de alta demanda para a equipe direta; o RH vê todos e pode tirar */
+  function bloqueiosHtml(lista, podeBloquear) {
+    const ctx = E().ctx, eu = String(E().eu.id);
+    let h = '<div class="card"><h3>Períodos bloqueados' + (ehRH() && !podeBloquear ? "" : " da sua equipe") + '<span class="extra muted">alta demanda · ninguém da equipe pede férias neles</span></h3>';
+    if (bloqueioSemCampo()) return h + '<p class="muted" style="margin:0">O bloqueio ainda não está no Bitrix: um administrador cria o campo em Configuração → "Criar ou completar a estrutura".</p></div>';
+    h += lista.length ? '<div class="lista">' + lista.map((b) => '<div class="item"><div class="principal-item"><div class="t">' + esc(F.periodo(b)) + "</div>" +
+      '<div class="d">' + esc([String(b.responsavel) === eu ? "" : "Equipe de " + dom.pessoa(ctx, b.responsavel).nome, b.justificativa || ""].filter(Boolean).join(" · ")) + "</div></div>" +
+      '<div class="lado">' + (ehRH() || String(b.responsavel) === eu ? '<button class="btn link excluir" data-acao="excluir-bloqueio" data-id="' + esc(b.id) + '">Tirar o bloqueio</button>' : "") + "</div></div>").join("") + "</div>"
+      : c.vazio("Nenhum período bloqueado daqui em diante.");
+    if (podeBloquear) h += '<div style="margin-top:12px"><button class="btn sec" data-acao="bloquear-periodo">Bloquear um período</button></div>';
+    return h + "</div>";
+  }
+  ui.acoes["bloquear-periodo"] = function () {
+    if (bloqueioSemCampo()) { ui.avisar("O bloqueio ainda não está no Bitrix: falta \"Criar ou completar a estrutura\" em Configuração.", "erro"); return; }
+    if (E().verComo) { ui.avisar("Em \"Ver como\", o bloqueio sairia no seu nome. Quem bloqueia é a própria liderança.", "erro"); return; }
+    const hoje = E().ctx.hoje;
+    ui.abrirPainel({
+      titulo: "Bloquear um período",
+      sub: "Período de alta demanda: ninguém da sua equipe direta pede férias nele. A equipe vê só as datas, como \"bloqueado pela liderança\". Pedidos já feitos nesse período não mudam: você decide na validação.",
+      corpo: '<div id="form-bloqueio"><div class="linha-campos">' + c.campo({ nome: "inicio", rotulo: "Primeiro dia", tipo: "data", min: hoje }) + c.campo({ nome: "fim", rotulo: "Último dia", tipo: "data", min: hoje }) + "</div>" +
+        c.campo({ nome: "motivo", rotulo: "Motivo", tipo: "textoLongo", opcional: true, ajuda: "Fica para você e para o RH. A equipe não vê." }) + "</div>",
+      rodape: '<button class="btn" data-acao="salvar-bloqueio">Bloquear</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
+    });
+  };
+  ui.acoes["salvar-bloqueio"] = function (el) {
+    const f = document.getElementById("form-bloqueio");
+    if (!ui.validar(f, ["inicio", "fim"])) return;
+    const d = ui.lerForm(f);
+    if (d.fim < d.inicio) { ui.erroNoPainel("O último dia vem antes do primeiro."); return; }
+    if (d.fim < E().ctx.hoje) { ui.erroNoPainel("Esse período já passou."); return; }
+    const eu = E().eu;
+    // na tabela "Férias e ausências", sem tipo, já aprovado: a liderança é a responsável e a liderança direta da equipe
+    ui.salvar(el, () => ui.criar("ferias", {
+      titulo: "Período bloqueado · " + eu.nome, responsavel: eu.id, autor: eu.id, lideranca: eu.id, bloqueio: true, estagio: "SUCCESS",
+      inicio: d.inicio, fim: d.fim, dias: F.diasCorridos(d.inicio, d.fim), justificativa: String(d.motivo || "").trim(),
+    }), { mensagem: "Período bloqueado: " + F.periodoCurto({ inicio: d.inicio, fim: d.fim }) + ". A sua equipe não pede férias nele." });
+  };
+  ui.acoes["excluir-bloqueio"] = function (el) {
+    const b = F.bloqueiosVisiveis(E().ctx, E().eu.id, E().visao).find((x) => x.id === String(el.dataset.id));
+    if (!b) return;
+    if (!window.confirm("Tirar o bloqueio de " + F.periodoCurto(b) + "? A equipe volta a poder pedir férias nesse período.")) return;
+    ui.salvar(el, () => ui.excluir("ferias", b.id), { mensagem: "Bloqueio retirado." });
+  };
 
   ui.rotas.ferias = function (partes) {
     if (partes[0] === "agenda") return telaAgenda();
@@ -85,10 +151,15 @@
       h += '<div class="aviso-atencao" style="margin-bottom:16px"><b>A tabela "Férias e ausências" ainda não existe no CRM do Bitrix.</b> ' +
         (eu.admin ? 'Abra <a href="#/config">Configuração</a> e clique em "Criar ou completar a estrutura".' : "Avise o TI: falta criar a estrutura no Bitrix.") + "</div>";
     }
-    h += '<div class="aviso-info" style="margin-bottom:16px">Você pede aqui, depois de ler as regras: o RH autoriza, a sua liderança valida, e o período entra na Agenda da equipe. Cada passo chega como aviso no Bitrix. ' +
-      "O e-mail para " + esc(F.EMAIL_RH) + " com cópia para a liderança, que a política pede, sai pronto para enviar pela sua caixa do Bitrix." + (ehRH() ? " O RH também registra direto uma ausência combinada fora do app." : "") + "</div>";
+    // texto do RH de 25/11/2026: as férias vão direto para a liderança direta; o day off passa antes pelo RH
+    h += '<div class="aviso-info" style="margin-bottom:16px">Você pede aqui, depois de ler as regras. O app confere o pedido com a política e com a agenda da equipe, e a sua liderança direta valida as férias em até 2 dias úteis (o day off passa antes pelo RH). ' +
+      "Validado, o período entra na Agenda da equipe. Cada passo chega como aviso no Bitrix." + (ehRH() ? " O RH também registra direto uma ausência combinada fora do app." : "") + "</div>";
     if (paraRH.length) h += '<div class="card acao"><h3>Aguardando a autorização do RH<span class="extra muted">por ordem de chegada · em até 3 dias úteis</span></h3>' + lista(paraRH, true, "") + "</div>";
-    if (paraMim.length) h += '<div class="card acao"><h3>Aguardando a sua validação<span class="extra muted">já autorizados pelo RH · em até 2 dias úteis</span></h3>' + lista(paraMim, true, "") + "</div>";
+    if (paraMim.length) h += '<div class="card acao"><h3>Aguardando a sua validação<span class="extra muted">em até 2 dias úteis</span></h3>' + lista(paraMim, true, "") + "</div>";
+    // os períodos bloqueados: a liderança com equipe direta bloqueia; o RH vê todos
+    const podeBloquear = visao !== "membro" && !semEstrutura() && dom.equipeDe(ctx, id).length > 0;
+    const bloqueios = F.bloqueiosVisiveis(ctx, id, visao).filter((b) => F.fimDe(b) >= ctx.hoje);
+    if (podeBloquear || (ehRH() && bloqueios.length)) h += bloqueiosHtml(bloqueios, podeBloquear);
     // o aniversário fica no topo dos seus pedidos: o day off de aniversário usa o mês dele
     const aniv = (u.aniversario ? "Seu aniversário: <b>" + calc.fmtData("2000-" + u.aniversario) + "</b> · day off no mês de " + calc.MESES_LONGOS[Number(u.aniversario.slice(0, 2)) - 1] + "."
       : "Seu aniversário não está cadastrado: o day off de aniversário usa o mês dele.") +
@@ -114,13 +185,16 @@
     let acoes = "";
     if (decide === "rh") acoes += '<button class="btn" data-acao="decidir-ferias" data-id="' + esc(p.id) + '" data-decisao="Aprovada">Autorizar</button><button class="btn sec" data-acao="decidir-ferias" data-id="' + esc(p.id) + '" data-decisao="Recusada">Devolver</button>';
     if (decide === "lideranca") acoes += '<button class="btn" data-acao="decidir-ferias" data-id="' + esc(p.id) + '" data-decisao="Aprovada">Validar</button><button class="btn sec" data-acao="decidir-ferias" data-id="' + esc(p.id) + '" data-decisao="Recusada">Devolver</button>';
-    if (meu && doApp && emAndamento(p) && !p.emailEnviadoEm) acoes += '<button class="btn sec" data-acao="email-do-pedido" data-id="' + esc(p.id) + '">' + icone("email", 14) + " E-mail ao RH</button>";
+    // as férias não levam mais o e-mail ao RH (texto do RH de 25/11/2026: tudo pelo app); o day off, sim
+    if (meu && doApp && emAndamento(p) && !p.emailEnviadoEm && p.tipo !== "Férias") acoes += '<button class="btn sec" data-acao="email-do-pedido" data-id="' + esc(p.id) + '">' + icone("email", 14) + " E-mail ao RH</button>";
     if (meu && emAndamento(p)) acoes += '<button class="btn link" data-acao="cancelar-ferias" data-id="' + esc(p.id) + '">Cancelar o pedido</button>';
     if (ehRH() && !doApp) acoes += '<button class="btn sec" data-acao="registrar-ausencia" data-id="' + esc(p.id) + '">Editar</button>';
     if (ehRH()) acoes += '<button class="btn link excluir" data-acao="excluir-ausencia" data-id="' + esc(p.id) + '">' + icone("lixeira", 14) + " Excluir</button>";
     let h = c.voltar("#/ferias", "Férias e ausências") + c.cabecalho("ferias", tipoNaTela(p) + " · " + quem.nome, "<span>" + c.tag(s.texto, s.cor) + "</span><span>" + esc(F.periodo(p)) + "</span>", acoes);
+    // passou (ou passa) pelo RH: o day off, as férias de antes de 25/11 e as de quem não tem liderança direta
+    const comRH = p.tipo !== "Férias" || p.estagio === "NEW" || !!p.rhDecisao;
     if (doApp) {
-      const passos = [["Pedido", true], ["RH autoriza", !!p.rhDecisao], ["Liderança valida", !!p.liderancaDecisao], ["Na agenda", p.estagio === "SUCCESS"]];
+      const passos = [["Pedido", true], comRH ? ["RH autoriza", !!p.rhDecisao] : ["Conferência do app", true], ["Liderança valida", !!p.liderancaDecisao], ["Na agenda", p.estagio === "SUCCESS"]];
       const atual = p.estagio === "NEW" ? 1 : p.estagio === "AG_LIDERANCA" ? 2 : -1;
       h += '<div class="card"><div class="passos">' + passos.map((x, i) => '<span class="p ' + (x[1] && i !== atual ? "feito" : i === atual ? "atual" : "") + '">' + x[0] + "</span>").join("") +
         (p.estagio === "FAIL" ? '<span class="p">' + esc(s.texto) + "</span>" : "") + "</div>" +
@@ -133,14 +207,14 @@
         conf.map((x) => '<div class="' + (x.ok ? "ok" : "falta") + '"><span class="s">' + (x.ok ? "✓" : "!") + "</span><span>" + esc(x.texto) + "</span></div>").join("") + "</div></div>";
     }
     if (p.foraDaPolitica) h += '<div class="card acao"><h3>' + icone("alerta", 15) + ' Pontos fora da política</h3><ul style="margin:0;padding-left:18px">' + p.foraDaPolitica.split("\n").filter(Boolean).map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul>" +
-      '<p class="muted" style="font-size:12px;margin-bottom:0">Apontados pelo app na hora do pedido. A justificativa de quem pediu está abaixo; quem decide é o RH.</p></div>';
+      '<p class="muted" style="font-size:12px;margin-bottom:0">Apontados pelo app na hora do pedido. A justificativa de quem pediu está abaixo; quem decide é ' + (comRH ? "o RH" : "a liderança direta") + ".</p></div>";
     const fer = dom.feriadosDe(ctx, F.dadosDaPessoa(ctx, p.responsavel).sigla);
     const fim = p.tipo === "Day off" ? p.inicio : p.fim || p.inicio;
     const lid = p.lideranca ? dom.pessoa(ctx, p.lideranca).nome : "";
     h += '<div class="card"><h3>' + (doApp ? "Pedido" : "Ausência registrada pelo RH") + "</h3>" + c.dados([["Pessoa", quem.nome], ["Tipo", tipoNaTela(p) + (p.motivoDayOff ? " (" + p.motivoDayOff.toLowerCase() + ")" : "")], ["Período", F.periodo(p)],
       ["Volta em", calc.fmtDiaSemana(calc.voltaEm(fim, fer)) + ", " + calc.fmtDataAno(calc.voltaEm(fim, fer))], ["Liderança direta", lid],
       doApp ? ["Pedido em", calc.fmtDataAno(p.criadoEm)] : ["Registrada por", dom.pessoa(ctx, p.autor || p.criadoPor).nome + (p.criadoEm ? " em " + calc.fmtDataAno(p.criadoEm) : "")],
-      doApp ? ["E-mail ao RH", p.emailEnviadoEm ? "enviado em " + calc.fmtDataAno(p.emailEnviadoEm) : "não enviado pelo app"] : null]) +
+      doApp && (p.tipo !== "Férias" || p.emailEnviadoEm) ? ["E-mail ao RH", p.emailEnviadoEm ? "enviado em " + calc.fmtDataAno(p.emailEnviadoEm) : "não enviado pelo app"] : null]) +
       '<div class="sci" style="margin-top:14px">' + c.textoRegistro("Cobertura das atividades", p.cobertura) + c.textoRegistro(doApp && p.foraDaPolitica ? "Justificativa" : "Observação", p.justificativa) + "</div></div>";
     if (doApp && (p.rhDecisao || p.liderancaDecisao || p.canceladaEm)) {
       h += '<div class="card"><h3>Respostas</h3><div class="sci">' +
@@ -297,11 +371,10 @@
   };
 
   /* ================================================================ PEDIR (qualquer pessoa) */
-  const CONTRATOS = ["Associado", "PJ", "Estágio", "CLT"];
   function regrasHtml(tipo) {
     if (!tipo) return "";
-    return '<div class="regras"><div class="rotulo">Regras de ' + esc(F.NOME_TIPO[tipo]) + "</div><ul>" + F.POLITICA[tipo].map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul>" +
-      '<div class="rotulo">Como o pedido anda</div><ol>' + F.POLITICA.fluxo.map((x) => "<li><b>" + esc(x[0]) + ".</b> " + esc(x[1]) + "</li>").join("") + "</ol>" +
+    return '<div class="regras"><div class="rotulo">Regras de ' + esc(F.NOME_TIPO[tipo]) + "</div>" + regrasDoTipoHtml(tipo) +
+      '<div class="rotulo">' + (tipo === "Férias" ? "Como solicitar" : "Como o pedido anda") + "</div>" + fluxoHtml(tipo) +
       '<label class="escolha li-regras"><input type="checkbox" name="lido"><span>Li as regras de ' + esc(F.NOME_TIPO[tipo]) + " e o fluxo do pedido</span></label></div>";
   }
   /** O modo do formulário: o tipo, e as férias pela política (PJ e associação) ou pela lei (CLT e estágio) */
@@ -312,10 +385,10 @@
     const comDatas = "Day off,Pausa contratual,Férias-lei";
     return '<div id="campos-ferias" hidden>' +
       '<div' + so("Day off") + ">" + c.campo({ nome: "motivoDayOff", rotulo: "Motivo do day off", tipo: "escolha", opcoes: GP.schema.OPCOES.motivoDayOff }) + "</div>" +
-      (pessoa.contrato ? "" : c.campo({ nome: "contrato", rotulo: "Seu modelo de contrato", tipo: "lista", opcoes: CONTRATOS, opcional: true, ajuda: "O app não achou o seu contrato no cadastro. As regras mudam para estágio e CLT." })) +
-      // férias de PJ e associação: o ciclo, a semana coletiva, como tirar os 23 dias e as datas (protótipo do RH, 06/11/2026)
+      // o "Seu modelo de contrato" saiu em 25/11/2026 (pedido do RH): sem contrato no cadastro, valem as regras da política
+      // férias de PJ e associação: os 23 dias, as datas da equipe, o calendário e a semana coletiva (protótipo do RH, 06/11/2026)
       '<div' + so("Férias-politica") + '><div id="bloco-politica"></div>' +
-        c.campo({ nome: "observacao", rotulo: "Observação para o RH", tipo: "textoLongo", opcional: true }) + "</div>" +
+        c.campo({ nome: "observacao", rotulo: "Observação para a liderança", tipo: "textoLongo", opcional: true }) + "</div>" +
       '<div' + so(comDatas) + '><div class="linha-campos">' + c.campo({ nome: "inicio", rotulo: "Primeiro dia", tipo: "data", min: ctx.hoje }) +
         '<div' + so("Pausa contratual,Férias-lei") + ">" + c.campo({ nome: "fim", rotulo: "Último dia", tipo: "data", min: ctx.hoje }) + "</div></div>" +
         '<div id="periodo-ferias" class="muted" style="font-size:12.5px;margin:-6px 0 14px"></div></div>' +
@@ -339,7 +412,7 @@
     const ctx = E().ctx;
     const lib = F.liberacao(pessoa, ctx.hoje);
     const atual = F.cicloDe(ctx.hoje), prox = F.proximoCiclo(atual);
-    return [atual, prox].filter((ci) => ci.fim >= lib.primeiraData || F.semanasColetivas(ci)[1].inicio > ctx.hoje);
+    return [atual, prox].filter((ci) => ci.fim >= lib.primeiraData || (F.coletivaAberta(ci, ctx.hoje) && F.semanasColetivas(ci)[1].inicio > ctx.hoje));
   }
   /** As datas reservadas pela equipe (do servidor; sem ele, o que o login lê) */
   async function carregarReservas(f) {
@@ -358,7 +431,7 @@
       DIA_CURTO[calc.diaSemana(o.inicio)] + ", " + calc.fmtData(o.inicio) + " a " + calc.fmtDataAno(o.fim) + (o.bloqueio ? " · " + o.bloqueio : "") + "</option>";
     const livres = ops.filter((o) => !o.bloqueio).length;
     return '<div class="campo" data-campo="' + nome + '"><label for="f-' + nome + '">' + esc(rotulo) + "</label>" + (ajuda ? '<div class="ajuda">' + esc(ajuda) + "</div>" : "") +
-      '<select class="entrada" id="f-' + nome + '" name="' + nome + '"><option value="">' + (livres ? "Escolha a data de início" : "Nenhuma data livre neste ciclo") + "</option>" +
+      '<select class="entrada" id="f-' + nome + '" name="' + nome + '"><option value="">' + (livres ? "Escolha a data de início" : "Nenhuma data livre neste calendário") + "</option>" +
       Object.keys(porMes).map((k) => '<optgroup label="' + calc.MESES_LONGOS[Number(k.slice(5, 7)) - 1] + " de " + k.slice(0, 4) + '">' + porMes[k].map(opt).join("") + "</optgroup>").join("") + "</select></div>";
   }
   /** O que o bloco mostra agora: o estado (st) vem do que a pessoa escolheu */
@@ -373,44 +446,26 @@
     const ctx = E().ctx, st = f._st;
     const lib = F.liberacao(pessoa, ctx.hoje);
     const ciclos = ciclosParaPedir(pessoa);
-    if (!ciclos.length) return '<div class="aviso-atencao">Não há ciclo com datas possíveis agora.</div>';
+    if (!ciclos.length) return '<div class="aviso-atencao">Não há calendário com datas possíveis agora.</div>';
     if (!ciclos.some((x) => x.ano === st.ciclo)) st.ciclo = ciclos[0].ano;
     const ciclo = ciclos.find((x) => x.ano === st.ciclo);
-    let h = "";
-    if (ciclos.length > 1) h += c.campo({ nome: "pol_ciclo", rotulo: "Ciclo", tipo: "escolha", opcoes: ciclos.map((x) => ({ valor: String(x.ano), rotulo: x.rotulo })), valor: String(st.ciclo) });
-    h += c.dados([["Ciclo", ciclo.rotulo], ["Início do contrato", lib.ref ? calc.fmtDataAno(lib.ref) + (lib.pelo === "cadastro" ? " (cadastro no Bitrix)" : "") : "não informado"],
-      [lib.aberta ? "Primeira data possível" : "Solicitação abre em", calc.fmtDataAno(lib.aberta ? lib.primeiraData : lib.abreEm)]]);
-    if (!lib.aberta) h += '<div class="aviso-atencao" style="margin-top:12px"><b>Sua solicitação abre quando você completar 10 meses de contrato.</b> A partir de ' + calc.fmtDataAno(lib.abreEm) +
-      " você poderá agendar férias com início depois de " + calc.fmtDataAno(lib.completa12) + ", data em que completa 12 meses. A semana de férias coletivas você já escolhe.</div>";
-    // a semana de férias coletivas (uma das duas; exceção à regra da equipe)
     const semanas = F.semanasColetivas(ciclo);
     const jaCol = F.coletivaDoCiclo(ctx, pessoa.id, ciclo);
     const meus = F.pedidosDe(ctx, pessoa.id);
-    h += '<div class="grupo-form"><div class="rotulo-grupo">Sua semana de férias coletivas</div>';
-    if (jaCol) h += '<p style="margin:0">' + esc(F.periodoCurto(jaCol)) + " · " + esc(F.situacao(ctx, jaCol).texto) + "</p>";
-    else if (coletivaSemCampo()) h += '<p class="muted" style="margin:0">A escolha da semana ainda não está no Bitrix: um administrador cria o campo em Configuração → "Criar ou completar a estrutura".</p>';
-    else {
-      h += '<div class="ajuda">Metade da equipe tira a semana do Natal e metade a do Ano Novo. Não conta nos 23 dias nem na regra da equipe.</div><div class="escolhas empilhadas" data-campo="pol_coletiva">' +
-        [{ valor: "", rotulo: "Escolher depois" }].concat(semanas.map((s) => ({ valor: String(s.n), rotulo: calc.fmtDiaSemana(s.inicio) + ", " + calc.fmtData(s.inicio) + " a " + calc.fmtDiaSemana(s.fim) + ", " + calc.fmtDataAno(s.fim) + " (" + s.rotulo + ")", s })))
-          .map((o) => {
-            const passou = o.s && o.s.inicio <= ctx.hoje;
-            const cruza = o.s && meus.some((x) => !F.ehColetiva(x) && x.inicio <= o.s.fim && F.fimDe(x) >= o.s.inicio);
-            const dis = passou || cruza;
-            return '<label class="escolha"><input type="radio" name="pol_coletiva" value="' + o.valor + '"' + (String(st.coletiva || "") === o.valor && !dis ? " checked" : "") + (dis ? " disabled" : "") + "><span>" + esc(o.rotulo) +
-              (passou ? ' <span class="op-d">já passou</span>' : cruza ? ' <span class="op-d">cai num período de férias seu</span>' : "") + "</span></label>";
-          }).join("") + "</div>";
-    }
-    h += "</div>";
-    // os 23 dias
-    h += '<div class="grupo-form"><div class="rotulo-grupo">Os 23 dias</div>';
+    const colAberta = F.coletivaAberta(ciclo, ctx.hoje);
+    const col = jaCol || (st.coletiva && colAberta ? semanas[Number(st.coletiva) - 1] : null);
+    let h = "";
+    if (!lib.aberta) h += '<div class="aviso-atencao" style="margin-bottom:12px"><b>Sua solicitação abre quando você completar 10 meses de contrato.</b> A partir de ' + calc.fmtDataAno(lib.abreEm) +
+      " você poderá agendar férias com início depois de " + calc.fmtDataAno(lib.completa12) + ", data em que completa 12 meses." + (colAberta ? " A semana de férias coletivas você já escolhe." : "") + "</div>";
+    // pedido do RH de 25/11/2026: os 23 dias no começo, depois o que a equipe já reservou, o calendário e a semana coletiva
+    h += '<div class="grupo-form"><div class="rotulo-grupo">Os 23 dias</div>' + (lib.aberta ? '<div class="ajuda">Os períodos começam sempre numa segunda-feira.</div>' : "");
     if (!lib.aberta) h += '<p class="muted" style="margin:0">Abrem em ' + calc.fmtDataAno(lib.abreEm) + ".</p>";
     else {
       const { rest, tamanhos } = tamanhosDoCiclo(pessoa, ciclo, st);
-      if (rest.completo) h += '<p style="margin:0">Você já pediu os 23 dias deste ciclo (' + esc(rest.dias.join(" + ")) + " dias)." + (rest.foraDaRegra ? " O RH confere a divisão." : "") + "</p>";
+      if (rest.completo) h += '<p style="margin:0">Você já pediu os 23 dias deste calendário (' + esc(rest.dias.join(" + ")) + " dias)." + (rest.foraDaRegra ? " O RH confere a divisão." : "") + "</p>";
       else {
-        if (rest.falta) h += '<p style="margin:0 0 10px">Falta o período de <b>' + rest.falta + " dias</b> deste ciclo (você já pediu " + rest.dias[0] + ").</p>";
+        if (rest.falta) h += '<p style="margin:0 0 10px">Falta o período de <b>' + rest.falta + " dias</b> deste calendário (você já pediu " + rest.dias[0] + ").</p>";
         else h += c.campo({ nome: "pol_modalidade", rotulo: "Como você quer tirar os 23 dias?", tipo: "escolha", valor: st.modalidade, opcoes: F.MODALIDADES.map((m) => ({ valor: m.id, rotulo: m.rotulo })) });
-        const col = jaCol || (st.coletiva ? semanas[Number(st.coletiva) - 1] : null);
         tamanhos.forEach((dias, i) => {
           const evitar = tamanhos.filter((x, j) => j !== i && st.inicios[x]).map((x) => ({ inicio: st.inicios[x], fim: calc.addDias(st.inicios[x], x - 1) }));
           const ops = F.opcoesDeInicio(ctx, ciclo, dias, { pessoa, reservas: st.reservas || [], coletiva: col ? { inicio: col.inicio, fim: F.fimDe(col) } : null, outros: meus, evitar });
@@ -426,8 +481,56 @@
     h += '<div class="grupo-form"><div class="rotulo-grupo">Já reservado na sua equipe</div>' + (st.erroReservas ? '<div class="aviso-atencao" style="margin-bottom:8px">' + esc(st.erroReservas) + "</div>" : "") +
       (st.reservas === null ? '<p class="muted" style="margin:0">Carregando…</p>' : res.length ? '<ul class="rv-reservas">' + res.map((r) => "<li>" + esc(calc.fmtData(r.inicio) + " a " + calc.fmtDataAno(r.fim)) + " · " + esc(r.situacao) + "</li>").join("") + "</ul>"
         : '<p class="muted" style="margin:0">Nada reservado na sua equipe daqui em diante.</p>') +
-      '<p class="muted" style="font-size:12px;margin:8px 0 0">Quem pediu primeiro fica com a data. Se um pedido for devolvido ou cancelado, ela volta a ficar livre. A semana de férias coletivas é exceção.</p></div>';
-    return h;
+      '<p class="muted" style="font-size:12px;margin:8px 0 0">Quem pediu primeiro fica com a data. Se um pedido for devolvido ou cancelado, ela volta a ficar livre. No período que a liderança bloqueou, ninguém pede. A semana de férias coletivas é exceção.</p></div>';
+    // o calendário (no lugar do "Ciclo", pedido do RH de 25/11/2026): o ano de novembro a outubro, mês a mês
+    h += '<div class="grupo-form"><div class="rotulo-grupo">Calendário</div>' +
+      (ciclos.length > 1 ? c.campo({ nome: "pol_ciclo", rotulo: "Qual calendário", tipo: "escolha", opcoes: ciclos.map((x) => ({ valor: String(x.ano), rotulo: x.rotulo })), valor: String(st.ciclo) }) : "") +
+      c.dados([ciclos.length > 1 ? null : ["Calendário", ciclo.rotulo], ["Início do contrato", lib.ref ? calc.fmtDataAno(lib.ref) + (lib.pelo === "cadastro" ? " (cadastro no Bitrix)" : "") : "não informado"],
+        [lib.aberta ? "Primeira data possível" : "Solicitação abre em", lib.aberta ? calc.fmtDiaSemana(lib.primeiraSegunda) + ", " + calc.fmtDataAno(lib.primeiraSegunda) : calc.fmtDataAno(lib.abreEm)]].filter(Boolean)) +
+      calendarioHtml(ciclo, { lib, meus, col, semanas, reservas: res, escolhidos: Object.keys(st.inicios).filter((k) => st.inicios[k]).map((k) => ({ inicio: st.inicios[k], fim: calc.addDias(st.inicios[k], Number(k) - 1) })) }) + "</div>";
+    // a semana de férias coletivas: a escolha abre na primeira segunda-feira de outubro (pedido do RH de 25/11/2026)
+    h += '<div class="grupo-form"><div class="rotulo-grupo">Sua semana de férias coletivas</div>' +
+      '<div class="ajuda">A escolha do período desejado não garante a aprovação da solicitação. Em caso de empate, terá prioridade de escolha o membro com maior tempo de contrato.</div>';
+    if (jaCol) h += '<p style="margin:0">' + esc(F.periodoCurto(jaCol)) + " · " + esc(F.situacao(ctx, jaCol).texto) + "</p>";
+    else if (coletivaSemCampo()) h += '<p class="muted" style="margin:0">A escolha da semana ainda não está no Bitrix: um administrador cria o campo em Configuração → "Criar ou completar a estrutura".</p>';
+    else if (!colAberta) h += '<p class="muted" style="margin:0">A escolha da semana de ' + esc(F.periodoCurto(semanas[0]) + " ou " + F.periodoCurto(semanas[1])) + " abre em " + calc.fmtDataAno(F.aberturaColetiva(ciclo)) + ", a primeira segunda-feira de outubro.</p>";
+    else {
+      h += '<div class="escolhas empilhadas" data-campo="pol_coletiva">' +
+        [{ valor: "", rotulo: "Escolher depois" }].concat(semanas.map((s) => ({ valor: String(s.n), rotulo: calc.fmtDiaSemana(s.inicio) + ", " + calc.fmtData(s.inicio) + " a " + calc.fmtDiaSemana(s.fim) + ", " + calc.fmtDataAno(s.fim) + " (" + s.rotulo + ")", s })))
+          .map((o) => {
+            const passou = o.s && o.s.inicio <= ctx.hoje;
+            const cruza = o.s && meus.some((x) => !F.ehColetiva(x) && x.inicio <= o.s.fim && F.fimDe(x) >= o.s.inicio);
+            const dis = passou || cruza;
+            return '<label class="escolha"><input type="radio" name="pol_coletiva" value="' + o.valor + '"' + (String(st.coletiva || "") === o.valor && !dis ? " checked" : "") + (dis ? " disabled" : "") + "><span>" + esc(o.rotulo) +
+              (passou ? ' <span class="op-d">já passou</span>' : cruza ? ' <span class="op-d">cai num período de férias seu</span>' : "") + "</span></label>";
+          }).join("") + "</div>";
+    }
+    return h + "</div>";
+  }
+  /** O calendário do ano de férias (novembro a outubro), mês a mês, semanas de segunda a domingo: os seus períodos, o que a
+      equipe já reservou, o que a liderança bloqueou, as semanas coletivas e o que vem antes da primeira data possível.
+      o = { lib, meus, col, semanas, reservas, escolhidos } */
+  function calendarioHtml(ciclo, o) {
+    const marca = {};
+    const pinta = (ini, fim, cls) => { for (let d = ini; d <= fim; d = calc.addDias(d, 1)) marca[d] = cls; };
+    // da menor prioridade para a maior: quem vem depois pinta por cima
+    if (o.lib.primeiraSegunda > ciclo.inicio) pinta(ciclo.inicio, calc.addDias(o.lib.primeiraSegunda < ciclo.fim ? o.lib.primeiraSegunda : calc.addDias(ciclo.fim, 1), -1), "antes");
+    o.semanas.forEach((s) => pinta(s.inicio, s.fim, "col"));
+    (o.reservas || []).filter((r) => !r.bloqueio).forEach((r) => pinta(r.inicio, r.fim, "res"));
+    (o.reservas || []).filter((r) => r.bloqueio).forEach((r) => pinta(r.inicio, r.fim, "blq"));
+    (o.meus || []).filter((x) => x.tipo === "Férias").forEach((x) => pinta(x.inicio, F.fimDe(x), "meu"));
+    if (o.col) pinta(o.col.inicio, F.fimDe(o.col), "meu");
+    (o.escolhidos || []).forEach((x) => pinta(x.inicio, x.fim, "meu"));
+    let h = '<div class="fe-cal">';
+    for (let i = 0; i < 12; i++) {
+      const primeiro = F.addMeses(ciclo.inicio, i), mes = primeiro.slice(0, 7);
+      h += '<div class="fe-mes"><div class="fe-mes-t">' + esc(calc.MESES_LONGOS[Number(mes.slice(5, 7)) - 1] + " " + mes.slice(0, 4)) + '</div><div class="fe-dias">' +
+        ["S", "T", "Q", "Q", "S", "S", "D"].map((x) => '<span class="cab">' + x + "</span>").join("") + "<span></span>".repeat((calc.diaSemana(primeiro) + 6) % 7);
+      for (let d = primeiro; d.slice(0, 7) === mes; d = calc.addDias(d, 1)) h += '<span class="' + (marca[d] || "") + (calc.diaSemana(d) === 1 ? " seg" : "") + '">' + Number(d.slice(8, 10)) + "</span>";
+      h += "</div></div>";
+    }
+    return h + '</div><div class="fe-legenda"><span><i class="meu"></i>seus períodos</span><span><i class="res"></i>reservado na equipe</span><span><i class="blq"></i>bloqueado pela liderança</span>' +
+      '<span><i class="col"></i>semanas coletivas</span><span><i class="antes"></i>antes da primeira data possível</span></div>';
   }
   /** Lê as escolhas do bloco para o estado (trocar de ciclo ou de divisão limpa o que dependia disso) */
   function lerBloco(f, d) {
@@ -444,15 +547,12 @@
     if (!ciclo) return [];
     const itens = [];
     const semanas = F.semanasColetivas(ciclo);
-    if (st.coletiva && !F.coletivaDoCiclo(ctx, pessoa.id, ciclo) && !coletivaSemCampo()) { const s = semanas[Number(st.coletiva) - 1]; itens.push({ tipo: "Férias", coletiva: true, inicio: s.inicio, fim: s.fim }); }
+    if (st.coletiva && F.coletivaAberta(ciclo, ctx.hoje) && !F.coletivaDoCiclo(ctx, pessoa.id, ciclo) && !coletivaSemCampo()) { const s = semanas[Number(st.coletiva) - 1]; itens.push({ tipo: "Férias", coletiva: true, inicio: s.inicio, fim: s.fim }); }
     if (F.liberacao(pessoa, ctx.hoje).aberta) tamanhosDoCiclo(pessoa, ciclo, st).tamanhos.forEach((dias) => { const i = st.inicios[dias]; if (i) itens.push({ tipo: "Férias", coletiva: false, inicio: i, fim: calc.addDias(i, dias - 1) }); });
     return itens;
   }
-  function pessoaDoForm(d) {
-    const pessoa = F.dadosDaPessoa(E().ctx, E().eu.id);
-    if (!pessoa.contrato && d.contrato) pessoa.contrato = d.contrato;
-    return pessoa;
-  }
+  // sem o campo "Seu modelo de contrato" (25/11/2026): o contrato vem só do cadastro em Membros
+  function pessoaDoForm() { return F.dadosDaPessoa(E().ctx, E().eu.id); }
   function ligarFormFerias(el) {
     const f = el.querySelector("#form-ferias");
     const btn = el.querySelector('[data-acao="enviar-pedido-ferias"]');
@@ -491,7 +591,7 @@
       const conf = F.conferirPedido(E().ctx, p, pessoaDoForm(d));
       alvo.innerHTML = '<div class="checagem">' + conf.ok.map((x) => '<div class="ok"><span class="s">✓</span><span>' + esc(x) + "</span></div>").join("") +
         conf.fora.map((x) => '<div class="falta"><span class="s">!</span><span>' + esc(x) + "</span></div>").join("") + "</div>" +
-        (conf.fora.length ? '<div class="aviso-atencao" style="margin-top:8px">O pedido pode seguir com pontos fora da política, com a justificativa. Quem decide é o RH.</div>' : "") +
+        (conf.fora.length ? '<div class="aviso-atencao" style="margin-top:8px">O pedido pode seguir com pontos fora da política, com a justificativa. Quem decide é ' + (F.estagioInicial(p, pessoaDoForm(d)) === "AG_LIDERANCA" ? "a sua liderança direta" : "o RH") + ".</div>" : "") +
         (conf.erros.length ? '<div class="muted" style="margin-top:8px">Falta: ' + esc(conf.erros.join(" ")) + "</div>" : "");
     };
     f.addEventListener("change", atualizar);
@@ -504,7 +604,7 @@
     const lid = pessoa.lideranca ? dom.pessoa(E().ctx, pessoa.lideranca).nome : "";
     ui.abrirPainel({
       titulo: "Pedir férias ou ausência", largo: true,
-      sub: "Escolha o tipo, leia as regras e marque que leu: o formulário aparece em seguida. O pedido vai para o RH" + (lid ? " e depois para a sua liderança (" + esc(lid) + ")" : "") + ".",
+      sub: "Escolha o tipo, leia as regras e marque que leu: o formulário aparece em seguida. " + (lid ? "As férias vão direto para a sua liderança direta (" + esc(lid) + "); o day off passa antes pelo RH." : "Sem liderança direta no Bitrix, o RH decide."),
       corpo: '<div id="form-ferias">' + c.campo({ nome: "tipo", rotulo: "O que você quer pedir?", tipo: "escolha", opcoes: F.TIPOS }) +
         '<div id="regras-ferias"></div>' + camposHtml(pessoa) + "</div>",
       rodape: '<button class="btn" data-acao="enviar-pedido-ferias" disabled>Enviar o pedido</button><button class="btn link" data-acao="fechar-painel">Cancelar</button>',
@@ -524,20 +624,27 @@
     if (modoDo(d, pessoa) === "Férias-politica") { enviarPelaPolitica(el, f, d, pessoa); return; }
     const conf = F.conferirPedido(ctx, p, pessoa);
     if (conf.erros.length) { ui.erroNoPainel(conf.erros.join(" ")); return; }
+    // as férias (aqui, as de CLT e estágio) vão direto para a liderança direta, sem o e-mail; o day off passa antes pelo RH
+    const estagio = F.estagioInicial(p, pessoa);
     const dados = {
-      titulo: p.tipo + " · " + eu.nome, responsavel: eu.id, autor: eu.id, lideranca: pessoa.lideranca || "", estagio: "NEW",
+      titulo: p.tipo + " · " + eu.nome, responsavel: eu.id, autor: eu.id, lideranca: pessoa.lideranca || "", estagio,
       tipo: p.tipo, motivoDayOff: p.motivoDayOff, inicio: p.inicio, fim: p.fim, dias: conf.dias,
       cobertura: p.cobertura.trim(), justificativa: p.justificativa.trim(), foraDaPolitica: conf.fora.join("\n"),
       regrasLidasEm: f.dataset.lidoEm || new Date().toISOString(),
     };
-    const email = F.emailDoPedido(ctx, Object.assign({}, p, { foraDaPolitica: dados.foraDaPolitica }), pessoa, { registrado: true });
-    let recusa = null;
+    const email = p.tipo === "Férias" ? null : F.emailDoPedido(ctx, Object.assign({}, p, { foraDaPolitica: dados.foraDaPolitica }), pessoa, { registrado: true });
+    let recusa = null, prazo = "";
     ui.salvar(el, async () => {
       let novo;
       try { novo = await ui.criar("ferias", dados); } catch (e) { if (semPermissao(e)) { recusa = e; return null; } throw e; }
       const oque = oQue(novo);
-      await GP.app.avisarRH(eu.nome + " pediu " + oque + (conf.fora.length ? ", com pontos fora da política" : "") + ". O RH analisa até " + calc.fmtData(F.prazoRH(ctx, novo)) + " no app Gestão de Pessoas → Férias e ausências.");
-      if (pessoa.lideranca) await GP.app.avisar([pessoa.lideranca], eu.nome + " pediu " + oque + ". O RH analisa primeiro; depois é a sua vez de confirmar.");
+      if (estagio === "AG_LIDERANCA") {
+        prazo = calc.fmtData(F.prazoLideranca(ctx, novo));
+        await GP.app.avisar([pessoa.lideranca], eu.nome + " pediu " + oque + (conf.fora.length ? ", com pontos fora da política" : "") + ". Valide até " + prazo + " no app Gestão de Pessoas → Férias e ausências.");
+      } else {
+        await GP.app.avisarRH(eu.nome + " pediu " + oque + (conf.fora.length ? ", com pontos fora da política" : "") + ". O RH analisa até " + calc.fmtData(F.prazoRH(ctx, novo)) + " no app Gestão de Pessoas → Férias e ausências.");
+        if (pessoa.lideranca) await GP.app.avisar([pessoa.lideranca], eu.nome + " pediu " + oque + ". O RH analisa primeiro; depois é a sua vez de confirmar.");
+      }
       return novo;
     }, { fechar: false, rotuloOcupado: "Enviando..." }).then((novo) => {
       if (recusa) {
@@ -550,7 +657,8 @@
       }
       if (!novo || !novo.id) return;
       ui.fecharPainel(true);
-      abrirEmail(email, { id: novo.id, registrado: true });
+      if (email) abrirEmail(email, { id: novo.id, registrado: true });
+      else ui.avisar(estagio === "AG_LIDERANCA" ? "Pedido enviado à sua liderança direta, que valida até " + prazo + "." : "Pedido enviado ao RH.");
     });
   };
   /** Férias de PJ e associação: a semana coletiva e os períodos escolhidos viram um item cada (cada um é autorizado
@@ -561,7 +669,9 @@
     if (!itens.length) { ui.erroNoPainel("Escolha a semana de férias coletivas ou a data de início de um período."); return; }
     const obs = String(d.observacao || "").trim();
     const regrasLidasEm = f.dataset.lidoEm || new Date().toISOString();
-    let criados = [], recusa = null;
+    // direto para a liderança direta (texto do RH de 25/11/2026); sem ela no Bitrix, o RH decide
+    const estagio = F.estagioInicial({ tipo: "Férias" }, pessoa);
+    let criados = [], recusa = null, prazo = "";
     ui.salvar(el, async () => {
       let reservas = f._st.reservas || [];
       try { reservas = await E().repo.reservasEquipe(); } catch (e) { /* sem o servidor: confere com o que já tinha */ }
@@ -573,14 +683,16 @@
       for (const it of itens) {
         try {
           criados.push(await ui.criar("ferias", {
-            titulo: (it.coletiva ? "Férias coletivas · " : "Férias · ") + eu.nome, responsavel: eu.id, autor: eu.id, lideranca: pessoa.lideranca || "", estagio: "NEW",
+            titulo: (it.coletiva ? "Férias coletivas · " : "Férias · ") + eu.nome, responsavel: eu.id, autor: eu.id, lideranca: pessoa.lideranca || "", estagio,
             tipo: "Férias", coletiva: !!it.coletiva, inicio: it.inicio, fim: it.fim, dias: it.dias, cobertura: "", justificativa: obs, foraDaPolitica: "", regrasLidasEm,
           }));
         } catch (e) { if (semPermissao(e) && !criados.length) { recusa = e; return null; } throw e; }
       }
       const oque = criados.map(oQue).join(" e ");
-      await GP.app.avisarRH(eu.nome + " pediu " + oque + ". O RH autoriza até " + calc.fmtData(F.prazoRH(ctx, criados[0])) + " no app Gestão de Pessoas → Férias e ausências.");
-      if (pessoa.lideranca) await GP.app.avisar([pessoa.lideranca], eu.nome + " pediu " + oque + ". O RH autoriza primeiro; depois é a sua vez de validar.");
+      if (estagio === "AG_LIDERANCA") {
+        prazo = calc.fmtData(F.prazoLideranca(ctx, criados[0]));
+        await GP.app.avisar([pessoa.lideranca], eu.nome + " pediu " + oque + ". Valide até " + prazo + " no app Gestão de Pessoas → Férias e ausências.");
+      } else await GP.app.avisarRH(eu.nome + " pediu " + oque + ". O RH autoriza até " + calc.fmtData(F.prazoRH(ctx, criados[0])) + " no app Gestão de Pessoas → Férias e ausências.");
       return criados;
     }, { fechar: false, rotuloOcupado: "Enviando..." }).then((r) => {
       if (recusa) {
@@ -590,9 +702,9 @@
       }
       // conflito ou erro: o bloco mostra as datas da equipe lidas agora
       if (!r) { const bloco = f.querySelector("#bloco-politica"); if (bloco && document.body.contains(bloco)) bloco.innerHTML = blocoPoliticaHtml(f, pessoa); return; }
+      // sem o e-mail ao RH: tudo pelo app (texto do RH de 25/11/2026)
       ui.fecharPainel(true);
-      const email = F.emailDoPedido(ctx, criados[0], pessoa, { registrado: true, junto: criados.slice(1) });
-      abrirEmail(email, { id: criados.map((x) => x.id).join(","), registrado: true });
+      ui.avisar(estagio === "AG_LIDERANCA" ? "Pedido enviado à sua liderança direta, que valida até " + prazo + "." : "Pedido enviado ao RH (sem liderança direta no Bitrix).");
     });
   }
   let emailPendente = null;
